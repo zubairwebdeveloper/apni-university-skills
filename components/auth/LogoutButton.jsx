@@ -2,47 +2,48 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { signOut } from "firebase/auth";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { FiLoader, FiLogOut } from "react-icons/fi";
 
 import { Button } from "@/components/ui/button";
-import { endServerSession } from "@/lib/firebase/client/auth";
+import { auth, endServerSession } from "@/lib/firebase/client/auth";
 import { cn } from "@/lib/utils";
 
 const swap = { type: "spring", stiffness: 420, damping: 26 };
 
 export function LogoutButton({
   className,
-  variant = "outline", // kept for compatibility, see note below
+  variant = "default",
   compact = false,
 }) {
-  const router = useRouter();
   const reduce = useReducedMotion();
   const [busy, setBusy] = useState(false);
 
   async function logout() {
-    if (busy) return; // ignore double clicks
+    if (busy) return; // double click ignore
     setBusy(true);
-    try {
-      await endServerSession();
-    } finally {
-      router.replace("/login");
-      router.refresh();
-    }
+
+    // 1. Pehle Firebase client logout (warna AuthProvider cookie dobara set kar dega)
+    await signOut(auth).catch(() => {});
+    // 2. Phir server cookie delete
+    await endServerSession();
+    // 3. Full reload: purana client/server state bilkul saaf
+    window.location.assign("/login");
   }
 
   return (
     <Button
       type="button"
-      // NOTE: your original file always used "default" and ignored the `variant` prop.
-      // Behaviour is unchanged. To respect the prop, use: variant={variant}
-      variant="default"
+      variant={variant}
       onClick={logout}
       disabled={busy}
       aria-label="Log out"
       aria-busy={busy}
-      className="w-full"
+      className={cn(
+        "group relative w-full cursor-pointer gap-2 overflow-hidden",
+        className,
+      )}
     >
       {/* Shine sweep on hover */}
       <span
@@ -82,7 +83,7 @@ export function LogoutButton({
         </AnimatePresence>
       </span>
 
-      {/* Label: crossfades between "Log out" and "Logging out…" */}
+      {/* Label: crossfade */}
       <span className={cn("relative inline-flex", compact && "sr-only")}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.span

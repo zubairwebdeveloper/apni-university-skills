@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
@@ -16,7 +15,11 @@ import { FieldGroup } from "@/components/ui/field";
 import { TextField } from "@/components/shared/TextField";
 import { PasswordInput } from "./PasswordInput";
 import { SocialAuth } from "./GoogleButton";
-import { auth, startServerSession } from "@/lib/firebase/client/auth";
+import {
+  auth,
+  startServerSession,
+  endServerSession,
+} from "@/lib/firebase/client/auth";
 import { authErrorMessage } from "@/lib/firebase/client/errors";
 import { loginSchema } from "@/lib/validations/auth";
 import { cn } from "@/lib/utils";
@@ -24,7 +27,13 @@ import { cn } from "@/lib/utils";
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
-
+function safeNext(value) {
+  return typeof value === "string" &&
+    value.startsWith("/") &&
+    !value.startsWith("//")
+    ? value
+    : "/student";
+}
 // Only the email is remembered (never the password), and only if the person opts in.
 const EMAIL_KEY = "apni:last-email";
 
@@ -102,7 +111,6 @@ function Hint({ show, children, tone = "info" }) {
 /* ------------------------------------------------------------------ */
 
 export function LoginForm({ next }) {
-  const router = useRouter();
   const reduce = useReducedMotion();
 
   const [error, setError] = useState("");
@@ -150,8 +158,12 @@ export function LoginForm({ next }) {
     setError("");
     setDone(false);
     try {
-      const cred = await signInWithEmailAndPassword(auth, v.email, v.password);
-      await startServerSession(cred.user);
+      const cred = await signInWithEmailAndPassword(
+        auth,
+        v.email.trim(),
+        v.password,
+      );
+      await startServerSession(cred.user); // cookie set na hui to yahin throw
 
       try {
         if (remember) localStorage.setItem(EMAIL_KEY, v.email.trim());
@@ -161,14 +173,16 @@ export function LoginForm({ next }) {
       }
 
       setDone(true);
-      router.replace(next);
-      router.refresh();
+      // success animation dikhane ke liye thora ruk kar, full reload ke saath
+      await new Promise((r) => setTimeout(r, reduce ? 0 : 700));
+      window.location.assign(safeNext(next));
     } catch (e) {
       setDone(false);
       setFails((n) => n + 1);
       setShake((n) => n + 1);
       setError(authErrorMessage(e));
-      await signOut(auth).catch(() => {}); // keep client and server state consistent
+      await signOut(auth).catch(() => {});
+      await endServerSession(); // cookie bhi saaf, client aur server dono sync
     }
   }
 

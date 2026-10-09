@@ -25,6 +25,7 @@ import {
 } from "react-icons/fi";
 
 import { PERMISSIONS as P } from "@/lib/constants/permissions";
+import { ShieldCheck } from "lucide-react";
 
 // ready: false items render as disabled "Soon" entries
 // until their batch ships, so there are no broken links.
@@ -68,6 +69,7 @@ export const adminNav = [
         permission: P.LESSONS_READ,
         ready: true,
       },
+
       {
         label: "Instructors",
         href: "/admin/instructors/create",
@@ -100,6 +102,13 @@ export const adminNav = [
         href: "/admin/users",
         icon: FiShield,
         permission: P.USERS_READ,
+        ready: true,
+      },
+      {
+        label: "Admin users",
+        href: "/admin/admin-users",
+        icon: ShieldCheck,
+        permission: P.ADMIN_ACCESS,
         ready: true,
       },
     ],

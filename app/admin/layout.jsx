@@ -4,7 +4,9 @@ import { requirePermission } from "@/lib/auth/authorize";
 import { getSessionUser } from "@/lib/auth/session";
 import { PERMISSIONS, permissionsFor } from "@/lib/constants/permissions";
 import { userService } from "@/services/userService";
-
+import { notFound } from "next/navigation";
+import { PERMISSIONS as P } from "@/lib/constants/permissions";
+import { Toaster } from "@/components/ui/sonner";
 export const metadata = {
   title: {
     default: "Admin",
@@ -17,6 +19,8 @@ export const metadata = {
 };
 
 export default async function AdminLayout({ children }) {
+   if (process.env.ADMIN_ENABLED !== "true") notFound();
+   await requirePermission(P.ADMIN_ACCESS);
   // Temporary admin authentication debug
   const dbg = await getSessionUser();
 
@@ -51,6 +55,7 @@ export default async function AdminLayout({ children }) {
       }
     >
       {children}
+      <Toaster richColors position="top-right" />
     </AdminShell>
   );
 }

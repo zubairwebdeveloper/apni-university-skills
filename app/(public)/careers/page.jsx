@@ -6,6 +6,7 @@ import {
   FiBriefcase,
   FiChevronDown,
   FiCompass,
+  FiDollarSign,
   FiLayers,
   FiMap,
   FiSearch,
@@ -78,6 +79,10 @@ const faqs = [
     q: "Can I switch paths later?",
     a: "Yes. Many technology skills overlap, so what you learn for one role usually helps with another.",
   },
+  {
+    q: "What if a role needs a skill I already have?",
+    a: "Skip ahead. Each roadmap is a guide, not a strict order, so you can start from wherever your current skills place you.",
+  },
 ];
 
 export default async function CareersPage() {
@@ -88,7 +93,13 @@ export default async function CareersPage() {
   const careers = JSON.parse(JSON.stringify(raw ?? []));
 
   // Stats derived from the data
+  const categoryCounts = new Map();
+  careers.forEach((c) => {
+    const cat = getCareerCategory(c);
+    if (cat) categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
+  });
   const categorySet = new Set(careers.map(getCareerCategory));
+
   const skillCounts = new Map();
   careers.forEach((c) =>
     getCareerSkills(c).forEach((s) =>
@@ -99,10 +110,19 @@ export default async function CareersPage() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 14);
 
+  const topCategories = [...categoryCounts.entries()].sort(
+    (a, b) => b[1] - a[1],
+  );
+
+  const withSalaryData = careers.filter(
+    (c) => c.salary && (c.salary.min != null || c.salary.max != null),
+  ).length;
+
   const stats = [
     { icon: FiBriefcase, value: careers.length, label: "Career paths" },
     { icon: FiLayers, value: categorySet.size, label: "Categories" },
     { icon: FiTrendingUp, value: skillCounts.size, label: "Skills covered" },
+    { icon: FiDollarSign, value: withSalaryData, label: "With salary data" },
   ];
 
   return (
@@ -117,22 +137,22 @@ export default async function CareersPage() {
         {/* Soft background glows */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
+          className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
         />
 
         {/* Stats */}
         {careers.length > 0 && (
           <Container className="relative pt-10">
-            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <ul className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {stats.map(({ icon: Icon, value, label }, i) => (
                 <li key={label} className="min-w-0">
                   <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group flex h-full items-center gap-4 rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+                    <div className="group flex h-full items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
                       <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
                         <Icon aria-hidden="true" className="size-5" />
                       </span>
                       <div>
-                        <p className="font-serif text-3xl font-semibold leading-none">
+                        <p className="font-serif text-3xl font-semibold leading-none text-foreground">
                           {value}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
@@ -154,18 +174,60 @@ export default async function CareersPage() {
           </Reveal>
         </Container>
 
+        {/* Categories at a glance (new, derived entirely from fetched data) */}
+        {topCategories.length > 0 && (
+          <section
+            aria-labelledby="categories-title"
+            className="border-t border-border py-12 sm:py-16"
+          >
+            <Container>
+              <Reveal className="mx-auto max-w-2xl text-center">
+                <Badge variant="secondary" className="mb-3">
+                  Categories at a glance
+                </Badge>
+                <h2
+                  id="categories-title"
+                  className="text-2xl text-foreground sm:text-3xl"
+                >
+                  Roles grouped by category
+                </h2>
+                <p className="mt-3 text-muted-foreground">
+                  Use the filters above to narrow the list to one of these.
+                </p>
+              </Reveal>
+              <Reveal delay={0.1}>
+                <ul className="mt-8 flex flex-wrap justify-center gap-2.5">
+                  {topCategories.map(([category, count]) => (
+                    <li key={category}>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground">
+                        {category}
+                        <span className="rounded-full bg-primary/10 px-1.5 text-xs text-primary">
+                          {count} {count === 1 ? "path" : "paths"}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Reveal>
+            </Container>
+          </section>
+        )}
+
         {/* Skills in demand */}
         {topSkills.length > 0 && (
           <section
             aria-labelledby="skills-title"
-            className="border-t bg-muted/20 py-12 sm:py-16"
+            className="border-t border-border bg-muted/20 py-12 sm:py-16"
           >
             <Container>
               <Reveal className="mx-auto max-w-2xl text-center">
                 <Badge variant="secondary" className="mb-3">
                   Skills in demand
                 </Badge>
-                <h2 id="skills-title" className="text-2xl sm:text-3xl">
+                <h2
+                  id="skills-title"
+                  className="text-2xl text-foreground sm:text-3xl"
+                >
                   Skills that appear across many roles
                 </h2>
                 <p className="mt-3 text-muted-foreground">
@@ -177,7 +239,7 @@ export default async function CareersPage() {
                 <ul className="mt-8 flex flex-wrap justify-center gap-2.5">
                   {topSkills.map(([skill, count]) => (
                     <li key={skill}>
-                      <span className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0">
                         {skill}
                         <span className="rounded-full bg-primary/10 px-1.5 text-xs text-primary">
                           {count} {count === 1 ? "role" : "roles"}
@@ -194,14 +256,17 @@ export default async function CareersPage() {
         {/* How to use */}
         <section
           aria-labelledby="steps-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t border-border py-12 sm:py-16"
         >
           <Container>
             <Reveal className="mx-auto max-w-2xl text-center">
               <Badge variant="secondary" className="mb-3">
                 How it works
               </Badge>
-              <h2 id="steps-title" className="text-2xl sm:text-3xl">
+              <h2
+                id="steps-title"
+                className="text-2xl text-foreground sm:text-3xl"
+              >
                 From curious to job-ready
               </h2>
               <p className="mt-3 text-muted-foreground">
@@ -212,14 +277,14 @@ export default async function CareersPage() {
               {steps.map(({ icon: Icon, title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group relative h-full rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+                    <div className="group relative h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
                       <span className="absolute right-4 top-3 font-serif text-4xl font-semibold text-primary/10">
                         {i + 1}
                       </span>
                       <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
                         <Icon aria-hidden="true" className="size-5" />
                       </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold">
+                      <h3 className="mt-4 font-sans text-base font-semibold text-foreground">
                         {title}
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -234,10 +299,10 @@ export default async function CareersPage() {
         </section>
 
         {/* Find courses banner */}
-        <section className="border-t bg-muted/20 py-12 sm:py-14">
+        <section className="border-t border-border bg-muted/20 py-12 sm:py-14">
           <Container>
             <Reveal>
-              <div className="relative overflow-hidden rounded-3xl border bg-card p-8 sm:p-10">
+              <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-8 sm:p-10">
                 <span
                   aria-hidden="true"
                   className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
@@ -248,7 +313,7 @@ export default async function CareersPage() {
                       <FiCompass aria-hidden="true" className="size-5" />
                     </span>
                     <div>
-                      <h2 className="text-xl sm:text-2xl">
+                      <h2 className="text-xl text-foreground sm:text-2xl">
                         Ready to learn the skills?
                       </h2>
                       <p className="mt-1 max-w-xl text-sm text-muted-foreground">
@@ -272,19 +337,22 @@ export default async function CareersPage() {
         {/* FAQ */}
         <section
           aria-labelledby="faq-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t border-border py-12 sm:py-16"
         >
           <Container className="max-w-3xl">
             <Reveal className="text-center">
-              <h2 id="faq-title" className="text-2xl sm:text-3xl">
+              <h2
+                id="faq-title"
+                className="text-2xl text-foreground sm:text-3xl"
+              >
                 Career questions
               </h2>
             </Reveal>
             <div className="mt-8 space-y-3">
               {faqs.map(({ q, a }, i) => (
                 <Reveal key={q} delay={i * 0.06}>
-                  <details className="group rounded-xl border bg-card px-4 py-3 open:shadow-md">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
+                  <details className="group rounded-xl border border-border bg-card px-4 py-3 open:shadow-md">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
                       {q}
                       <FiChevronDown
                         aria-hidden="true"

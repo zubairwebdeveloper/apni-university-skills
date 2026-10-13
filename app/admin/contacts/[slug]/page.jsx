@@ -1,17 +1,17 @@
 // app/admin/contacts/[slug]/page.jsx
 import { notFound } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { ContactRecordActions } from "@/components/admin/contacts/ContactRecordActions";
+import { ContactMessageView } from "@/components/admin/contacts/ContactMessageView";
 import { subjectLabel } from "@/components/admin/contacts/ContactsTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { adminSlug } from "@/lib/validations/common";
 import { contactAdminRepository } from "@/repositories/admin/contactAdminRepository";
 import { formatDateTime } from "@/lib/utils/format";
-// ...plus AdminPageHeader, requirePermission, PERMISSIONS, permissionsFor
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { requirePermission } from "@/lib/auth/authorize";
 import { PERMISSIONS as P, permissionsFor } from "@/lib/constants/permissions";
+
 export default async function AdminContactPage({ params }) {
   const user = await requirePermission(P.CONTACTS_READ);
   const parsed = adminSlug.safeParse((await params).slug);
@@ -37,16 +37,13 @@ export default async function AdminContactPage({ params }) {
           </>
         }
       />
-      <Card className="max-w-3xl gap-4 p-6">
-        <p className="whitespace-pre-line text-sm leading-relaxed">
-          {m.message}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Received {formatDateTime(m.createdAt)}. Reference{" "}
-          <span className="font-mono">{m.slug}</span>. After replying from your
-          mail app, mark it as replied from the actions menu.
-        </p>
-      </Card>
+      <ContactMessageView
+        name={m.name}
+        email={m.email}
+        message={m.message}
+        slug={m.slug}
+        receivedAt={formatDateTime(m.createdAt)}
+      />
     </>
   );
 }

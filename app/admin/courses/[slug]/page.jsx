@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { CourseMediaPreview } from "@/components/admin/courses/CourseMediaPreview";
 import { CourseRecordActions } from "@/components/admin/courses/CourseRecordActions";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { requirePermission } from "@/lib/auth/authorize";
@@ -52,6 +53,7 @@ export default async function AdminCoursePage({ params }) {
       ? await courseGuard("publish", c).catch(() => null)
       : null;
   const perms = permissionsFor(user.role);
+  const hasMedia = !!(c.videoId || c.videoThumbnail || c.externalUrl);
 
   return (
     <>
@@ -144,6 +146,18 @@ export default async function AdminCoursePage({ params }) {
               ]}
             />
           </Card>
+          {hasMedia && (
+            <Card className="gap-4 p-5">
+              <h2 className="text-lg">Video and links</h2>
+              <div className="max-w-xl">
+                <CourseMediaPreview
+                  videoUrl={c.videoId}
+                  thumbnailUrl={c.videoThumbnail}
+                  externalUrl={c.externalUrl}
+                />
+              </div>
+            </Card>
+          )}
           <Card className="gap-3 p-5">
             <h2 className="text-lg">Search preview</h2>
             <p className="text-base text-primary">{c.seoTitle || c.title}</p>

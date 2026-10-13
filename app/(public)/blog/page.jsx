@@ -12,7 +12,9 @@ import {
   FiEdit3,
   FiFileText,
   FiHash,
+  FiHeart,
   FiLock,
+  FiRefreshCw,
   FiSearch,
   FiTarget,
   FiTrendingUp,
@@ -88,6 +90,10 @@ const principles = [
     title: "Keep it honest",
     text: "We say what a skill can and cannot do for your career, with no hype.",
   },
+  {
+    title: "Revisit and update",
+    text: "Technology moves fast, so articles get rechecked rather than left to go stale.",
+  },
 ];
 
 const faqs = [
@@ -106,6 +112,10 @@ const faqs = [
   {
     q: "I finished an article. What next?",
     a: "Try a related course to practice the skill, or open a career path to see how it fits into a role.",
+  },
+  {
+    q: "Can I suggest a topic?",
+    a: "Yes. Use the Contact page to send a suggestion and it will be considered for a future article.",
   },
 ];
 
@@ -159,7 +169,7 @@ export default async function BlogPage({ searchParams }) {
           {chips.map(({ icon: Icon, text }) => (
             <li
               key={text}
-              className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3.5 py-1.5 text-sm font-medium backdrop-blur"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3.5 py-1.5 text-sm font-medium text-foreground backdrop-blur"
             >
               <Icon aria-hidden="true" className="size-4 text-primary" />
               {text}
@@ -171,13 +181,13 @@ export default async function BlogPage({ searchParams }) {
       <div className="relative overflow-x-clip">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
+          className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
         />
 
         <Container className="relative py-8 sm:py-10">
           {/* Topics */}
           <Reveal>
-            <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Browse by topic
               </p>
@@ -333,14 +343,17 @@ export default async function BlogPage({ searchParams }) {
         {BLOG_TOPICS.length > 0 && (
           <section
             aria-labelledby="topics-title"
-            className="border-t bg-muted/20 py-12 sm:py-16"
+            className="border-t border-border bg-muted/20 py-12 sm:py-16"
           >
             <Container>
               <Reveal className="mx-auto max-w-2xl text-center">
                 <Badge variant="secondary" className="mb-3">
                   Explore by topic
                 </Badge>
-                <h2 id="topics-title" className="text-2xl sm:text-3xl">
+                <h2
+                  id="topics-title"
+                  className="text-2xl text-foreground sm:text-3xl"
+                >
                   Pick a subject and start reading
                 </h2>
                 <p className="mt-3 text-muted-foreground">
@@ -359,13 +372,13 @@ export default async function BlogPage({ searchParams }) {
                       >
                         <Link
                           href={buildQuery("/blog", { category: topic.slug })}
-                          className="group flex h-full items-center gap-4 rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                          className="group flex h-full items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                         >
                           <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
                             <Icon aria-hidden="true" className="size-5" />
                           </span>
                           <span className="min-w-0">
-                            <span className="block font-sans text-base font-semibold">
+                            <span className="block font-sans text-base font-semibold text-foreground">
                               {topic.label}
                             </span>
                             <span className="block text-sm text-muted-foreground">
@@ -385,14 +398,17 @@ export default async function BlogPage({ searchParams }) {
         {/* Why read */}
         <section
           aria-labelledby="why-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t border-border py-12 sm:py-16"
         >
           <Container>
             <Reveal className="mx-auto max-w-2xl text-center">
               <Badge variant="secondary" className="mb-3">
                 Why read our blog
               </Badge>
-              <h2 id="why-title" className="text-2xl sm:text-3xl">
+              <h2
+                id="why-title"
+                className="text-2xl text-foreground sm:text-3xl"
+              >
                 Learning that fits real life
               </h2>
             </Reveal>
@@ -400,11 +416,11 @@ export default async function BlogPage({ searchParams }) {
               {benefits.map(({ icon: Icon, title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group h-full rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+                    <div className="group h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
                       <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
                         <Icon aria-hidden="true" className="size-5" />
                       </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold">
+                      <h3 className="mt-4 font-sans text-base font-semibold text-foreground">
                         {title}
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -421,26 +437,29 @@ export default async function BlogPage({ searchParams }) {
         {/* How we write */}
         <section
           aria-labelledby="write-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t border-border bg-muted/20 py-12 sm:py-16"
         >
-          <Container className="max-w-4xl">
+          <Container className="max-w-5xl">
             <Reveal className="mx-auto max-w-2xl text-center">
               <Badge variant="secondary" className="mb-3">
                 Our approach
               </Badge>
-              <h2 id="write-title" className="text-2xl sm:text-3xl">
+              <h2
+                id="write-title"
+                className="text-2xl text-foreground sm:text-3xl"
+              >
                 How we write our articles
               </h2>
             </Reveal>
-            <ol className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <ol className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {principles.map(({ title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.1} className="h-full">
-                    <div className="h-full rounded-2xl border bg-card p-5 text-center">
+                    <div className="h-full rounded-2xl border border-border bg-card p-5 text-center">
                       <span className="mx-auto grid size-10 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
                         {i + 1}
                       </span>
-                      <h3 className="mt-3 font-sans text-base font-semibold">
+                      <h3 className="mt-3 font-sans text-base font-semibold text-foreground">
                         {title}
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -454,11 +473,41 @@ export default async function BlogPage({ searchParams }) {
           </Container>
         </section>
 
+        {/* Reader note (new) */}
+        <section className="border-t border-border py-10 sm:py-12">
+          <Container className="max-w-3xl">
+            <Reveal>
+              <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card px-6 py-6 text-center sm:flex-row sm:text-left">
+                <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                  <FiHeart aria-hidden="true" className="size-5" />
+                </span>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    Notice something outdated or unclear?
+                  </span>{" "}
+                  Let us know through the Contact page and we&apos;ll take a
+                  look.
+                </p>
+                <Link
+                  href="/contact"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "shrink-0",
+                  )}
+                >
+                  <FiRefreshCw aria-hidden="true" />
+                  Suggest a fix
+                </Link>
+              </div>
+            </Reveal>
+          </Container>
+        </section>
+
         {/* Learn banner */}
-        <section className="border-t py-12 sm:py-14">
+        <section className="border-t border-border py-12 sm:py-14">
           <Container>
             <Reveal>
-              <div className="relative overflow-hidden rounded-3xl border bg-card p-8 sm:p-10">
+              <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-8 sm:p-10">
                 <span
                   aria-hidden="true"
                   className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
@@ -469,7 +518,7 @@ export default async function BlogPage({ searchParams }) {
                       <FiCompass aria-hidden="true" className="size-5" />
                     </span>
                     <div>
-                      <h2 className="text-xl sm:text-2xl">
+                      <h2 className="text-xl text-foreground sm:text-2xl">
                         Ready to turn reading into skills?
                       </h2>
                       <p className="mt-1 max-w-xl text-sm text-muted-foreground">
@@ -502,19 +551,22 @@ export default async function BlogPage({ searchParams }) {
         {/* FAQ */}
         <section
           aria-labelledby="faq-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t border-border bg-muted/20 py-12 sm:py-16"
         >
           <Container className="max-w-3xl">
             <Reveal className="text-center">
-              <h2 id="faq-title" className="text-2xl sm:text-3xl">
+              <h2
+                id="faq-title"
+                className="text-2xl text-foreground sm:text-3xl"
+              >
                 Blog questions
               </h2>
             </Reveal>
             <div className="mt-8 space-y-3">
               {faqs.map(({ q, a }, i) => (
                 <Reveal key={q} delay={i * 0.06}>
-                  <details className="group rounded-xl border bg-card px-4 py-3 open:shadow-md">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
+                  <details className="group rounded-xl border border-border bg-card px-4 py-3 open:shadow-md">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
                       {q}
                       <FiChevronDown
                         aria-hidden="true"

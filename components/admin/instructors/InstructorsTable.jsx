@@ -1,7 +1,15 @@
 // components/admin/instructors/InstructorsTable.jsx
 "use client";
 import Link from "next/link";
-import { FiEdit2, FiEye, FiStar, FiUsers } from "react-icons/fi";
+import { motion, useReducedMotion } from "framer-motion";
+import {
+  FiBookOpen,
+  FiEdit2,
+  FiEye,
+  FiMail,
+  FiStar,
+  FiUsers,
+} from "react-icons/fi";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -19,17 +27,59 @@ import {
   runInstructorAction,
 } from "@/app/actions/admin/instructors";
 
+function initials(name) {
+  const parts = String(name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  return (
+    parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")
+  ).toUpperCase();
+}
+
+function Stat({ icon: Icon, value, label }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 tabular-nums">
+      <Icon className="size-3.5 text-muted-foreground" aria-hidden="true" />
+      <span>{value}</span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
+function FeaturedStar() {
+  const reduce = useReducedMotion();
+  return (
+    <motion.span
+      className="inline-flex"
+      initial={reduce ? false : { scale: 0.5, rotate: -20 }}
+      animate={{ scale: 1, rotate: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 14 }}
+    >
+      <FiStar
+        className="size-4 fill-current text-highlight"
+        aria-hidden="true"
+      />
+      <span className="sr-only">Featured</span>
+    </motion.span>
+  );
+}
+
 export function InstructorsTable({ rows, perms }) {
   const { selected, setSelected, clear, ids } = useSelection(rows);
   const columns = [
     {
       key: "name",
       header: "Instructor",
+      className: "min-w-52",
       cell: (r) => (
         <div className="flex items-center gap-3">
-          <Avatar className="size-9">
+          <Avatar className="size-10 ring-2 ring-border">
             <AvatarImage src={r.avatar || undefined} alt="" />
-            <AvatarFallback>{r.name?.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+              {initials(r.name)}
+            </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
             <Link
@@ -49,19 +99,36 @@ export function InstructorsTable({ rows, perms }) {
       key: "email",
       header: "Email",
       className: "text-muted-foreground",
-      cell: (r) => r.email || "—",
+      cell: (r) =>
+        r.email ? (
+          <a
+            href={`mailto:${r.email}`}
+            className="inline-flex items-center gap-1.5 hover:text-foreground hover:underline"
+          >
+            <FiMail className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="max-w-48 truncate">{r.email}</span>
+          </a>
+        ) : (
+          "—"
+        ),
     },
     {
       key: "courses",
       header: "Courses",
-      className: "tabular-nums",
-      cell: (r) => r.coursesCount ?? 0,
+      cell: (r) => (
+        <Stat icon={FiBookOpen} value={r.coursesCount ?? 0} label="courses" />
+      ),
     },
     {
       key: "students",
       header: "Students",
-      className: "tabular-nums",
-      cell: (r) => formatCompact(r.studentsCount ?? 0),
+      cell: (r) => (
+        <Stat
+          icon={FiUsers}
+          value={formatCompact(r.studentsCount ?? 0)}
+          label="students"
+        />
+      ),
     },
     {
       key: "status",
@@ -73,13 +140,7 @@ export function InstructorsTable({ rows, perms }) {
       header: "Featured",
       cell: (r) =>
         r.featured ? (
-          <>
-            <FiStar
-              className="size-4 fill-current text-highlight"
-              aria-hidden="true"
-            />
-            <span className="sr-only">Featured</span>
-          </>
+          <FeaturedStar />
         ) : (
           <span className="text-muted-foreground" aria-label="Not featured">
             —
@@ -155,4 +216,3 @@ export function InstructorsTable({ rows, perms }) {
     </>
   );
 }
-

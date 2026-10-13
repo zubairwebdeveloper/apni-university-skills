@@ -31,6 +31,8 @@ export default async function AuthLayout({ children }) {
           tagline={tagline}
           year={new Date().getFullYear()}
           logo={logo}
+          stats={[{ value: 120, suffix: "+", label: "Courses" }]}
+          testimonials={[{ quote: "...", name: "...", role: "..." }]}
         />
 
         {/* Right Side */}

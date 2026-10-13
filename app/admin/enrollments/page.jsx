@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { StatusSummaryCards } from "@/components/admin/StatusSummaryCards";
 import { DataTableToolbar } from "@/components/admin/table/DataTableToolbar";
 import { EnrollmentsTable } from "@/components/admin/enrollments/EnrollmentsTable";
 import { CursorPagination } from "@/components/shared/CursorPagination";
@@ -19,6 +20,20 @@ import { courseAdminRepository } from "@/repositories/admin/courseAdminRepositor
 
 export const metadata = { title: "Enrollments" };
 
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Keeps every other filter / sort / search in the link, swaps only the status.
+function hrefFor(params, status) {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (k === "status" || v == null || v === "") continue;
+    qs.set(k, String(v));
+  }
+  if (status) qs.set("status", status);
+  const s = qs.toString();
+  return `/admin/enrollments${s ? `?${s}` : ""}`;
+}
+
 export default async function AdminEnrollmentsPage({ searchParams }) {
   const user = await requirePermission(P.ENROLLMENTS_READ);
   const p = parseListParams(await searchParams, {
@@ -26,9 +41,11 @@ export default async function AdminEnrollmentsPage({ searchParams }) {
     statuses: ENROLLMENT_STATUSES,
     filters: { course: z.string().regex(/^[a-z0-9-]{1,120}$/) },
   });
-  const filters = [...rangeFilter(p.range, "enrolledAt")];
+  // Range + course only: these also drive the status counts.
+  const baseFilters = [...rangeFilter(p.range, "enrolledAt")];
+  if (p.course) baseFilters.push(["courseSlug", "==", p.course]);
+  const filters = [...baseFilters];
   if (p.status && p.status !== "all") filters.push(["status", "==", p.status]);
-  if (p.course) filters.push(["courseSlug", "==", p.course]);
 
   let problem = null;
   if (p.q) {
@@ -43,7 +60,8 @@ export default async function AdminEnrollmentsPage({ searchParams }) {
         "Search by a student's full email address or an enrollment reference (enr-…).";
   }
 
-  const [listing, courses] = await Promise.all([
+  const statuses = ENROLLMENT_STATUSES.filter((s) => s !== "all");
+  const [listing, courses, ...counts] = await Promise.all([
     problem
       ? { items: [], nextCursor: null, total: 0 }
       : enrollmentAdminRepository.list({
@@ -54,6 +72,12 @@ export default async function AdminEnrollmentsPage({ searchParams }) {
     courseAdminRepository
       .list({ status: "published", limit: 100, sort: "name-asc" })
       .catch(() => ({ items: [] })),
+    ...statuses.map((s) =>
+      enrollmentAdminRepository.list({
+        filters: [...baseFilters, ["status", "==", s]],
+        sort: p.sort,
+      }),
+    ),
   ]);
   const names = await userAdminRepository.namesByIds(
     listing.items.map((i) => i.studentId),
@@ -64,44 +88,55 @@ export default async function AdminEnrollmentsPage({ searchParams }) {
   }));
   const { after, keyword, ...linkParams } = p;
 
+  const summary = statuses.map((s, i) => ({
+    key: s,
+    label: cap(s),
+    count: counts[i].total,
+    href: hrefFor(linkParams, s),
+    active: p.status === s,
+  }));
+
   return (
     <>
       <AdminPageHeader
         title="Enrollments"
         description="Who is enrolled in what. Refunds and payment status are controlled by Stripe."
       />
-      <DataTableToolbar
-        searchPlaceholder="Student email or enr-…"
-        searchHint="Exact student email or an enrollment reference."
-        total={problem ? 0 : listing.total}
-        sorts={sortOptions(ENROLLMENT_SORTS)}
-        filters={[
-          {
-            key: "status",
-            label: "Status",
-            allLabel: "All statuses",
-            options: ENROLLMENT_STATUSES.map((s) => ({
-              value: s,
-              label: s.charAt(0).toUpperCase() + s.slice(1),
-            })),
-          },
-          {
-            key: "course",
-            label: "Course",
-            allLabel: "All courses",
-            options: courses.items.map((c) => ({
-              value: c.slug,
-              label: c.title,
-            })),
-          },
-          {
-            key: "range",
-            label: "Enrolled",
-            allLabel: "Any time",
-            options: RANGE_OPTIONS,
-          },
-        ]}
-      />
+      <StatusSummaryCards items={summary} ariaLabel="Enrollments by status" />
+      <div className="mt-6">
+        <DataTableToolbar
+          searchPlaceholder="Student email or enr-…"
+          searchHint="Exact student email or an enrollment reference."
+          total={problem ? 0 : listing.total}
+          sorts={sortOptions(ENROLLMENT_SORTS)}
+          filters={[
+            {
+              key: "status",
+              label: "Status",
+              allLabel: "All statuses",
+              options: ENROLLMENT_STATUSES.map((s) => ({
+                value: s,
+                label: cap(s),
+              })),
+            },
+            {
+              key: "course",
+              label: "Course",
+              allLabel: "All courses",
+              options: courses.items.map((c) => ({
+                value: c.slug,
+                label: c.title,
+              })),
+            },
+            {
+              key: "range",
+              label: "Enrolled",
+              allLabel: "Any time",
+              options: RANGE_OPTIONS,
+            },
+          ]}
+        />
+      </div>
       {problem && (
         <Alert className="mt-4">
           <AlertDescription>{problem}</AlertDescription>
@@ -119,4 +154,3 @@ export default async function AdminEnrollmentsPage({ searchParams }) {
     </>
   );
 }
-

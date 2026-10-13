@@ -12,14 +12,20 @@ export function Container({ className, children, ...props }) {
 }
 
 export function Section({
-  className,
-  children,
   as: Tag = "section",
+  className,
+  containerClassName,
+  labelledBy,
+  children,
   ...props
 }) {
   return (
-    <Tag className={cn("py-16 sm:py-20 lg:py-24", className)} {...props}>
-      <Container>{children}</Container>
+    <Tag
+      className={cn("py-16 sm:py-20 lg:py-24", className)}
+      aria-labelledby={labelledBy ?? props["aria-labelledby"]}
+      {...props}
+    >
+      <Container className={containerClassName}>{children}</Container>
     </Tag>
   );
 }

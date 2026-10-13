@@ -1,5 +1,6 @@
 // components/admin/jobs/JobsTable.jsx
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FiBriefcase, FiStar } from "react-icons/fi";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,41 @@ import {
   setJobFeatured,
 } from "@/app/actions/admin/jobs";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SOON_DAYS = 7;
+
 export function JobsTable({ rows, perms }) {
+  // "Now" is read after mount so server and client render the same markup
+  const [now, setNow] = useState(null);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setNow(Date.now()), 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  // Expiry cell: the date, plus a flag when it has passed or is close
+  function expiryCell(r) {
+    const date = formatDate(r.expiresAt) || "—";
+    if (!r.expiresAt || now === null) return date;
+    if (r.expiresAt < now)
+      return (
+        <span className="font-medium text-destructive">
+          {date}
+          <span className="ml-1.5 text-xs font-normal">Expired</span>
+        </span>
+      );
+    const days = Math.ceil((r.expiresAt - now) / DAY_MS);
+    if (days <= SOON_DAYS)
+      return (
+        <span className="font-medium text-foreground">
+          {date}
+          <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+            {days}d left
+          </span>
+        </span>
+      );
+    return date;
+  }
+
   const columns = [
     {
       key: "title",
@@ -23,7 +58,7 @@ export function JobsTable({ rows, perms }) {
         <div className="min-w-0">
           <Link
             href={`/admin/jobs/${r.slug}/edit`}
-            className="line-clamp-2 font-medium hover:underline"
+            className="line-clamp-2 font-medium hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {r.title}
           </Link>
@@ -35,16 +70,19 @@ export function JobsTable({ rows, perms }) {
       key: "location",
       header: "Location",
       className: "text-muted-foreground",
-      cell: (r) => (
-        <>
-          {r.location}
-          {r.remote && (
-            <Badge variant="secondary" className="ml-2">
-              Remote
-            </Badge>
-          )}
-        </>
-      ),
+      cell: (r) =>
+        r.location || r.remote ? (
+          <>
+            {r.location}
+            {r.remote && (
+              <Badge variant="secondary" className={r.location ? "ml-2" : ""}>
+                Remote
+              </Badge>
+            )}
+          </>
+        ) : (
+          "—"
+        ),
     },
     {
       key: "type",
@@ -89,7 +127,7 @@ export function JobsTable({ rows, perms }) {
       key: "expires",
       header: "Expires",
       className: "whitespace-nowrap text-muted-foreground",
-      cell: (r) => formatDate(r.expiresAt) || "—",
+      cell: expiryCell,
     },
     {
       key: "updated",
@@ -129,4 +167,3 @@ export function JobsTable({ rows, perms }) {
     />
   );
 }
-

@@ -7,7 +7,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Check, Info, Loader2, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  Info,
+  Loader2,
+  Sparkles,
+  TimerReset,
+} from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -37,6 +44,10 @@ function safeNext(value) {
 // Only the email is remembered (never the password), and only if the person opts in.
 const EMAIL_KEY = "apni:last-email";
 
+// Client-side cool-down after repeated failures (UI nudge only; Firebase enforces the real limits).
+const MAX_FAILS_BEFORE_PAUSE = 5;
+const PAUSE_SECONDS = 30;
+
 // Common typos in email domains
 const TYPOS = {
   "gmial.com": "gmail.com",
@@ -63,15 +74,15 @@ function suggestEmail(value) {
 
 const list = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
+  show: { transition: { staggerChildren: 0.06, delayChildren: 0.08 } },
 };
 
 const item = {
-  hidden: { opacity: 0, y: 14 },
+  hidden: { opacity: 0, y: 10 },
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -85,7 +96,7 @@ function Hint({ show, children, tone = "info" }) {
           initial={reduce ? false : { opacity: 0, height: 0, y: -4 }}
           animate={{ opacity: 1, height: "auto", y: 0 }}
           exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.25 }}
+          transition={{ duration: 0.22 }}
           className="overflow-hidden"
         >
           <p
@@ -93,8 +104,8 @@ function Hint({ show, children, tone = "info" }) {
             className={cn(
               "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-relaxed",
               tone === "warn"
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                : "border-primary/20 bg-primary/5 text-foreground/80",
+                ? "border-amber-600/30 bg-amber-500/10 text-amber-800 dark:border-amber-400/30 dark:text-amber-300"
+                : "border-primary/20 bg-primary/5 text-foreground",
             )}
           >
             <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
@@ -121,6 +132,7 @@ export function LoginForm({ next }) {
   const [shake, setShake] = useState(0);
   const [caps, setCaps] = useState(false);
   const [inPassword, setInPassword] = useState(false);
+  const [pause, setPause] = useState(0); // seconds left in the cool-down
 
   const form = useForm({
     resolver: zodResolver(loginSchema),
@@ -154,7 +166,15 @@ export function LoginForm({ next }) {
     return () => clearTimeout(t);
   }, [setValue, setFocus]);
 
+  // Cool-down countdown
+  useEffect(() => {
+    if (pause <= 0) return;
+    const t = setTimeout(() => setPause((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [pause]);
+
   async function onSubmit(v) {
+    if (pause > 0) return;
     setError("");
     setDone(false);
     try {
@@ -177,14 +197,18 @@ export function LoginForm({ next }) {
       await new Promise((r) => setTimeout(r, reduce ? 0 : 700));
       window.location.assign(safeNext(next));
     } catch (e) {
+      const count = fails + 1;
       setDone(false);
-      setFails((n) => n + 1);
+      setFails(count);
       setShake((n) => n + 1);
       setError(authErrorMessage(e));
+      if (count % MAX_FAILS_BEFORE_PAUSE === 0) setPause(PAUSE_SECONDS);
       await signOut(auth).catch(() => {});
       await endServerSession(); // cookie bhi saaf, client aur server dono sync
     }
   }
+
+  const paused = pause > 0;
 
   return (
     <motion.form
@@ -213,10 +237,10 @@ export function LoginForm({ next }) {
               animate={
                 reduce
                   ? { opacity: 1, y: 0 }
-                  : { opacity: 1, y: 0, x: [0, -8, 8, -6, 6, 0] }
+                  : { opacity: 1, y: 0, x: [0, -6, 6, -4, 4, 0] }
               }
               exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.45 }}
+              transition={{ duration: 0.4 }}
             >
               <Alert variant="destructive" role="alert">
                 <AlertDescription>{error}</AlertDescription>
@@ -230,7 +254,7 @@ export function LoginForm({ next }) {
           Still can&apos;t get in?{" "}
           <Link
             href="/forgot-password"
-            className="cursor-pointer font-medium text-primary underline-offset-4 hover:underline"
+            className="font-medium text-primary underline-offset-4 hover:underline focus-visible:underline"
           >
             Reset your password
           </Link>
@@ -253,8 +277,8 @@ export function LoginForm({ next }) {
               <motion.button
                 type="button"
                 key={emailFix}
-                initial={reduce ? false : { opacity: 0, y: -6, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
+                initial={reduce ? false : { opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2 }}
                 onClick={() =>
@@ -263,7 +287,7 @@ export function LoginForm({ next }) {
                     shouldDirty: true,
                   })
                 }
-                className="group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs text-foreground/80 outline-none transition-colors duration-200 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                className="group inline-flex min-h-8 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs text-foreground outline-none transition-colors duration-200 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
               >
                 <Sparkles aria-hidden="true" className="size-3 text-primary" />
                 Did you mean{" "}
@@ -292,14 +316,14 @@ export function LoginForm({ next }) {
           variants={item}
           className="-mt-1 flex items-center justify-between gap-3 text-sm"
         >
-          <label className="group inline-flex cursor-pointer select-none items-center gap-2 text-foreground/80">
+          <label className="group inline-flex min-h-8 cursor-pointer select-none items-center gap-2 text-foreground">
             <input
               type="checkbox"
               checked={remember}
               onChange={(e) => setRemember(e.target.checked)}
               className="peer sr-only"
             />
-            <span className="grid size-[18px] place-items-center rounded-md border bg-background transition-all duration-200 group-hover:border-primary/60 peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-checked:[&>svg]:scale-100 motion-reduce:transition-none">
+            <span className="grid size-[18px] place-items-center rounded-md border border-input bg-background transition-colors duration-200 group-hover:border-primary/60 peer-checked:border-primary peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background peer-checked:[&>svg]:scale-100 motion-reduce:transition-none">
               <Check
                 aria-hidden="true"
                 className="size-3 scale-0 text-primary-foreground transition-transform duration-200 motion-reduce:transition-none"
@@ -310,63 +334,67 @@ export function LoginForm({ next }) {
 
           <Link
             href="/forgot-password"
-            className="group inline-flex cursor-pointer items-center gap-1 text-primary underline-offset-4 outline-none hover:underline focus-visible:underline"
+            className="group inline-flex min-h-8 items-center gap-1 rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             Forgot password?
             <ArrowRight
               aria-hidden="true"
-              className="size-3.5 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
+              className="size-3.5 -translate-x-1 opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
             />
           </Link>
         </motion.div>
+
+        {/* Cool-down notice after repeated failed attempts */}
+        <Hint show={paused} tone="warn">
+          Too many attempts. Please wait{" "}
+          <span className="tabular-nums">{pause}s</span> before trying again.
+        </Hint>
 
         {/* Submit (shakes when the form is invalid) */}
         <motion.div variants={item}>
           <motion.div
             key={shake}
             animate={
-              shake > 0 && !reduce ? { x: [0, -8, 8, -5, 5, 0] } : undefined
+              shake > 0 && !reduce ? { x: [0, -6, 6, -4, 4, 0] } : undefined
             }
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.35 }}
           >
             <Button
               type="submit"
               size="lg"
-              disabled={submitting || googleBusy}
+              disabled={submitting || googleBusy || paused}
               aria-live="polite"
               className={cn(
-                "group relative w-full cursor-pointer gap-2 overflow-hidden shadow-md shadow-primary/20 transition-all duration-200",
-                "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 active:scale-[0.98]",
-                "disabled:cursor-not-allowed disabled:opacity-90",
-                "motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100",
-                done && "bg-emerald-600 hover:bg-emerald-600",
+                "group w-full gap-2 shadow-sm shadow-primary/25 transition-[background-color,box-shadow,transform] duration-200",
+                "hover:shadow-md hover:shadow-primary/30 active:scale-[0.99]",
+                "disabled:cursor-not-allowed disabled:opacity-70",
+                "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "motion-reduce:transition-none motion-reduce:active:scale-100",
+                done &&
+                  "bg-emerald-700 text-white hover:bg-emerald-700 dark:bg-emerald-600",
               )}
             >
-              {/* Shine sweep */}
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 -left-full w-1/2 skew-x-[-20deg] bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-[320%] group-disabled:hidden motion-reduce:hidden"
-              />
-
               {done ? (
                 <>
-                  <Check aria-hidden="true" className="relative size-4" />
-                  <span className="relative">Success! Redirecting…</span>
+                  <Check aria-hidden="true" className="size-4" />
+                  <span>Success! Redirecting…</span>
                 </>
               ) : submitting ? (
                 <>
-                  <Loader2
-                    aria-hidden="true"
-                    className="relative size-4 animate-spin"
-                  />
-                  <span className="relative">Logging in…</span>
+                  <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                  <span>Logging in…</span>
+                </>
+              ) : paused ? (
+                <>
+                  <TimerReset aria-hidden="true" className="size-4" />
+                  <span className="tabular-nums">Try again in {pause}s</span>
                 </>
               ) : (
                 <>
-                  <span className="relative">Log in</span>
+                  <span>Log in</span>
                   <ArrowRight
                     aria-hidden="true"
-                    className="relative size-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                    className="size-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
                   />
                 </>
               )}
@@ -393,11 +421,11 @@ export function LoginForm({ next }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="absolute inset-0 z-10 grid place-content-center justify-items-center gap-3 rounded-xl bg-card/90 text-center backdrop-blur-sm"
+            className="absolute inset-0 z-10 grid place-content-center justify-items-center gap-3 rounded-xl bg-card/95 text-center"
           >
             <svg
               viewBox="0 0 64 64"
-              className="size-20 text-emerald-500"
+              className="size-20 text-emerald-600 dark:text-emerald-400"
               fill="none"
               stroke="currentColor"
               strokeWidth="4"
@@ -424,12 +452,33 @@ export function LoginForm({ next }) {
               <p className="font-sans text-lg font-semibold text-foreground">
                 Welcome back!
               </p>
-              <p className="mt-0.5 text-sm text-foreground/70">
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 Taking you to your account…
               </p>
             </div>
           </motion.div>
         )}
+
+        {/* Create account */}
+        <motion.div
+          variants={item}
+          className="flex flex-wrap items-center justify-center gap-1 border-t border-border pt-4 text-sm"
+        >
+          <span className="text-muted-foreground">
+            Don&apos;t have an account?
+          </span>
+
+          <Link
+            href="/register"
+            className="group inline-flex min-h-8 items-center gap-1 rounded-sm font-semibold text-primary underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Create account
+            <ArrowRight
+              aria-hidden="true"
+              className="size-3.5 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
+            />
+          </Link>
+        </motion.div>
       </AnimatePresence>
     </motion.form>
   );

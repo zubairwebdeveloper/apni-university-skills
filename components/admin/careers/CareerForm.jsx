@@ -1,9 +1,10 @@
 // components/admin/careers/CareerForm.jsx
 "use client";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiArrowDown, FiArrowUp, FiPlus, FiTrash2 } from "react-icons/fi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +21,8 @@ import { SKILLS } from "@/config/skills";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { careerSchema } from "@/lib/validations/career";
 import { createCareer, updateCareer } from "@/app/actions/admin/careers";
+
+const MAX_STEPS = 10;
 
 const defaults = (c) => ({
   title: c?.title ?? "",
@@ -42,6 +45,19 @@ const defaults = (c) => ({
   seoTitle: c?.seoTitle ?? "",
   seoDescription: c?.seoDescription ?? "",
 });
+
+// Live character count. Turns red only when a hard limit is broken.
+function Count({ value, min, max }) {
+  const n = value?.length ?? 0;
+  const bad = n > 0 && ((min && n < min) || n > max);
+  return (
+    <span
+      className={`ml-1 tabular-nums ${bad ? "font-medium text-destructive" : ""}`}
+    >
+      ({n}/{max})
+    </span>
+  );
+}
 
 export function CareerForm({ record = null, categories }) {
   const router = useRouter();
@@ -70,12 +86,64 @@ export function CareerForm({ record = null, categories }) {
     router.refresh();
   }
 
+  const { isDirty, isSubmitting, isSubmitSuccessful } = form.formState;
+
+  // Warn before closing or reloading the tab with unsaved edits.
+  // (In-app link clicks are not intercepted by the browser event.)
+  useEffect(() => {
+    if (!isDirty || isSubmitting || isSubmitSuccessful) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty, isSubmitting, isSubmitSuccessful]);
+
+  // Ctrl/Cmd+S saves. The ref keeps the listener pointing at the latest handler.
+  const submitRef = useRef(null);
+  submitRef.current = form.handleSubmit(onSubmit);
+  useEffect(() => {
+    const onKey = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        submitRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const summary = form.watch("summary");
+  const seoTitle = form.watch("seoTitle");
+  const seoDescription = form.watch("seoDescription");
+  const salaryMin = form.watch("salaryMin");
+  const salaryMax = form.watch("salaryMax");
+
+  const minNum = Number(salaryMin);
+  const maxNum = Number(salaryMax);
+  const salaryOutOfOrder =
+    salaryMin !== "" &&
+    salaryMax !== "" &&
+    Number.isFinite(minNum) &&
+    Number.isFinite(maxNum) &&
+    minNum > maxNum;
+
   return (
     <form
       onSubmit={form.handleSubmit(onSubmit)}
       noValidate
       className="space-y-6"
     >
+      {isDirty && !isSubmitting && (
+        <p
+          role="status"
+          className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground"
+        >
+          You have unsaved changes. Press Ctrl+S (Cmd+S on Mac) to save.
+        </p>
+      )}
+
       <FormSection title="Basics">
         <TextField
           control={form.control}
@@ -110,7 +178,12 @@ export function CareerForm({ record = null, categories }) {
           label="Summary"
           component={Textarea}
           rows={2}
-          description="20–250 characters. Shown on cards."
+          description={
+            <>
+              20–250 characters. Shown on cards.
+              <Count value={summary} min={20} max={250} />
+            </>
+          }
         />
         <TextField
           control={form.control}
@@ -141,10 +214,19 @@ export function CareerForm({ record = null, categories }) {
 
       <FormSection
         title="Roadmap"
-        description="Ordered steps, shown as a numbered path."
+        description={`Ordered steps, shown as a numbered path. ${steps.fields.length} of ${MAX_STEPS} steps used.`}
       >
         {steps.fields.map((f, i) => (
-          <div key={f.id} className="space-y-3 rounded-lg border p-4">
+          <div key={f.id} className="space-y-3 rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+              >
+                {i + 1}
+              </span>
+              <span aria-hidden="true" className="h-px flex-1 bg-border" />
+            </div>
             <TextField
               control={form.control}
               name={`roadmap.${i}.title`}
@@ -157,7 +239,7 @@ export function CareerForm({ record = null, categories }) {
               component={Textarea}
               rows={2}
             />
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               <Button
                 type="button"
                 variant="ghost"
@@ -165,7 +247,9 @@ export function CareerForm({ record = null, categories }) {
                 disabled={i === 0}
                 onClick={() => steps.move(i, i - 1)}
               >
-                Move step {i + 1} up
+                <FiArrowUp aria-hidden="true" />
+                <span className="sr-only">Move step {i + 1} up</span>
+                <span aria-hidden="true">Up</span>
               </Button>
               <Button
                 type="button"
@@ -174,21 +258,25 @@ export function CareerForm({ record = null, categories }) {
                 disabled={i === steps.fields.length - 1}
                 onClick={() => steps.move(i, i + 1)}
               >
-                Move step {i + 1} down
+                <FiArrowDown aria-hidden="true" />
+                <span className="sr-only">Move step {i + 1} down</span>
+                <span aria-hidden="true">Down</span>
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
+                className="text-destructive hover:text-destructive"
                 onClick={() => steps.remove(i)}
               >
                 <FiTrash2 aria-hidden="true" />
-                Remove step {i + 1}
+                <span className="sr-only">Remove step {i + 1}</span>
+                <span aria-hidden="true">Remove</span>
               </Button>
             </div>
           </div>
         ))}
-        {steps.fields.length < 10 && (
+        {steps.fields.length < MAX_STEPS && (
           <Button
             type="button"
             variant="outline"
@@ -278,6 +366,11 @@ export function CareerForm({ record = null, categories }) {
             options={SUPPORTED_CURRENCIES.map((c) => ({ value: c, label: c }))}
           />
         </div>
+        {salaryOutOfOrder && (
+          <p role="alert" className="text-sm font-medium text-destructive">
+            The minimum is higher than the maximum. Check the two values.
+          </p>
+        )}
         <TextField
           control={form.control}
           name="salaryNote"
@@ -291,7 +384,15 @@ export function CareerForm({ record = null, categories }) {
           control={form.control}
           name="seoTitle"
           label="SEO title"
-          description="Defaults to “{title} career path”."
+          description={
+            <>
+              Defaults to “{"{title}"} career path”. Around 60 characters or
+              fewer displays best in search results.
+              <span className="ml-1 tabular-nums">
+                ({seoTitle?.length ?? 0})
+              </span>
+            </>
+          }
         />
         <TextField
           control={form.control}
@@ -299,7 +400,15 @@ export function CareerForm({ record = null, categories }) {
           label="SEO description"
           component={Textarea}
           rows={2}
-          description="Defaults to the summary."
+          description={
+            <>
+              Defaults to the summary. Around 160 characters or fewer displays
+              best.
+              <span className="ml-1 tabular-nums">
+                ({seoDescription?.length ?? 0})
+              </span>
+            </>
+          }
         />
       </FormSection>
       <FormFooter
@@ -310,4 +419,3 @@ export function CareerForm({ record = null, categories }) {
     </form>
   );
 }
-

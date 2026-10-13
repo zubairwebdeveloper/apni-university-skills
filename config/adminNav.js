@@ -57,7 +57,7 @@ export const adminNav = [
       },
       {
         label: "Categories",
-        href: "/admin/categories/create",
+        href: "/admin/categories",
         icon: FiGrid,
         permission: P.CATEGORIES_READ,
         ready: true,
@@ -72,7 +72,7 @@ export const adminNav = [
 
       {
         label: "Instructors",
-        href: "/admin/instructors/create",
+        href: "/admin/instructors",
         icon: FiUserCheck,
         permission: P.INSTRUCTORS_READ,
         ready: true,
@@ -119,7 +119,7 @@ export const adminNav = [
     items: [
       {
         label: "Blog",
-        href: "/admin/blog/create",
+        href: "/admin/blog",
         icon: FiFileText,
         permission: P.BLOG_READ,
         key: "blog",
@@ -127,7 +127,7 @@ export const adminNav = [
       },
       {
         label: "Careers",
-        href: "/admin/careers/create",
+        href: "/admin/careers",
         icon: FiCompass,
         permission: P.CAREERS_READ,
         key: "careers",

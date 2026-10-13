@@ -3,7 +3,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -294,7 +293,6 @@ function Progress({ done, total }) {
 
 // `next` is where Google sign-up sends the person. Pass it from the page if needed.
 export function RegisterForm({ next = "/student" }) {
-  const router = useRouter();
   const reduce = useReducedMotion();
 
   const [error, setError] = useState("");
@@ -340,27 +338,44 @@ export function RegisterForm({ next = "/student" }) {
   ];
   const doneSteps = steps.filter(Boolean).length;
 
-  async function onSubmit(v) {
-    setError("");
-    setDone(false);
-    try {
-      const { user } = await createUserWithEmailAndPassword(
-        auth,
-        v.email,
-        v.password,
-      );
-      await updateProfile(user, { displayName: v.displayName });
-      await sendEmailVerification(user).catch(() => {}); // the verify page offers a resend
-      await startServerSession(user); // the server creates users/{uid} with role "student"
+  
+async function onSubmit(values) {
+  setError("");
+  setDone(false);
 
-      setDone(true);
-      router.refresh();
-    } catch (e) {
-      setDone(false);
-      setShake((n) => n + 1);
-      setError(authErrorMessage(e));
+  try {
+    const { user } = await createUserWithEmailAndPassword(
+      auth,
+      values.email.trim(),
+      values.password,
+    );
+
+    await updateProfile(user, { displayName: values.displayName.trim() });
+
+    try {
+      await sendEmailVerification(user);
+    } catch (verificationError) {
+      console.error("Failed to send verification email:", verificationError);
     }
+
+    // Naya token lo, taake updateProfile ke baad ka token cookie mein jaye
+    await user.getIdToken(true);
+
+    // Agar yeh fail ho to catch mein jayega, aur "Account created" nahi dikhega
+    await startServerSession(user);
+
+    setDone(true);
+
+    // Hard navigation: cookie ke saath fresh request
+    window.location.assign(next);
+  } catch (error) {
+    console.error("Register failed:", error);
+    setDone(false);
+    setShake((value) => value + 1);
+    setError(authErrorMessage(error));
   }
+}
+
 
   return (
     <motion.form

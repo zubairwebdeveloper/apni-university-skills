@@ -253,6 +253,22 @@ function useCountUp(value, reduce) {
 /* Small pieces                                                        */
 /* ------------------------------------------------------------------ */
 
+// Gives a small checkbox a finger-sized (40px) tap area without changing
+// how it looks. Clicking the padding toggles the checkbox.
+function TapTarget({ children, disabled, className }) {
+  return (
+    <label
+      className={cn(
+        "-m-3 flex size-10 items-center justify-center",
+        disabled ? "cursor-not-allowed" : "cursor-pointer",
+        className,
+      )}
+    >
+      {children}
+    </label>
+  );
+}
+
 function RoleBadge({ role }) {
   const m = roleMeta(role);
   const Icon = m.icon;
@@ -301,15 +317,16 @@ function StatCard({ label, value, icon: Icon, tone, delay, active, onClick }) {
       initial={reduce ? false : { opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: [0.22, 1, 0.36, 1] }}
-      className="text-left outline-none"
+      className="min-w-0 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <Card
         className={cn(
-          "gap-0 py-0 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+          "h-full gap-0 py-0 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
           active && "border-primary ring-1 ring-primary/40",
         )}
       >
-        <CardContent className="flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
+        {/* Stacked on very narrow phones, side by side from ~420px */}
+        <CardContent className="flex flex-col items-start gap-2.5 p-3 min-[420px]:flex-row min-[420px]:items-center min-[420px]:gap-3 sm:gap-4 sm:p-4">
           <div
             className={cn(
               "flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11",
@@ -318,7 +335,7 @@ function StatCard({ label, value, icon: Icon, tone, delay, active, onClick }) {
           >
             <Icon aria-hidden="true" className="size-5" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-full">
             <p className="text-xl font-semibold tabular-nums leading-none tracking-tight sm:text-2xl">
               {shown}
             </p>
@@ -352,7 +369,7 @@ function LoadingState() {
 
 function EmptyState({ filtered, onClear }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-4 py-14 text-center sm:py-16">
+    <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center sm:py-16">
       <div className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
         {filtered ? (
           <Search className="size-6" />
@@ -389,17 +406,22 @@ function EmptyState({ filtered, onClear }) {
 function RowMenu({ admin, canDelete, blockedReason, onCopy, onDelete }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger >
         <Button
           variant="ghost"
           size="icon"
+          className="size-10 shrink-0 md:size-9"
           aria-label={`Options for ${admin.name || admin.id}`}
         >
           <MoreHorizontal className="size-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuItem asChild>
+      <DropdownMenuContent
+        align="end"
+        collisionPadding={12}
+        className="w-52 max-w-[calc(100vw-1.5rem)]"
+      >
+        <DropdownMenuItem >
           <Link
             href={`/admin/admin-users/${encodeURIComponent(admin.id)}/edit`}
           >
@@ -409,7 +431,7 @@ function RowMenu({ admin, canDelete, blockedReason, onCopy, onDelete }) {
         <DropdownMenuItem onClick={() => onCopy(admin.id)}>
           <Copy className="mr-2 size-4" /> Copy email
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem >
           <a href={`mailto:${admin.id}`}>
             <Mail className="mr-2 size-4" /> Send email
           </a>
@@ -626,7 +648,7 @@ export function AdminUsersTable() {
         <AlertCircle className="size-4" />
         <AlertTitle>Couldn&apos;t load admins</AlertTitle>
         <AlertDescription className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <span>{error}</span>
+          <span className="min-w-0 break-words">{error}</span>
           <Button size="sm" variant="outline" onClick={() => load()}>
             <RefreshCw className="mr-1.5 size-4" /> Try again
           </Button>
@@ -640,7 +662,7 @@ export function AdminUsersTable() {
   /* ---------- render ---------- */
 
   return (
-    <div className="space-y-5 pb-24 sm:space-y-6">
+    <div className="min-w-0 space-y-5 pb-28 sm:space-y-6 sm:pb-24">
       {/* Stats (click to filter) */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -683,7 +705,7 @@ export function AdminUsersTable() {
 
       {/* Toolbar */}
       <div className="space-y-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <div className="relative flex-1">
             <Search
               aria-hidden="true"
@@ -705,18 +727,18 @@ export function AdminUsersTable() {
                 type="button"
                 onClick={() => setQuery("")}
                 aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground transition-colors hover:text-foreground"
               >
                 <X className="size-4" />
               </button>
             ) : (
-              <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground sm:block">
+              <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground md:block">
                 /
               </kbd>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+          <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
             <Select
               value={roleFilter}
               onValueChange={(v) => {
@@ -725,7 +747,7 @@ export function AdminUsersTable() {
               }}
             >
               <SelectTrigger
-                className="w-full sm:w-[140px]"
+                className="w-full md:w-[140px]"
                 aria-label="Filter by role"
               >
                 <SelectValue />
@@ -740,7 +762,7 @@ export function AdminUsersTable() {
 
             <Select value={sort} onValueChange={setSort}>
               <SelectTrigger
-                className="w-full sm:w-[150px]"
+                className="w-full md:w-[150px]"
                 aria-label="Sort admins"
               >
                 <SelectValue />
@@ -756,7 +778,7 @@ export function AdminUsersTable() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground" aria-live="polite">
             <span className="font-medium text-foreground">
               {filtered.length}
@@ -767,16 +789,16 @@ export function AdminUsersTable() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="ml-2 font-medium text-primary underline-offset-4 hover:underline"
+                className="ml-2 py-1 font-medium text-primary underline-offset-4 hover:underline"
               >
                 Clear filters
               </button>
             ) : null}
           </p>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
             {syncedAt ? (
-              <span className="hidden items-center gap-1 text-xs text-muted-foreground md:inline-flex">
+              <span className="hidden items-center gap-1 text-xs text-muted-foreground lg:inline-flex">
                 <Clock aria-hidden="true" className="size-3" />
                 Synced{" "}
                 {new Intl.DateTimeFormat("en-GB", {
@@ -819,11 +841,10 @@ export function AdminUsersTable() {
               size="sm"
               onClick={() => exportCsv(filtered)}
               disabled={!filtered.length}
-              className="gap-1.5"
+              className="h-10 flex-1 gap-1.5 sm:h-8 sm:flex-none"
             >
               <Download aria-hidden="true" className="size-4" />
-              <span className="hidden sm:inline">Export CSV</span>
-              <span className="sm:hidden">CSV</span>
+              Export CSV
             </Button>
 
             <Button
@@ -832,6 +853,7 @@ export function AdminUsersTable() {
               onClick={() => load({ soft: true })}
               disabled={refreshing}
               aria-label="Refresh list"
+              className="size-10 shrink-0 sm:size-8"
             >
               <RefreshCw
                 className={cn("size-4", refreshing && "animate-spin")}
@@ -842,29 +864,31 @@ export function AdminUsersTable() {
       </div>
 
       {/* Content */}
-      <Card className="gap-0 overflow-hidden py-0">
+      <Card className="min-w-0 gap-0 overflow-hidden py-0">
         {pageItems.length === 0 ? (
           <EmptyState filtered={hasFilters} onClear={clearFilters} />
         ) : (
           <>
-            {/* Table: md and up */}
+            {/* Table: md and up (scrolls sideways inside the card if needed) */}
             <div className={cn(showTable ? "hidden md:block" : "hidden")}>
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="w-10 pl-4">
-                      <Checkbox
-                        aria-label="Select all on this page"
-                        checked={
-                          allPageSelected
-                            ? true
-                            : somePageSelected
-                              ? "indeterminate"
-                              : false
-                        }
-                        onCheckedChange={(v) => togglePage(v === true)}
-                        disabled={selectablePage.length === 0}
-                      />
+                      <TapTarget disabled={selectablePage.length === 0}>
+                        <Checkbox
+                          aria-label="Select all on this page"
+                          checked={
+                            allPageSelected
+                              ? true
+                              : somePageSelected
+                                ? "indeterminate"
+                                : false
+                          }
+                          onCheckedChange={(v) => togglePage(v === true)}
+                          disabled={selectablePage.length === 0}
+                        />
+                      </TapTarget>
                     </TableHead>
                     <TableHead className="text-xs font-semibold uppercase tracking-wide">
                       Admin
@@ -895,15 +919,25 @@ export function AdminUsersTable() {
                         className="animate-in fade-in slide-in-from-bottom-1 duration-500 motion-reduce:animate-none"
                       >
                         <TableCell className="pl-4">
-                          <Checkbox
-                            aria-label={`Select ${a.name || a.id}`}
-                            checked={selected.has(a.id)}
-                            disabled={!del.ok}
-                            onCheckedChange={(v) => toggleOne(a.id, v === true)}
-                          />
+                          <TapTarget disabled={!del.ok}>
+                            <Checkbox
+                              aria-label={`Select ${a.name || a.id}`}
+                              checked={selected.has(a.id)}
+                              disabled={!del.ok}
+                              onCheckedChange={(v) =>
+                                toggleOne(a.id, v === true)
+                              }
+                            />
+                          </TapTarget>
                         </TableCell>
-                        <TableCell className="py-3">
+                        <TableCell className="max-w-[12rem] py-3 md:max-w-[16rem] lg:max-w-[22rem]">
                           <PersonCell admin={a} isMe={isMe} />
+                          {/* "Added" moves under the person on tablets, where its column is hidden */}
+                          {a.createdAt ? (
+                            <p className="mt-1 truncate pl-[3.25rem] text-xs text-muted-foreground lg:hidden">
+                              Added {timeAgo(a.createdAt)}
+                            </p>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           <RoleBadge role={a.role} />
@@ -912,7 +946,7 @@ export function AdminUsersTable() {
                           <p className="text-foreground/80">
                             {formatDate(a.createdAt)}
                           </p>
-                          <p className="truncate text-xs">
+                          <p className="max-w-[16rem] truncate text-xs">
                             {timeAgo(a.createdAt)}
                             {a.createdBy ? ` · by ${a.createdBy}` : ""}
                           </p>
@@ -938,7 +972,7 @@ export function AdminUsersTable() {
             {/* Cards: phones always, desktop when chosen */}
             <div
               className={cn(
-                "grid gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3",
+                "grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3",
                 showTable && "md:hidden",
               )}
             >
@@ -953,7 +987,7 @@ export function AdminUsersTable() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.35, delay: i * 0.04 }}
                     className={cn(
-                      "group relative overflow-hidden rounded-xl border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+                      "group relative min-w-0 overflow-hidden rounded-xl border bg-card p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-4",
                       isSel && "border-primary ring-1 ring-primary/40",
                     )}
                   >
@@ -962,13 +996,16 @@ export function AdminUsersTable() {
                       className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/60 via-primary/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
                     />
                     <div className="flex items-start gap-3">
-                      <Checkbox
-                        aria-label={`Select ${a.name || a.id}`}
-                        checked={isSel}
-                        disabled={!del.ok}
-                        onCheckedChange={(v) => toggleOne(a.id, v === true)}
-                        className="mt-1"
-                      />
+                      <div className="mt-1 shrink-0">
+                        <TapTarget disabled={!del.ok}>
+                          <Checkbox
+                            aria-label={`Select ${a.name || a.id}`}
+                            checked={isSel}
+                            disabled={!del.ok}
+                            onCheckedChange={(v) => toggleOne(a.id, v === true)}
+                          />
+                        </TapTarget>
+                      </div>
                       <div className="min-w-0 flex-1">
                         <PersonCell admin={a} isMe={isMe} size="size-11" />
                       </div>
@@ -998,7 +1035,7 @@ export function AdminUsersTable() {
         {/* Pagination */}
         {filtered.length > 0 ? (
           <div className="flex flex-col gap-3 border-t bg-muted/30 px-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-4">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-muted-foreground sm:justify-start">
               <p>
                 Showing{" "}
                 <span className="font-medium text-foreground">
@@ -1020,7 +1057,7 @@ export function AdminUsersTable() {
                 >
                   <SelectTrigger
                     size="sm"
-                    className="h-8 w-[72px]"
+                    className="h-9 w-[72px] sm:h-8"
                     aria-label="Rows per page"
                   >
                     <SelectValue />
@@ -1037,11 +1074,11 @@ export function AdminUsersTable() {
             </div>
 
             {totalPages > 1 ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between gap-1.5 sm:justify-end">
                 <Button
                   variant="outline"
                   size="icon"
-                  className="size-8"
+                  className="size-10 sm:size-8"
                   disabled={safePage <= 1}
                   onClick={() => setPage(safePage - 1)}
                   aria-label="Previous page"
@@ -1069,13 +1106,13 @@ export function AdminUsersTable() {
                     ),
                   )}
                 </div>
-                <span className="px-2 text-xs text-muted-foreground sm:hidden">
-                  {safePage} / {totalPages}
+                <span className="px-2 text-xs tabular-nums text-muted-foreground sm:hidden">
+                  Page {safePage} of {totalPages}
                 </span>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="size-8"
+                  className="size-10 sm:size-8"
                   disabled={safePage >= totalPages}
                   onClick={() => setPage(safePage + 1)}
                   aria-label="Next page"
@@ -1101,7 +1138,7 @@ export function AdminUsersTable() {
             What each role can do in the dashboard.
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {ROLE_GUIDE.map((r, i) => {
             const m = roleMeta(r.role);
             const Icon = m.icon;
@@ -1112,29 +1149,33 @@ export function AdminUsersTable() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.35, delay: i * 0.06 }}
-                className="rounded-xl border bg-card p-4"
+                className="flex items-start gap-3 rounded-xl border bg-card p-4 md:block"
               >
                 <span
                   className={cn(
-                    "mb-3 flex size-9 items-center justify-center rounded-lg border",
+                    "flex size-9 shrink-0 items-center justify-center rounded-lg border md:mb-3",
                     m.badge,
                   )}
                 >
                   <Icon aria-hidden="true" className="size-4" />
                 </span>
-                <h3 className="text-sm font-semibold tracking-tight">
-                  {r.title}
-                </h3>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  {r.text}
-                </p>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold tracking-tight">
+                    {r.title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {r.text}
+                  </p>
+                </div>
               </motion.div>
             );
           })}
         </div>
       </section>
 
-      {/* Floating bulk action bar */}
+      {/* Floating bulk action bar.
+          Phones/tablets: leaves room on the right for the scroll-to-top button
+          and respects the iOS home-indicator safe area. */}
       <AnimatePresence>
         {selected.size > 0 && (
           <motion.div
@@ -1142,7 +1183,7 @@ export function AdminUsersTable() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-xl flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card/95 p-3 shadow-xl backdrop-blur sm:bottom-6"
+            className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 right-[4.75rem] z-40 mx-auto flex max-w-xl flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card/95 p-3 shadow-xl backdrop-blur sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] md:right-3"
             role="region"
             aria-label="Bulk actions"
           >
@@ -1182,7 +1223,7 @@ export function AdminUsersTable() {
         open={pending.length > 0}
         onOpenChange={(open) => !open && !deleting && setPending([])}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <AlertDialogHeader>
             <div className="mb-1 flex size-11 items-center justify-center rounded-full bg-destructive/10 text-destructive">
               <Trash2 aria-hidden="true" className="size-5" />
@@ -1192,7 +1233,7 @@ export function AdminUsersTable() {
                 ? `Delete ${pending.length} admins?`
                 : "Delete this admin?"}
             </AlertDialogTitle>
-            <AlertDialogDescription className="leading-6">
+            <AlertDialogDescription className="break-words leading-6">
               {pending.length === 1 ? (
                 <>
                   <strong className="text-foreground">

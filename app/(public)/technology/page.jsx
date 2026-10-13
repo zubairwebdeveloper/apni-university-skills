@@ -23,6 +23,10 @@ import { CTASection } from "@/components/public/CTASection";
 import { Reveal } from "@/components/public/PricingMotion";
 import { TechnologyExplorer } from "@/components/public/TechnologyExplorer";
 import { getTechCategory } from "@/components/public/technologyUtils";
+import { AreasMap } from "@/components/public/AreasMap";
+import { Tilt } from "@/components/public/Reveal";
+import { SectionNav } from "@/components/public/SectionNav";
+import { TechScene } from "@/components/public/TechScene";
 import { technologyService } from "@/services/technologyService";
 
 export const revalidate = 300;
@@ -34,10 +38,22 @@ export const metadata = {
   alternates: { canonical: "/technology" },
 };
 
+const h2Class =
+  "text-balance text-[clamp(1.5rem,3vw,2.25rem)] font-semibold leading-tight tracking-tight";
+
 const chips = [
   { icon: FiHelpCircle, text: "What it is" },
   { icon: FiTarget, text: "Why it matters" },
   { icon: FiBriefcase, text: "Roles it leads to" },
+];
+
+const navItems = [
+  { id: "explorer", label: "Explore" },
+  { id: "areas", label: "Fields overview" },
+  { id: "how", label: "How it works" },
+  { id: "why", label: "Why it matters" },
+  { id: "path", label: "Learning path" },
+  { id: "faq", label: "FAQ" },
 ];
 
 const howTo = [
@@ -120,6 +136,17 @@ const faqs = [
   },
 ];
 
+// FAQPage structured data built from the same visible questions.
+const faqJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map(({ q, a }) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a },
+  })),
+}).replace(/</g, "\\u003c");
+
 export default async function TechnologyPage() {
   const raw = await technologyService.getAllTechnologies();
 
@@ -139,6 +166,12 @@ export default async function TechnologyPage() {
 
   return (
     <>
+      <style>{`html{scroll-padding-top:8rem}@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}`}</style>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: faqJsonLd }}
+      />
+
       <PageHeader
         title="Understand the technology"
         description="What each technology is, why it matters, the skills it needs, and the roles it leads to."
@@ -156,6 +189,8 @@ export default async function TechnologyPage() {
           ))}
         </ul>
       </PageHeader>
+
+      <SectionNav items={navItems} />
 
       <div className="relative overflow-x-clip">
         <div
@@ -192,7 +227,7 @@ export default async function TechnologyPage() {
           </ul>
         </Container>
 
-        {/* Featured AI hub */}
+        {/* Featured AI hub, with the single 3D scene of this page */}
         <Container className="relative pt-8">
           <Reveal>
             <Link
@@ -207,7 +242,7 @@ export default async function TechnologyPage() {
                 aria-hidden="true"
                 className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/15 blur-3xl transition-transform duration-700 group-hover:scale-125 motion-reduce:transition-none"
               />
-              <div className="relative flex flex-col items-start gap-5 md:flex-row md:items-center md:justify-between">
+              <div className="relative grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_18rem]">
                 <div className="flex items-start gap-4">
                   <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground transition-transform duration-300 group-hover:rotate-6 motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
                     <FiCpu aria-hidden="true" className="size-6" />
@@ -221,29 +256,63 @@ export default async function TechnologyPage() {
                       Generative AI, agents, automation, and machine learning,
                       in one dedicated hub.
                     </p>
+                    <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                      Explore the AI hub
+                      <FiArrowRight
+                        aria-hidden="true"
+                        className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
+                      />
+                    </span>
                   </div>
                 </div>
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
-                  Explore the AI hub
-                  <FiArrowRight
-                    aria-hidden="true"
-                    className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
+                <div className="relative h-44 md:h-52">
+                  <TechScene
+                    nodeCount={Math.max(categorySet.size, 6)}
+                    scrollLinked={false}
+                    className="absolute inset-0"
                   />
-                </span>
+                </div>
               </div>
             </Link>
           </Reveal>
         </Container>
 
         {/* Explorer */}
+        <span id="explorer" className="block" />
         <Container className="relative py-10">
           <Reveal>
             <TechnologyExplorer items={items} />
           </Reveal>
         </Container>
 
+        {/* Fields overview with maturity filter */}
+        <section
+          id="areas"
+          aria-labelledby="areas-title"
+          className="border-t py-12 sm:py-16"
+        >
+          <Container>
+            <Reveal className="mx-auto max-w-2xl text-center">
+              <Badge variant="secondary" className="mb-3">
+                Fields overview
+              </Badge>
+              <h2 id="areas-title" className={h2Class}>
+                What is established and what is still developing
+              </h2>
+              <p className="mt-3 text-muted-foreground">
+                See what you could build in each field and what to know first.
+                Newer fields change fast, so we label them honestly.
+              </p>
+            </Reveal>
+            <div className="mt-8">
+              <AreasMap />
+            </div>
+          </Container>
+        </section>
+
         {/* How to use */}
         <section
+          id="how"
           aria-labelledby="how-title"
           className="border-t bg-muted/20 py-12 sm:py-16"
         >
@@ -252,7 +321,7 @@ export default async function TechnologyPage() {
               <Badge variant="secondary" className="mb-3">
                 How to use this page
               </Badge>
-              <h2 id="how-title" className="text-2xl sm:text-3xl">
+              <h2 id="how-title" className={h2Class}>
                 From curious to confident
               </h2>
             </Reveal>
@@ -283,6 +352,7 @@ export default async function TechnologyPage() {
 
         {/* Why it matters */}
         <section
+          id="why"
           aria-labelledby="why-title"
           className="border-t py-12 sm:py-16"
         >
@@ -291,7 +361,7 @@ export default async function TechnologyPage() {
               <Badge variant="secondary" className="mb-3">
                 Why it matters
               </Badge>
-              <h2 id="why-title" className="text-2xl sm:text-3xl">
+              <h2 id="why-title" className={h2Class}>
                 Why technology knowledge pays off
               </h2>
             </Reveal>
@@ -319,6 +389,7 @@ export default async function TechnologyPage() {
 
         {/* Learning path */}
         <section
+          id="path"
           aria-labelledby="path-title"
           className="border-t bg-muted/20 py-12 sm:py-16"
         >
@@ -327,7 +398,7 @@ export default async function TechnologyPage() {
               <Badge variant="secondary" className="mb-3">
                 Your learning path
               </Badge>
-              <h2 id="path-title" className="text-2xl sm:text-3xl">
+              <h2 id="path-title" className={h2Class}>
                 Three steps from guide to job-ready
               </h2>
             </Reveal>
@@ -339,17 +410,19 @@ export default async function TechnologyPage() {
               {path.map(({ title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.1} className="h-full">
-                    <div className="relative h-full rounded-2xl border bg-card p-5 text-center">
-                      <span className="mx-auto grid size-12 place-items-center rounded-full bg-primary font-serif text-lg font-semibold text-primary-foreground">
-                        {i + 1}
-                      </span>
-                      <h3 className="mt-3 font-sans text-base font-semibold">
-                        {title}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {text}
-                      </p>
-                    </div>
+                    <Tilt className="h-full" max={4}>
+                      <div className="relative h-full rounded-2xl border bg-card p-5 text-center">
+                        <span className="mx-auto grid size-12 place-items-center rounded-full bg-primary font-serif text-lg font-semibold text-primary-foreground">
+                          {i + 1}
+                        </span>
+                        <h3 className="mt-3 font-sans text-base font-semibold">
+                          {title}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {text}
+                        </p>
+                      </div>
+                    </Tilt>
                   </Reveal>
                 </li>
               ))}
@@ -404,12 +477,13 @@ export default async function TechnologyPage() {
 
         {/* FAQ */}
         <section
+          id="faq"
           aria-labelledby="faq-title"
           className="border-t bg-muted/20 py-12 sm:py-16"
         >
           <Container className="max-w-3xl">
             <Reveal className="text-center">
-              <h2 id="faq-title" className="text-2xl sm:text-3xl">
+              <h2 id="faq-title" className={h2Class}>
                 Technology questions
               </h2>
             </Reveal>

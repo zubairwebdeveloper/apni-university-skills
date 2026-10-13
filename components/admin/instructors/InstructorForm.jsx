@@ -1,7 +1,7 @@
 // components/admin/instructors/InstructorForm.jsx
 "use client";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +14,7 @@ import {
   applyActionError,
 } from "@/components/admin/forms/fields";
 import { ImageField } from "@/components/admin/forms/ImageField";
+import { InstructorPreview } from "@/components/admin/instructors/InstructorPreview";
 import { instructorSchema } from "@/lib/validations/instructor";
 import {
   createInstructor,
@@ -51,6 +52,7 @@ export function InstructorForm({ record = null }) {
     resolver: zodResolver(instructorSchema),
     defaultValues: defaults(record),
   });
+  const watched = useWatch({ control: form.control });
 
   async function onSubmit(values) {
     const res = edit
@@ -76,6 +78,7 @@ export function InstructorForm({ record = null }) {
       noValidate
       className="space-y-6"
     >
+      <InstructorPreview values={watched} />
       <FormSection title="Profile">
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField
@@ -187,4 +190,3 @@ export function InstructorForm({ record = null }) {
     </form>
   );
 }
-

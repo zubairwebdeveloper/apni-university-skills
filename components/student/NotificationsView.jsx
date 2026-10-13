@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  AnimatePresence,
+  MotionConfig,
   animate,
   motion,
   useMotionValue,
+  useReducedMotion,
+  useSpring,
   useTransform,
 } from "framer-motion";
 import {
@@ -26,7 +28,6 @@ import {
   Megaphone,
   MailOpen,
   Search,
-  Sparkles,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -61,8 +62,14 @@ const getKind = (n) => {
 
 const KIND_META = {
   announcement: { icon: Megaphone, tone: "bg-primary/10 text-primary" },
-  course: { icon: BookOpen, tone: "bg-orange-500/10 text-orange-500" },
-  certificate: { icon: Award, tone: "bg-green-500/10 text-green-600" },
+  course: {
+    icon: BookOpen,
+    tone: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  },
+  certificate: {
+    icon: Award,
+    tone: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  },
 };
 
 // `now` comes from the server so server and client render identical text
@@ -117,32 +124,72 @@ function AnimatedNumber({ value }) {
   return <motion.span>{rounded}</motion.span>;
 }
 
+// 3D hero scene: tilted orbit rings that follow the pointer.
+// Text stays flat (outside the 3D layer) so it is always readable.
 function BellBadge({ unread }) {
+  const reduce = useReducedMotion();
+  const rx = useMotionValue(0);
+  const ry = useMotionValue(0);
+  const sx = useSpring(rx, { stiffness: 110, damping: 14 });
+  const sy = useSpring(ry, { stiffness: 110, damping: 14 });
+
+  const onMove = (e) => {
+    if (reduce) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    ry.set(((e.clientX - r.left) / r.width - 0.5) * 26);
+    rx.set(-((e.clientY - r.top) / r.height - 0.5) * 26);
+  };
+  const onLeave = () => {
+    rx.set(0);
+    ry.set(0);
+  };
+
+  const rings = [
+    { size: "100%", z: -36, dur: 34, tone: "border-primary/25" },
+    { size: "78%", z: 0, dur: 24, tone: "border-primary/40" },
+    { size: "56%", z: 36, dur: 16, tone: "border-primary/60" },
+  ];
+
   return (
-    <div className="relative flex size-36 shrink-0 items-center justify-center sm:size-44">
+    <div
+      onPointerMove={onMove}
+      onPointerLeave={onLeave}
+      className="relative size-44 shrink-0 sm:size-56"
+      style={{ perspective: 800 }}
+    >
       <motion.div
         aria-hidden
-        animate={{ rotate: 360 }}
-        transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-0 rounded-full border-2 border-dashed border-primary/30"
-      />
-      <div className="absolute inset-4 rounded-full bg-gradient-to-br from-primary/25 to-primary/5" />
+        className="absolute inset-0"
+        style={{ rotateX: sx, rotateY: sy, transformStyle: "preserve-3d" }}
+      >
+        {rings.map((r, i) => (
+          <motion.div
+            key={r.size}
+            className={cn(
+              "absolute left-1/2 top-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border",
+              r.tone,
+            )}
+            style={{ width: r.size, rotateX: 68, translateZ: r.z }}
+            animate={{ rotate: i % 2 ? -360 : 360 }}
+            transition={{ duration: r.dur, repeat: Infinity, ease: "linear" }}
+          />
+        ))}
 
-      {["-right-1 top-6", "-left-2 bottom-8", "right-4 -bottom-1"].map(
-        (pos, i) => (
-          <motion.span
-            key={pos}
-            aria-hidden
-            animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 3, repeat: Infinity, delay: i * 0.8 }}
-            className={cn("absolute", pos)}
-          >
-            <Sparkles className="size-4 text-primary" />
-          </motion.span>
-        ),
-      )}
+        {/* brand-yellow node travelling across the orbit */}
+        <motion.span
+          className="absolute left-1/2 top-1/2 size-2.5 rounded-full bg-amber-400 shadow-[0_0_12px_#F5B82E]"
+          style={{ translateZ: 36 }}
+          animate={{ x: [80, 0, -80, 0, 80], y: [0, 30, 0, -30, 0] }}
+          transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+        />
 
-      <div className="relative flex flex-col items-center">
+        <div
+          className="absolute inset-[26%] rounded-full bg-gradient-to-br from-primary/30 to-primary/5 backdrop-blur-sm"
+          style={{ transform: "translateZ(18px)" }}
+        />
+      </motion.div>
+
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
         <motion.span
           animate={
             unread > 0 ? { rotate: [0, 14, -14, 10, -10, 0] } : { rotate: 0 }
@@ -151,9 +198,9 @@ function BellBadge({ unread }) {
           className="inline-flex origin-top"
         >
           {unread > 0 ? (
-            <BellRing className="size-10 text-primary sm:size-12" />
+            <BellRing className="size-9 text-primary sm:size-11" />
           ) : (
-            <Bell className="size-10 text-primary sm:size-12" />
+            <Bell className="size-9 text-primary sm:size-11" />
           )}
         </motion.span>
         <span className="mt-1 text-3xl font-bold sm:text-4xl">
@@ -172,15 +219,32 @@ function NotificationCard({ n, now }) {
   const Icon = meta.icon;
   const isLong = (n.body ?? "").length > 180;
 
+  // Cursor spotlight: sets CSS variables only, so it causes no re-render
+  const spot = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+  };
+
   return (
     <div
+      onMouseMove={spot}
       className={cn(
-        "group relative overflow-hidden rounded-xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5 sm:p-5",
+        "group relative overflow-hidden rounded-xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5 motion-reduce:hover:translate-y-0 sm:p-5",
         n.read
           ? "bg-card hover:border-primary/30"
           : "border-primary/40 bg-primary/5 hover:border-primary/60",
       )}
     >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        style={{
+          background:
+            "radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), hsl(var(--primary) / 0.12), transparent 70%)",
+        }}
+      />
+
       {!n.read && (
         <motion.span
           aria-hidden
@@ -190,10 +254,10 @@ function NotificationCard({ n, now }) {
         />
       )}
 
-      <div className="flex items-start gap-3 sm:gap-4">
+      <div className="relative flex items-start gap-3 sm:gap-4">
         <span
           className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-110",
+            "flex size-10 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-110 motion-reduce:group-hover:scale-100",
             meta.tone,
           )}
         >
@@ -214,7 +278,7 @@ function NotificationCard({ n, now }) {
             <div className="flex shrink-0 items-center gap-2">
               {!n.read && (
                 <span className="relative flex size-2.5">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
+                  <span className="absolute inline-flex size-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
                   <span className="relative inline-flex size-2.5 rounded-full bg-primary" />
                 </span>
               )}
@@ -246,7 +310,7 @@ function NotificationCard({ n, now }) {
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
                 aria-expanded={expanded}
-                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                className="inline-flex items-center gap-1 rounded text-xs font-medium text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {expanded ? "Show less" : "Read more"}
                 <ChevronDown
@@ -280,105 +344,107 @@ function NotificationCard({ n, now }) {
 /* ---------------- Guide + FAQ (also used on the empty page) ---------------- */
 export function NotificationsExtras() {
   return (
-    <div className="mt-10 space-y-12">
-      <section>
-        <h2 className="mb-5 text-xl font-semibold tracking-tight">
-          Types of notifications
-        </h2>
-        <motion.div
-          variants={listVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-60px" }}
-          className="grid gap-4 md:grid-cols-3"
-        >
-          {NOTIFICATION_KINDS.map((k) => {
-            const meta = KIND_META[k.value];
-            const Icon = meta.icon;
-            return (
-              <motion.div
-                key={k.value}
-                variants={itemVariants}
-                whileHover={{ y: -3 }}
-                className="rounded-xl border bg-card p-5 transition-colors hover:border-primary/40"
-              >
-                <span
-                  className={cn(
-                    "mb-3 flex size-10 items-center justify-center rounded-lg",
-                    meta.tone,
-                  )}
+    <MotionConfig reducedMotion="user">
+      <div className="mt-10 space-y-12">
+        <section>
+          <h2 className="mb-5 text-xl font-semibold tracking-tight">
+            Types of notifications
+          </h2>
+          <motion.div
+            variants={listVariants}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-60px" }}
+            className="grid gap-4 md:grid-cols-3"
+          >
+            {NOTIFICATION_KINDS.map((k) => {
+              const meta = KIND_META[k.value];
+              const Icon = meta.icon;
+              return (
+                <motion.div
+                  key={k.value}
+                  variants={itemVariants}
+                  whileHover={{ y: -3 }}
+                  className="rounded-xl border bg-card p-5 transition-colors hover:border-primary/40"
                 >
-                  <Icon className="size-5" />
-                </span>
-                <h3 className="font-semibold">{k.label}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {k.description}
-                </p>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-      </section>
+                  <span
+                    className={cn(
+                      "mb-3 flex size-10 items-center justify-center rounded-lg",
+                      meta.tone,
+                    )}
+                  >
+                    <Icon className="size-5" />
+                  </span>
+                  <h3 className="font-semibold">{k.label}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {k.description}
+                  </p>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </section>
 
-      <section>
-        <div className="mb-5 flex items-center gap-2">
-          <Lightbulb className="size-5 text-yellow-500" />
-          <h2 className="text-xl font-semibold tracking-tight">
-            Make the most of your inbox
-          </h2>
-        </div>
-        <motion.div
-          variants={listVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-60px" }}
-          className="grid gap-4 md:grid-cols-3"
-        >
-          {NOTIFICATION_TIPS.map((t) => {
-            const Icon = TIP_ICONS[t.icon];
-            return (
-              <motion.div
-                key={t.title}
-                variants={itemVariants}
-                whileHover={{ y: -3 }}
-                className="rounded-xl border bg-gradient-to-br from-muted/60 to-transparent p-5"
-              >
-                <Icon className="mb-3 size-5 text-primary" />
-                <h3 className="font-semibold">{t.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t.description}
-                </p>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-      </section>
+        <section>
+          <div className="mb-5 flex items-center gap-2">
+            <Lightbulb className="size-5 text-amber-600 dark:text-amber-300" />
+            <h2 className="text-xl font-semibold tracking-tight">
+              Make the most of your inbox
+            </h2>
+          </div>
+          <motion.div
+            variants={listVariants}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-60px" }}
+            className="grid gap-4 md:grid-cols-3"
+          >
+            {NOTIFICATION_TIPS.map((t) => {
+              const Icon = TIP_ICONS[t.icon];
+              return (
+                <motion.div
+                  key={t.title}
+                  variants={itemVariants}
+                  whileHover={{ y: -3 }}
+                  className="rounded-xl border bg-gradient-to-br from-muted/60 to-transparent p-5"
+                >
+                  <Icon className="mb-3 size-5 text-primary" />
+                  <h3 className="font-semibold">{t.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t.description}
+                  </p>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </section>
 
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <HelpCircle className="size-5 text-primary" />
-          <h2 className="text-xl font-semibold tracking-tight">
-            Frequently asked questions
-          </h2>
-        </div>
-        <Accordion
-          type="single"
-          collapsible
-          className="rounded-xl border bg-card px-5"
-        >
-          {NOTIFICATION_FAQ.map((f, i) => (
-            <AccordionItem key={f.q} value={`faq-${i}`}>
-              <AccordionTrigger className="text-left hover:text-primary hover:no-underline">
-                {f.q}
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                {f.a}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </section>
-    </div>
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <HelpCircle className="size-5 text-primary" />
+            <h2 className="text-xl font-semibold tracking-tight">
+              Frequently asked questions
+            </h2>
+          </div>
+          <Accordion
+            type="single"
+            collapsible
+            className="rounded-xl border bg-card px-5"
+          >
+            {NOTIFICATION_FAQ.map((f, i) => (
+              <AccordionItem key={f.q} value={`faq-${i}`}>
+                <AccordionTrigger className="text-left hover:text-primary hover:no-underline">
+                  {f.q}
+                </AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">
+                  {f.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </section>
+      </div>
+    </MotionConfig>
   );
 }
 
@@ -388,6 +454,25 @@ export function NotificationsView({ items, now }) {
   const [kind, setKind] = useState("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
+  const searchRef = useRef(null);
+
+  // Press "/" to jump to search (ignored while typing in a field)
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target?.tagName;
+      if (
+        e.key !== "/" ||
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        e.target?.isContentEditable
+      )
+        return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const stats = useMemo(() => {
     const unread = items.filter((n) => !n.read).length;
@@ -399,6 +484,15 @@ export function NotificationsView({ items, now }) {
         .length,
     };
   }, [items, now]);
+
+  const kindCounts = useMemo(() => {
+    const c = { all: items.length };
+    for (const n of items) {
+      const k = getKind(n);
+      c[k] = (c[k] ?? 0) + 1;
+    }
+    return c;
+  }, [items]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -437,19 +531,19 @@ export function NotificationsView({ items, now }) {
       label: "Unread",
       value: stats.unread,
       icon: BellRing,
-      tone: "text-orange-500 bg-orange-500/10",
+      tone: "text-amber-700 bg-amber-500/15 dark:text-amber-300",
     },
     {
       label: "Read",
       value: stats.read,
       icon: CheckCheck,
-      tone: "text-green-600 bg-green-500/10",
+      tone: "text-emerald-700 bg-emerald-500/15 dark:text-emerald-300",
     },
     {
       label: "Last 7 days",
       value: stats.week,
       icon: Clock,
-      tone: "text-violet-500 bg-violet-500/10",
+      tone: "text-sky-700 bg-sky-500/15 dark:text-sky-300",
     },
   ];
 
@@ -465,207 +559,219 @@ export function NotificationsView({ items, now }) {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Hero */}
-      <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5 sm:p-8"
-      >
-        <motion.div
-          aria-hidden
-          animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
-          transition={{ duration: 6, repeat: Infinity }}
-          className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/20 blur-3xl"
-        />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <Badge variant="secondary" className="gap-1">
-              <Inbox className="size-3" /> Your inbox
-            </Badge>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-              {stats.unread > 0
-                ? `You have ${stats.unread} unread notification${stats.unread > 1 ? "s" : ""}`
-                : "You're all caught up"}
-            </h2>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">
-              {stats.unread > 0
-                ? "Catch up on the latest announcements and updates from our team."
-                : "No new messages right now. We will let you know when there is something new."}
-            </p>
-            <p className="mt-2 text-sm font-medium">
-              {stats.week} new in the last 7 days
-            </p>
-
-            {stats.unread > 0 && tab !== "unread" && (
-              <Button onClick={() => setTab("unread")} className="group mt-5">
-                View unread
-                <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-              </Button>
-            )}
-          </div>
-
-          <div className="flex justify-center lg:justify-end">
-            <BellBadge unread={stats.unread} />
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Stats */}
-      <motion.div
-        variants={listVariants}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
-      >
-        {statCards.map((s) => (
+    <MotionConfig reducedMotion="user">
+      <div className="space-y-8">
+        {/* Hero */}
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5 sm:p-8"
+        >
           <motion.div
-            key={s.label}
-            variants={itemVariants}
-            whileHover={{ y: -3 }}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40"
-          >
-            <span
-              className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                s.tone,
-              )}
-            >
-              <s.icon className="size-5" />
-            </span>
-            <div>
-              <p className="text-2xl font-bold leading-none">
-                <AnimatedNumber value={s.value} />
+            aria-hidden
+            animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
+            transition={{ duration: 6, repeat: Infinity }}
+            className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/20 blur-3xl"
+          />
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <Badge variant="secondary" className="gap-1">
+                <Inbox className="size-3" /> Your inbox
+              </Badge>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
+                {stats.unread > 0
+                  ? `You have ${stats.unread} unread notification${stats.unread > 1 ? "s" : ""}`
+                  : "You're all caught up"}
+              </h2>
+              <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">
+                {stats.unread > 0
+                  ? "Catch up on the latest announcements and updates from our team."
+                  : "No new messages right now. We will let you know when there is something new."}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
-            </div>
-          </motion.div>
-        ))}
-      </motion.div>
+              <p className="mt-2 text-sm font-medium">
+                {stats.week} new in the last 7 days
+              </p>
 
-      {/* Toolbar */}
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="-mx-1 overflow-x-auto px-1">
-            <Tabs value={tab} onValueChange={setTab}>
-              <TabsList className="w-max">
-                {[
-                  { value: "all", label: "All", count: stats.total },
-                  { value: "unread", label: "Unread", count: stats.unread },
-                  { value: "read", label: "Read", count: stats.read },
-                ].map((t) => (
-                  <TabsTrigger key={t.value} value={t.value}>
-                    {t.label}
-                    <span className="ml-1.5 text-xs text-muted-foreground">
-                      {t.count}
-                    </span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative sm:w-64">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search notifications..."
-                className="pl-9"
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                setSort((s) => (s === "newest" ? "oldest" : "newest"))
-              }
-              className="group justify-center"
-            >
-              <ArrowUpDown className="size-4 transition-transform group-hover:scale-110" />
-              {sort === "newest" ? "Newest first" : "Oldest first"}
-            </Button>
-          </div>
-        </div>
-
-        {/* Type chips */}
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-          {kindChips.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setKind(c.value)}
-              aria-pressed={kind === c.value}
-              className={cn(
-                "relative shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                kind === c.value
-                  ? "border-primary text-primary-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:border-primary/40 hover:text-primary",
+              {stats.unread > 0 && tab !== "unread" && (
+                <Button onClick={() => setTab("unread")} className="group mt-5">
+                  View unread
+                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                </Button>
               )}
+            </div>
+
+            <div className="flex justify-center lg:justify-end">
+              <BellBadge unread={stats.unread} />
+            </div>
+          </div>
+        </motion.section>
+
+        {/* Stats */}
+        <motion.div
+          variants={listVariants}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
+        >
+          {statCards.map((s) => (
+            <motion.div
+              key={s.label}
+              variants={itemVariants}
+              whileHover={{ y: -3 }}
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40"
             >
-              {kind === c.value && (
-                <motion.span
-                  layoutId="kind-chip-pill"
-                  className="absolute inset-0 rounded-full bg-primary"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10">{c.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          Showing {filtered.length} of {stats.total} notifications
-        </p>
-
-        {/* Grouped list */}
-        {groups.length ? (
-          <div className="space-y-8">
-            {groups.map((g) => (
-              <div key={g.key}>
-                <div className="mb-3 flex items-center gap-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    {g.label}
-                  </h2>
-                  <span className="h-px flex-1 bg-border" />
-                  <span className="text-xs text-muted-foreground">
-                    {g.items.length}
-                  </span>
-                </div>
-                <motion.ul
-                  key={`${g.key}-${tab}-${kind}-${sort}`}
-                  variants={listVariants}
-                  initial="hidden"
-                  animate="show"
-                  className="space-y-3"
-                >
-                  {g.items.map((n) => (
-                    <motion.li key={n.id} variants={itemVariants}>
-                      <NotificationCard n={n} now={now} />
-                    </motion.li>
-                  ))}
-                </motion.ul>
+              <span
+                className={cn(
+                  "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                  s.tone,
+                )}
+              >
+                <s.icon className="size-5" />
+              </span>
+              <div>
+                <p className="text-2xl font-bold leading-none">
+                  <AnimatedNumber value={s.value} />
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
               </div>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Toolbar */}
+        <section className="space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="-mx-1 overflow-x-auto px-1">
+              <Tabs value={tab} onValueChange={setTab}>
+                <TabsList className="w-max">
+                  {[
+                    { value: "all", label: "All", count: stats.total },
+                    { value: "unread", label: "Unread", count: stats.unread },
+                    { value: "read", label: "Read", count: stats.read },
+                  ].map((t) => (
+                    <TabsTrigger key={t.value} value={t.value}>
+                      {t.label}
+                      <span className="ml-1.5 text-xs text-muted-foreground">
+                        {t.count}
+                      </span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative sm:w-64">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search notifications..."
+                  aria-label="Search notifications"
+                  className="pl-9 pr-9"
+                />
+                <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-muted px-1.5 text-[10px] text-muted-foreground sm:block">
+                  /
+                </kbd>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setSort((s) => (s === "newest" ? "oldest" : "newest"))
+                }
+                className="group justify-center"
+              >
+                <ArrowUpDown className="size-4 transition-transform group-hover:scale-110" />
+                {sort === "newest" ? "Newest first" : "Oldest first"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Type chips */}
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+            {kindChips.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => setKind(c.value)}
+                aria-pressed={kind === c.value}
+                className={cn(
+                  "relative shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  kind === c.value
+                    ? "border-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:border-primary/40 hover:text-primary",
+                )}
+              >
+                {kind === c.value && (
+                  <motion.span
+                    layoutId="kind-chip-pill"
+                    className="absolute inset-0 rounded-full bg-primary"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10">
+                  {c.label}
+                  <span className="ml-1.5 opacity-70">
+                    {kindCounts[c.value] ?? 0}
+                  </span>
+                </span>
+              </button>
             ))}
           </div>
-        ) : (
-          <EmptyState
-            icon={Search}
-            title="No matching notifications"
-            description="Try a different keyword or switch to another tab."
-            action={
-              <Button variant="outline" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            }
-          />
-        )}
-      </section>
 
-      <NotificationsExtras />
-    </div>
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            Showing {filtered.length} of {stats.total} notifications
+          </p>
+
+          {/* Grouped list */}
+          {groups.length ? (
+            <div className="space-y-8">
+              {groups.map((g) => (
+                <div key={g.key}>
+                  <div className="mb-3 flex items-center gap-3">
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      {g.label}
+                    </h2>
+                    <span className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted-foreground">
+                      {g.items.length}
+                    </span>
+                  </div>
+                  <motion.ul
+                    key={`${g.key}-${tab}-${kind}-${sort}`}
+                    variants={listVariants}
+                    initial="hidden"
+                    animate="show"
+                    className="space-y-3"
+                  >
+                    {g.items.map((n) => (
+                      <motion.li key={n.id} variants={itemVariants}>
+                        <NotificationCard n={n} now={now} />
+                      </motion.li>
+                    ))}
+                  </motion.ul>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={Search}
+              title="No matching notifications"
+              description="Try a different keyword or switch to another tab."
+              action={
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              }
+            />
+          )}
+        </section>
+
+        <NotificationsExtras />
+      </div>
+    </MotionConfig>
   );
 }

@@ -1,9 +1,12 @@
 // app/admin/analytics/page.jsx
+import { AlertCircle, Inbox } from "lucide-react";
+
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DataTableToolbar } from "@/components/admin/table/DataTableToolbar";
 import { ChartCard } from "@/components/admin/charts/ChartCard";
 import { DonutChart, HBarChart } from "@/components/admin/charts/charts";
 import { KpiCard } from "@/components/admin/analytics/KpiCard";
+import { ExportCsvButton } from "@/components/admin/analytics/ExportCsvButton";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -18,6 +21,7 @@ import { PERMISSIONS as P } from "@/lib/constants/permissions";
 import { parseListParams } from "@/lib/admin/listParams";
 import { getAnalytics } from "@/services/admin/analyticsService";
 import { formatPrice } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Analytics" };
 const NAMES = {
@@ -29,6 +33,81 @@ const NAMES = {
 const any = (a) => Array.isArray(a) && a.some((x) => x.value > 0);
 const stateOf = (v, ok) => (v === null ? "error" : ok ? "ready" : "empty");
 
+/* ------------------------------------------------------------------ */
+/* Small presentational helpers (server-safe, no hooks)               */
+/* ------------------------------------------------------------------ */
+
+function StateMessage({ icon: Icon, children }) {
+  return (
+    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Icon aria-hidden="true" className="size-4 shrink-0" />
+      {children}
+    </p>
+  );
+}
+
+function CompletionRing({ percent }) {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  const offset = c - ((percent ?? 0) / 100) * c;
+  const tone =
+    percent === null
+      ? { ring: "stroke-muted-foreground/30", text: "text-muted-foreground" }
+      : percent >= 70
+        ? {
+            ring: "stroke-emerald-500",
+            text: "text-emerald-600 dark:text-emerald-400",
+          }
+        : percent >= 40
+          ? {
+              ring: "stroke-amber-500",
+              text: "text-amber-600 dark:text-amber-400",
+            }
+          : {
+              ring: "stroke-rose-500",
+              text: "text-rose-600 dark:text-rose-400",
+            };
+
+  return (
+    <div className="relative size-16 shrink-0">
+      <svg viewBox="0 0 64 64" className="size-16 -rotate-90">
+        <circle
+          cx="32"
+          cy="32"
+          r={r}
+          fill="none"
+          strokeWidth="6"
+          className="stroke-muted"
+        />
+        {percent !== null && (
+          <circle
+            cx="32"
+            cy="32"
+            r={r}
+            fill="none"
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeDasharray={c}
+            strokeDashoffset={offset}
+            className={cn(
+              "transition-[stroke-dashoffset] duration-700 ease-out",
+              tone.ring,
+            )}
+          />
+        )}
+      </svg>
+      <span
+        className={cn(
+          "absolute inset-0 grid place-items-center text-sm font-semibold tabular-nums",
+          tone.text,
+        )}
+      >
+        {percent === null ? "—" : `${percent}%`}
+      </span>
+    </div>
+  );
+}
+
 export default async function AdminAnalyticsPage({ searchParams }) {
   await requirePermission(P.ANALYTICS_READ);
   const range =
@@ -39,12 +118,36 @@ export default async function AdminAnalyticsPage({ searchParams }) {
       ? Math.round((d.completion.completed / d.completion.enrolled) * 100)
       : null;
   const updated = new Intl.DateTimeFormat("en-US", {
-    timeStyle: "short",
+    hour: "numeric",
+    minute: "2-digit",
     timeZoneName: "short",
   }).format(new Date(d.generatedAt));
 
+  const topMax = d.topRevenue?.length
+    ? Math.max(...d.topRevenue.map((c) => c.revenue))
+    : 0;
+  const topSingleCurrency = d.topRevenue?.length
+    ? new Set(d.topRevenue.map((c) => c.currency)).size <= 1
+    : false;
+  const catMax = d.categories?.length
+    ? Math.max(...d.categories.map((c) => c.students))
+    : 0;
+
   return (
-    <div className="space-y-8">
+    <div className="ea-stagger space-y-8">
+      <style>{`
+        @keyframes ea-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (prefers-reduced-motion: no-preference) {
+          .ea-stagger > * { animation: ea-fade-up 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+          .ea-stagger > *:nth-child(1) { animation-delay: 0ms; }
+          .ea-stagger > *:nth-child(2) { animation-delay: 60ms; }
+          .ea-stagger > *:nth-child(3) { animation-delay: 120ms; }
+          .ea-stagger > *:nth-child(4) { animation-delay: 180ms; }
+          .ea-stagger > *:nth-child(5) { animation-delay: 240ms; }
+          .ea-stagger > *:nth-child(6) { animation-delay: 300ms; }
+        }
+      `}</style>
+
       <AdminPageHeader
         title="Analytics"
         description={`Last ${NAMES[range]}, compared with the ${NAMES[range]} before. Real figures from your data, refreshed every few minutes (updated ${updated}).`}
@@ -85,22 +188,20 @@ export default async function AdminAnalyticsPage({ searchParams }) {
         ) : (
           <KpiCard label="Revenue" data={{ current: 0, previous: 0 }} />
         )}
-        <Card className="gap-1 p-5">
-          <p className="text-sm text-muted-foreground">
-            Completion of new enrollments
-          </p>
-          <p className="font-serif text-2xl font-semibold">
-            {d.completion === null
-              ? "Unavailable"
-              : done === null
-                ? "—"
-                : `${done}%`}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {d.completion?.enrolled
-              ? `${d.completion.completed} of ${d.completion.enrolled} finished so far`
-              : "No data available yet."}
-          </p>
+        <Card className="flex items-center gap-4 p-5">
+          <CompletionRing percent={d.completion === null ? null : done} />
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-sm text-muted-foreground">
+              Completion of new enrollments
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {d.completion === null
+                ? "Unavailable"
+                : d.completion?.enrolled
+                  ? `${d.completion.completed} of ${d.completion.enrolled} finished so far`
+                  : "No data available yet."}
+            </p>
+          </div>
         </Card>
       </div>
 
@@ -128,25 +229,46 @@ export default async function AdminAnalyticsPage({ searchParams }) {
           />
         </ChartCard>
         <Card className="gap-3 p-5">
-          <h3 className="font-serif text-lg font-semibold">
-            Top courses by revenue
-          </h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-serif text-lg font-semibold">
+              Top courses by revenue
+            </h3>
+            <ExportCsvButton
+              filename={`top-courses-${range}`}
+              headers={["Course", "Revenue", "Currency"]}
+              rows={(d.topRevenue ?? []).map((c) => [
+                c.title,
+                c.revenue,
+                c.currency,
+              ])}
+            />
+          </div>
           {d.topRevenue === null ? (
-            <p className="text-sm text-muted-foreground">
+            <StateMessage icon={AlertCircle}>
               Couldn&apos;t load this list.
-            </p>
+            </StateMessage>
           ) : !d.topRevenue.length ? (
-            <p className="text-sm text-muted-foreground">
-              No data available yet.
-            </p>
+            <StateMessage icon={Inbox}>No data available yet.</StateMessage>
           ) : (
-            <ol className="space-y-2 text-sm">
+            <ol className="space-y-3 text-sm">
               {d.topRevenue.map((c) => (
-                <li key={c.slug} className="flex justify-between gap-3">
-                  <span className="min-w-0 truncate">{c.title}</span>
-                  <span className="shrink-0 font-medium">
-                    {formatPrice(c.revenue, c.currency)}
-                  </span>
+                <li key={c.slug} className="space-y-1.5">
+                  <div className="flex justify-between gap-3">
+                    <span className="min-w-0 truncate">{c.title}</span>
+                    <span className="shrink-0 font-medium tabular-nums">
+                      {formatPrice(c.revenue, c.currency)}
+                    </span>
+                  </div>
+                  {topSingleCurrency && topMax > 0 && (
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary/70"
+                        style={{
+                          width: `${Math.max(4, (c.revenue / topMax) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  )}
                 </li>
               ))}
             </ol>
@@ -155,18 +277,27 @@ export default async function AdminAnalyticsPage({ searchParams }) {
       </div>
 
       <Card className="gap-3 p-5">
-        <h3 className="font-serif text-lg font-semibold">Categories</h3>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-serif text-lg font-semibold">Categories</h3>
+          <ExportCsvButton
+            filename={`categories-${range}`}
+            headers={["Category", "Courses", "Students"]}
+            rows={(d.categories ?? []).map((c) => [
+              c.name,
+              c.courses,
+              c.students,
+            ])}
+          />
+        </div>
         {d.categories === null ? (
-          <p className="text-sm text-muted-foreground">
+          <StateMessage icon={AlertCircle}>
             Couldn&apos;t load this table.
-          </p>
+          </StateMessage>
         ) : !d.categories.length ? (
-          <p className="text-sm text-muted-foreground">
-            No data available yet.
-          </p>
+          <StateMessage icon={Inbox}>No data available yet.</StateMessage>
         ) : (
           <div className="overflow-x-auto rounded-lg border">
-            <Table className="min-w-[420px]">
+            <Table className="min-w-[480px]">
               <TableHeader>
                 <TableRow>
                   <TableHead scope="col">Category</TableHead>
@@ -185,8 +316,20 @@ export default async function AdminAnalyticsPage({ searchParams }) {
                     <TableCell className="text-right tabular-nums">
                       {c.courses}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {c.students}
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {catMax > 0 && (
+                          <span className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
+                            <span
+                              className="block h-full rounded-full bg-primary/70"
+                              style={{
+                                width: `${Math.max(4, (c.students / catMax) * 100)}%`,
+                              }}
+                            />
+                          </span>
+                        )}
+                        <span className="tabular-nums">{c.students}</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -199,9 +342,9 @@ export default async function AdminAnalyticsPage({ searchParams }) {
       <Card className="gap-3 p-5">
         <h3 className="font-serif text-lg font-semibold">Content</h3>
         {d.content === null ? (
-          <p className="text-sm text-muted-foreground">
+          <StateMessage icon={AlertCircle}>
             Couldn&apos;t load this section.
-          </p>
+          </StateMessage>
         ) : (
           <dl className="grid gap-4 text-sm sm:grid-cols-3">
             {[
@@ -228,4 +371,3 @@ export default async function AdminAnalyticsPage({ searchParams }) {
     </div>
   );
 }
-

@@ -14,6 +14,7 @@ import { SiteBackground } from "@/components/layout/SiteBackground";
 import { settingsService } from "@/services/settingsService";
 
 import "./globals.css";
+import { SnakeScrollAuto } from "@/components/layout/SnakeScrollbar";
 
 const sans = DM_Sans({
   subsets: ["latin"],
@@ -125,10 +126,10 @@ export default async function RootLayout({ children }) {
   return (
     <html
       lang="en"
-      className={`${sans.variable} ${serif.variable}`}
+      className={`${sans.variable} ${serif.variable} scroll-smooth motion-reduce:scroll-auto`}
       suppressHydrationWarning
     >
-      <body className="relative flex min-h-dvh flex-col bg-background font-sans text-foreground antialiased selection:bg-primary/20 selection:text-foreground">
+      <body className="relative flex min-h-dvh flex-col overflow-x-clip bg-background font-sans text-[15px] leading-relaxed text-foreground antialiased selection:bg-primary/20 selection:text-foreground sm:text-base lg:text-[17px] dark:selection:bg-primary/30">
         <Providers>
           <AuthProvider>
             {/* Animated background behind the whole site */}
@@ -140,11 +141,10 @@ export default async function RootLayout({ children }) {
             <main
               id="main-content"
               tabIndex={-1}
-              className="flex-1 outline-none"
+              className="flex-1 outline-none motion-safe:animate-fade-in"
             >
               {children}
             </main>
-
             <Footer />
 
             {/* Ctrl/⌘ + K quick search */}
@@ -153,6 +153,7 @@ export default async function RootLayout({ children }) {
             <Toaster richColors closeButton position="top-right" />
           </AuthProvider>
         </Providers>
+        <SnakeScrollAuto />
 
         <script
           type="application/ld+json"

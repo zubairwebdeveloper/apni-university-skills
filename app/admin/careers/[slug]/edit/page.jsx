@@ -1,6 +1,9 @@
 // app/admin/careers/[slug]/edit/page.jsx
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FiArrowLeft } from "react-icons/fi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { buttonVariants } from "@/components/ui/button";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { CareerForm } from "@/components/admin/careers/CareerForm";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -13,6 +16,18 @@ import { categoryAdminRepository } from "@/repositories/admin/categoryAdminRepos
 
 export const metadata = { title: "Edit career guide" };
 
+function BackLink() {
+  return (
+    <Link
+      href="/admin/careers"
+      className="mb-4 inline-flex min-h-9 items-center gap-1.5 rounded-md text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+    >
+      <FiArrowLeft aria-hidden="true" className="size-4" />
+      Back to career guides
+    </Link>
+  );
+}
+
 export default async function EditCareerPage({ params }) {
   await requirePermission(P.CAREERS_UPDATE);
   const parsed = adminSlug.safeParse((await params).slug);
@@ -21,12 +36,28 @@ export default async function EditCareerPage({ params }) {
   if (!record) notFound();
   if (record.status === "deleted")
     return (
-      <Alert variant="destructive">
-        <AlertTitle>In trash</AlertTitle>
-        <AlertDescription>
-          Restore this guide from the Careers list (Trash filter) to edit it.
-        </AlertDescription>
-      </Alert>
+      <>
+        <BackLink />
+        <Alert variant="destructive">
+          <AlertTitle>In trash</AlertTitle>
+          <AlertDescription>
+            <p>
+              Restore this guide from the Careers list (Trash filter) to edit
+              it.
+            </p>
+            <Link
+              href="/admin/careers"
+              className={buttonVariants({
+                variant: "outline",
+                size: "sm",
+                className: "mt-3",
+              })}
+            >
+              Go to career guides
+            </Link>
+          </AlertDescription>
+        </Alert>
+      </>
     );
   const [categories, blocker] = await Promise.all([
     categoryAdminRepository.options(),
@@ -34,8 +65,10 @@ export default async function EditCareerPage({ params }) {
   ]);
   return (
     <>
+      <BackLink />
       <AdminPageHeader
         title={`Edit ${record.title}`}
+        description={record.slug ? `Slug: ${record.slug}` : undefined}
         actions={<StatusBadge status={record.status} />}
       />
       {blocker && (

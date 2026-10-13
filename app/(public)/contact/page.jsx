@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import {
+  FiArrowRight,
   FiBookOpen,
   FiBriefcase,
   FiCheckCircle,
   FiChevronDown,
   FiCompass,
   FiCreditCard,
-  FiHelpCircle,
   FiInbox,
   FiMail,
   FiMessageSquare,
@@ -18,7 +18,6 @@ import {
   FiZap,
 } from "react-icons/fi";
 
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Container } from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -153,11 +152,11 @@ export default async function ContactPage() {
         description="Questions about courses, payments, or careers? We read every message."
         breadcrumbs={[{ label: "Home", href: "/" }, { label: "Contact" }]}
       >
-        <ul className="mt-5 flex flex-wrap gap-2.5">
+        <ul className="mt-5 flex flex-wrap gap-2">
           {chips.map(({ icon: Icon, text }) => (
             <li
               key={text}
-              className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3.5 py-1.5 text-sm font-medium backdrop-blur"
+              className="inline-flex items-center gap-2 rounded-full border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground"
             >
               <Icon aria-hidden="true" className="size-4 text-primary" />
               {text}
@@ -172,264 +171,251 @@ export default async function ContactPage() {
           className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
         />
 
-        {/* Topic cards */}
-        <Container className="relative pt-10">
-          <Reveal className="mb-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              What do you need help with?
-            </p>
-          </Reveal>
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Self-service shortcuts: one bordered strip, divided into cells */}
+        <Container className="relative pt-10 sm:pt-12">
+          <h2 className="text-xl sm:text-2xl">What do you need help with?</h2>
+          <ul className="mt-5 grid grid-cols-1 divide-y divide-border overflow-hidden rounded-2xl border bg-card sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
             {topics.map(({ icon: Icon, title, text, href, cta }, i) => (
-              <li key={title} className="min-w-0">
-                <Reveal delay={i * 0.08} className="h-full">
-                  <Link
-                    href={href}
-                    className="group flex h-full flex-col rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-                  >
-                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                      <Icon aria-hidden="true" className="size-5" />
-                    </span>
-                    <h2 className="mt-4 font-sans text-base font-semibold">
-                      {title}
-                    </h2>
-                    <p className="mt-1 flex-1 text-sm text-muted-foreground">
-                      {text}
-                    </p>
-                    <span className="mt-3 text-sm font-medium text-primary">
-                      {cta} <span aria-hidden="true">→</span>
-                    </span>
-                  </Link>
-                </Reveal>
+              <li
+                key={title}
+                className={`min-w-0 ${
+                  i > 1 ? "sm:border-t sm:border-border lg:border-t-0" : ""
+                } ${i % 2 === 1 ? "sm:border-l sm:border-border lg:border-l-0" : ""}`}
+              >
+                <Link
+                  href={href}
+                  className="group flex h-full flex-col p-5 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+                >
+                  <Icon aria-hidden="true" className="size-6 text-primary" />
+                  <h3 className="mt-4 font-sans text-base font-semibold text-foreground">
+                    {title}
+                  </h3>
+                  <p className="mt-1 flex-1 text-sm text-muted-foreground">
+                    {text}
+                  </p>
+                  <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                    {cta}
+                    <FiArrowRight
+                      aria-hidden="true"
+                      className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                    />
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>
         </Container>
 
-        {/* Form and sidebar */}
-        <Container className="relative grid items-start gap-10 py-12 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-12">
+        {/* Form (the main job of this page) and sidebar */}
+        <Container className="relative grid items-start gap-10 py-12 sm:py-16 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-14">
           <Reveal className="min-w-0">
-            <div className="relative overflow-hidden rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
-              />
-              <div className="mb-6 flex items-start gap-4">
-                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <FiSend aria-hidden="true" className="size-5" />
-                </span>
-                <div>
-                  <h2 className="text-xl sm:text-2xl">Send us a message</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    The more detail you share, the faster we can help.
-                  </p>
-                </div>
+            <div className="rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
+              <h2 className="text-2xl sm:text-3xl">Send us a message</h2>
+              <p className="mt-2 text-muted-foreground">
+                The more detail you share, the faster we can help.
+              </p>
+              <div className="mt-6">
+                <ContactForm />
               </div>
-              <ContactForm />
             </div>
           </Reveal>
 
-          <aside className="space-y-4 lg:sticky lg:top-24">
-            <Reveal delay={0.1}>
-              <div className="rounded-2xl border bg-card p-5">
-                <h2 className="flex items-center gap-2 font-sans text-lg font-semibold">
-                  <FiHelpCircle
-                    aria-hidden="true"
-                    className="size-5 text-primary"
-                  />
-                  Before you write
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Many answers are on our FAQ page. For payment questions,
-                  include the email on your account and the course name.
-                </p>
-                <Link
-                  href="/faq"
-                  className={buttonVariants({
-                    variant: "outline",
-                    size: "sm",
-                    className: "mt-4",
-                  })}
-                >
-                  Read the FAQ
-                </Link>
-              </div>
-            </Reveal>
+          <aside className="space-y-8 lg:sticky lg:top-24">
+            <div>
+              <h2 className="font-sans text-lg font-semibold text-foreground">
+                Before you write
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Many answers are on our FAQ page. For payment questions, include
+                the email on your account and the course name.
+              </p>
+              <Link
+                href="/faq"
+                className={buttonVariants({
+                  variant: "outline",
+                  size: "sm",
+                  className: "mt-4",
+                })}
+              >
+                Read the FAQ
+              </Link>
+            </div>
 
             {contactEmail && (
-              <Reveal delay={0.18}>
-                <div className="group rounded-2xl border bg-card p-5 transition-all duration-300 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none">
-                  <div className="flex items-start gap-4">
-                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                      <FiMail aria-hidden="true" className="size-5" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm text-muted-foreground">
-                        You can also email
-                      </p>
-                      <a
-                        href={`mailto:${contactEmail}`}
-                        className="mt-0.5 block break-all font-medium text-primary underline-offset-4 hover:underline"
-                      >
-                        {contactEmail}
-                      </a>
-                    </div>
+              <div className="border-t pt-8">
+                <div className="flex items-start gap-3">
+                  <FiMail
+                    aria-hidden="true"
+                    className="mt-0.5 size-5 shrink-0 text-primary"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm text-muted-foreground">
+                      You can also email
+                    </p>
+                    <a
+                      href={`mailto:${contactEmail}`}
+                      className="mt-0.5 block break-all font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {contactEmail}
+                    </a>
                   </div>
                 </div>
-              </Reveal>
+              </div>
             )}
 
-            <Reveal delay={0.26}>
-              <div className="rounded-2xl border bg-card p-5">
-                <h2 className="flex items-center gap-2 font-sans text-lg font-semibold">
-                  <FiShield
-                    aria-hidden="true"
-                    className="size-5 text-primary"
-                  />
-                  Your privacy
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  We use your message only to reply to you. Never send your card
-                  number or password in a message. We will never ask for them.
-                </p>
-              </div>
-            </Reveal>
+            <div className="border-t pt-8">
+              <h2 className="flex items-center gap-2 font-sans text-lg font-semibold text-foreground">
+                <FiShield aria-hidden="true" className="size-5 text-primary" />
+                Your privacy
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                We use your message only to reply to you. Never send your card
+                number or password in a message. We will never ask for them.
+              </p>
+            </div>
           </aside>
         </Container>
 
-        {/* What to include */}
+        {/* What to include: three columns, no cards */}
         <section
           aria-labelledby="include-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t bg-muted/30 py-14 sm:py-20"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                Get a faster answer
-              </Badge>
-              <h2 id="include-title" className="text-2xl sm:text-3xl">
-                What to include in your message
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                A few details at the start save a lot of back and forth.
-              </p>
-            </Reveal>
-            <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-              {includeGuide.map(({ icon: Icon, title, points }, i) => (
-                <li key={title} className="min-w-0">
-                  <Reveal delay={i * 0.1} className="h-full">
-                    <div className="group h-full rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold">
-                        {title}
-                      </h3>
-                      <ul className="mt-3 space-y-2 text-sm">
-                        {points.map((p) => (
-                          <li key={p} className="flex gap-2">
-                            <FiCheckCircle
-                              aria-hidden="true"
-                              className="mt-0.5 size-4 shrink-0 text-primary"
-                            />
-                            <span className="text-muted-foreground">{p}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </Reveal>
+            <h2
+              id="include-title"
+              className="max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              What to include in your message
+            </h2>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              A few details at the start save a lot of back and forth.
+            </p>
+
+            <ul className="mt-10 grid grid-cols-1 gap-10 md:grid-cols-3 md:gap-8">
+              {includeGuide.map(({ icon: Icon, title, points }) => (
+                <li
+                  key={title}
+                  className="min-w-0 border-t-2 border-primary pt-5"
+                >
+                  <h3 className="flex items-center gap-2 font-sans text-base font-semibold text-foreground">
+                    <Icon aria-hidden="true" className="size-5 text-primary" />
+                    {title}
+                  </h3>
+                  <ul className="mt-4 space-y-2.5 text-sm sm:text-base">
+                    {points.map((p) => (
+                      <li key={p} className="flex gap-2.5">
+                        <FiCheckCircle
+                          aria-hidden="true"
+                          className="mt-1 size-4 shrink-0 text-primary"
+                        />
+                        <span className="text-muted-foreground">{p}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               ))}
             </ul>
           </Container>
         </section>
 
-        {/* What happens next */}
+        {/* What happens next: a true sequence */}
         <section
           aria-labelledby="next-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t py-14 sm:py-20"
         >
-          <Container className="max-w-4xl">
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                What happens next
-              </Badge>
-              <h2 id="next-title" className="text-2xl sm:text-3xl">
-                From your message to our reply
-              </h2>
-            </Reveal>
-            <ol className="relative mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-              <span
-                aria-hidden="true"
-                className="absolute left-[16%] right-[16%] top-9 hidden h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent md:block"
-              />
-              {nextSteps.map(({ icon: Icon, title, text }, i) => (
-                <li key={title} className="min-w-0">
-                  <Reveal delay={i * 0.1} className="h-full">
-                    <div className="relative h-full rounded-2xl border bg-card p-5 text-center">
-                      <span className="mx-auto grid size-12 place-items-center rounded-full bg-primary text-primary-foreground">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <h3 className="mt-3 font-sans text-base font-semibold">
+          <Container>
+            <h2
+              id="next-title"
+              className="max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              From your message to our reply
+            </h2>
+
+            <Reveal>
+              <ol className="relative mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
+                <span
+                  aria-hidden="true"
+                  className="absolute left-5 right-5 top-5 hidden h-px bg-border sm:block"
+                />
+                {nextSteps.map(({ icon: Icon, title, text }, i) => (
+                  <li
+                    key={title}
+                    className="relative flex gap-4 sm:block sm:pr-4"
+                  >
+                    <span
+                      className={`relative z-10 grid size-10 shrink-0 place-items-center rounded-full ${
+                        i === nextSteps.length - 1
+                          ? "bg-highlight text-foreground"
+                          : "bg-primary text-primary-foreground"
+                      }`}
+                    >
+                      <Icon aria-hidden="true" className="size-5" />
+                    </span>
+                    <div className="sm:mt-5">
+                      <h3 className="font-sans text-base font-semibold text-foreground">
+                        <span className="sr-only">Step {i + 1}: </span>
                         {title}
                       </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="mt-1 max-w-xs text-sm text-muted-foreground sm:text-base">
                         {text}
                       </p>
                     </div>
-                  </Reveal>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                ))}
+              </ol>
+            </Reveal>
           </Container>
         </section>
 
-        {/* FAQ */}
+        {/* FAQ: heading left, accordion right */}
         <section
           aria-labelledby="faq-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t bg-muted/30 py-14 sm:py-20"
         >
-          <Container className="max-w-3xl">
-            <Reveal className="text-center">
-              <h2 id="faq-title" className="text-2xl sm:text-3xl">
-                Before you contact us
-              </h2>
-            </Reveal>
-            <div className="mt-8 space-y-3">
-              {faqs.map(({ q, a }, i) => (
-                <Reveal key={q} delay={i * 0.06}>
-                  <details className="group rounded-xl border bg-card px-4 py-3 open:shadow-md">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
+          <Container>
+            <div className="grid gap-8 lg:grid-cols-12 lg:gap-16">
+              <div className="lg:col-span-4">
+                <h2
+                  id="faq-title"
+                  className="text-balance text-3xl sm:text-4xl"
+                >
+                  Before you contact us
+                </h2>
+                <p className="mt-4 text-sm text-muted-foreground sm:text-base">
+                  More answers are on the{" "}
+                  <Link
+                    href="/faq"
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    FAQ page
+                  </Link>{" "}
+                  and in our{" "}
+                  <Link
+                    href="/terms"
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    Terms
+                  </Link>
+                  .
+                </p>
+              </div>
+
+              <div className="divide-y divide-border border-y border-border lg:col-span-8">
+                {faqs.map(({ q, a }) => (
+                  <details key={q} className="group py-1">
+                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-left text-base font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                       {q}
                       <FiChevronDown
                         aria-hidden="true"
-                        className="size-4 shrink-0 text-primary transition-transform duration-300 group-open:rotate-180 motion-reduce:transition-none"
+                        className="size-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
                       />
                     </summary>
-                    <p className="mt-3 text-sm text-muted-foreground">{a}</p>
+                    <p className="max-w-2xl pb-4 text-muted-foreground">{a}</p>
                   </details>
-                </Reveal>
-              ))}
+                ))}
+              </div>
             </div>
-            <Reveal delay={0.1}>
-              <p className="mt-8 text-center text-sm text-muted-foreground">
-                More answers are on the{" "}
-                <Link
-                  href="/faq"
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  FAQ page
-                </Link>{" "}
-                and in our{" "}
-                <Link
-                  href="/terms"
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Terms
-                </Link>
-                .
-              </p>
-            </Reveal>
           </Container>
         </section>
 

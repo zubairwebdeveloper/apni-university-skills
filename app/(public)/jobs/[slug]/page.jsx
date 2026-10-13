@@ -3,9 +3,19 @@
 import { cache } from "react";
 
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { FiMapPin } from "react-icons/fi";
+import {
+  FiArrowLeft,
+  FiArrowRight,
+  FiBarChart2,
+  FiBriefcase,
+  FiCalendar,
+  FiClock,
+  FiDollarSign,
+  FiMapPin,
+} from "react-icons/fi";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -14,6 +24,7 @@ import { Container } from "@/components/layout/Container";
 import { PageBreadcrumbs } from "@/components/layout/PageBreadcrumbs";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { Paragraphs } from "@/components/shared/Paragraphs";
+import { TiltCard } from "@/components/public/TiltCard";
 
 import { jobService } from "@/services/jobService";
 
@@ -34,6 +45,8 @@ const getJob = cache((slug) => jobService.getJobBySlug(slug));
 const getCurrentTime = cache(() => Date.now());
 
 const iso = (ms) => (ms ? new Date(ms).toISOString() : undefined);
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
@@ -76,20 +89,48 @@ export async function generateMetadata({ params }) {
   };
 }
 
-const List = ({ id, title, items }) =>
-  items?.length > 0 && (
-    <section aria-labelledby={id}>
-      <h2 id={id} className="mb-3 text-xl">
+function List({ id, title, items }) {
+  if (!items?.length) return null;
+
+  return (
+    <section
+      id={id}
+      aria-labelledby={`${id}-title`}
+      className="scroll-mt-24 border-t pt-10"
+    >
+      <h2 id={`${id}-title`} className="mb-4 text-xl sm:text-2xl">
         {title}
       </h2>
 
-      <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+      <ul className="max-w-3xl space-y-3 text-sm text-muted-foreground sm:text-base">
         {items.map((item) => (
-          <li key={item}>{item}</li>
+          <li key={item} className="flex gap-3">
+            <span
+              aria-hidden="true"
+              className="mt-2.5 size-1.5 shrink-0 rounded-full bg-primary"
+            />
+            {item}
+          </li>
         ))}
       </ul>
     </section>
   );
+}
+
+function Fact({ icon: Icon, label, children }) {
+  return (
+    <div className="flex items-start gap-3">
+      <Icon
+        aria-hidden="true"
+        className="mt-0.5 size-4 shrink-0 text-primary"
+      />
+      <div className="min-w-0">
+        <dt className="text-xs text-muted-foreground">{label}</dt>
+        <dd className="text-sm font-medium text-foreground">{children}</dd>
+      </div>
+    </div>
+  );
+}
 
 export default async function JobPage({ params }) {
   const { slug } = await params;
@@ -97,11 +138,11 @@ export default async function JobPage({ params }) {
   const job = await getJob(slug);
 
   if (!job) {
-
     notFound();
   }
 
-  const expired = !!job.expiresAt && job.expiresAt < getCurrentTime();
+  const now = getCurrentTime();
+  const expired = !!job.expiresAt && job.expiresAt < now;
 
   const applyUrl = safeExternalUrl(job.applyUrl);
 
@@ -112,6 +153,33 @@ export default async function JobPage({ params }) {
           job.currency,
         )}`
       : null;
+
+  // Time left to apply (real expiry date only)
+  const daysLeft =
+    job.expiresAt && !expired
+      ? Math.max(1, Math.ceil((job.expiresAt - now) / DAY_MS))
+      : null;
+  const closingSoon = daysLeft !== null && daysLeft <= 7;
+  const daysLeftLabel =
+    daysLeft === null
+      ? null
+      : daysLeft === 1
+        ? "1 day left"
+        : `${daysLeft} days left`;
+
+  const showStickyApply = !expired && !!applyUrl;
+
+  // In-page navigation lists only sections that render
+  const sections = [
+    { id: "role", label: "The role" },
+    ...(job.responsibilities?.length
+      ? [{ id: "resp", label: "Responsibilities" }]
+      : []),
+    ...(job.requirements?.length
+      ? [{ id: "reqs", label: "Requirements" }]
+      : []),
+    ...(job.skills?.length ? [{ id: "skills-job", label: "Skills" }] : []),
+  ];
 
   return (
     <>
@@ -144,8 +212,9 @@ export default async function JobPage({ params }) {
         }}
       />
 
-      <div className="border-b bg-secondary/40">
-        <Container className="py-8 sm:py-12">
+      {/* Job header */}
+      <div className="overflow-x-clip border-b bg-secondary/40">
+        <Container className="py-8 sm:py-12 lg:py-14">
           <PageBreadcrumbs
             items={[
               {
@@ -162,38 +231,98 @@ export default async function JobPage({ params }) {
             ]}
           />
 
-          <div className="mt-6 flex items-start gap-4">
-            <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl border bg-card font-serif text-xl">
-              {job.companyLogo ? (
-                <Image
-                  src={job.companyLogo}
-                  alt=""
-                  fill
-                  sizes="56px"
-                  className="object-contain p-1.5"
-                />
-              ) : (
-                job.company?.charAt(0)
-              )}
-            </div>
+          <div className="mt-8 flex items-start gap-5 sm:gap-6">
+            {/* 3D company tile: depth layers, tilts toward the pointer on desktop */}
+            <TiltCard className="size-16 shrink-0 sm:size-20" max={14}>
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 rounded-2xl bg-highlight/40 [transform:translateZ(-14px)_translate(6px,6px)]"
+              />
+              <div className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl border bg-card font-serif text-2xl text-foreground shadow-lg [transform:translateZ(22px)] sm:text-3xl">
+                {job.companyLogo ? (
+                  <Image
+                    src={job.companyLogo}
+                    alt=""
+                    fill
+                    sizes="80px"
+                    className="object-contain p-2"
+                  />
+                ) : (
+                  job.company?.charAt(0)
+                )}
+              </div>
+            </TiltCard>
 
             <div className="min-w-0">
-              <h1 className="text-3xl sm:text-4xl">{job.title}</h1>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">
+                  {employmentLabel(job.employmentType)}
+                </Badge>
+                {job.experienceLevel && (
+                  <Badge variant="secondary">
+                    {experienceLabel(job.experienceLevel)}
+                  </Badge>
+                )}
+                {job.remote && <Badge variant="outline">Remote</Badge>}
+                {expired && <Badge variant="destructive">Expired</Badge>}
+                {closingSoon && (
+                  <Badge className="bg-highlight text-highlight-foreground">
+                    {daysLeftLabel}
+                  </Badge>
+                )}
+              </div>
 
-              <p className="mt-1 text-muted-foreground">{job.company}</p>
+              <h1 className="text-balance text-3xl tracking-tight sm:text-4xl lg:text-5xl">
+                {job.title}
+              </h1>
+
+              <p className="mt-2 text-lg text-muted-foreground">
+                {job.company}
+                {job.location && (
+                  <>
+                    <span aria-hidden="true"> · </span>
+                    {job.location}
+                  </>
+                )}
+              </p>
             </div>
           </div>
+
+          <nav aria-label="On this page" className="mt-8">
+            <ul className="flex flex-wrap gap-2">
+              {sections.map((s) => (
+                <li key={s.id}>
+                  <a
+                    href={`#${s.id}`}
+                    className="inline-flex min-h-9 items-center rounded-full border bg-card px-4 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                  >
+                    {s.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </Container>
       </div>
 
-      <Container className="grid gap-10 py-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <Container
+        className={`grid gap-10 pt-10 sm:pt-14 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-14 lg:pb-14 ${
+          showStickyApply ? "pb-28" : "pb-10"
+        }`}
+      >
         <div className="min-w-0 space-y-10">
-          <section aria-labelledby="about-role">
-            <h2 id="about-role" className="mb-3 text-xl">
+          <section
+            id="role"
+            aria-labelledby="about-role"
+            className="scroll-mt-24"
+          >
+            <h2 id="about-role" className="mb-4 text-xl sm:text-2xl">
               About the role
             </h2>
 
-            <Paragraphs text={job.description} />
+            <div className="max-w-3xl">
+              <Paragraphs text={job.description} />
+            </div>
           </section>
 
           <List
@@ -205,8 +334,12 @@ export default async function JobPage({ params }) {
           <List id="reqs" title="Requirements" items={job.requirements} />
 
           {job.skills?.length > 0 && (
-            <section aria-labelledby="skills-job">
-              <h2 id="skills-job" className="mb-3 text-xl">
+            <section
+              id="skills-job"
+              aria-labelledby="skills-job-title"
+              className="scroll-mt-24 border-t pt-10"
+            >
+              <h2 id="skills-job-title" className="mb-4 text-xl sm:text-2xl">
                 Skills
               </h2>
 
@@ -219,47 +352,69 @@ export default async function JobPage({ params }) {
               </ul>
             </section>
           )}
+
+          <div className="border-t pt-8">
+            <Link
+              href="/jobs"
+              className={buttonVariants({ variant: "outline", size: "lg" })}
+            >
+              <FiArrowLeft aria-hidden="true" />
+              Back to all jobs
+            </Link>
+          </div>
         </div>
 
         <aside>
-          <Card className="gap-4 p-5 lg:sticky lg:top-24">
-            <ul className="space-y-2 text-sm">
+          <Card className="gap-5 p-5 sm:p-6 lg:sticky lg:top-24">
+            <dl className="space-y-4">
               {job.location && (
-                <li className="flex items-center gap-2 text-muted-foreground">
-                  <FiMapPin aria-hidden="true" />
+                <Fact icon={FiMapPin} label="Location">
                   {job.location}
                   {job.remote && " · Remote"}
-                </li>
+                </Fact>
               )}
 
-              <li className="text-muted-foreground">
+              <Fact icon={FiBriefcase} label="Employment type">
                 {employmentLabel(job.employmentType)}
-                {job.experienceLevel &&
-                  ` · ${experienceLabel(job.experienceLevel)}`}
-              </li>
+              </Fact>
 
-              {salary && <li className="font-medium">{salary}</li>}
+              {job.experienceLevel && (
+                <Fact icon={FiBarChart2} label="Experience">
+                  {experienceLabel(job.experienceLevel)}
+                </Fact>
+              )}
+
+              {salary && (
+                <Fact icon={FiDollarSign} label="Salary">
+                  {salary}
+                </Fact>
+              )}
 
               {job.publishedAt && (
-                <li className="text-muted-foreground">
-                  Posted {formatDate(job.publishedAt)}
-                </li>
+                <Fact icon={FiCalendar} label="Posted">
+                  {formatDate(job.publishedAt)}
+                </Fact>
               )}
 
               {job.expiresAt && (
-                <li
-                  className={
-                    expired
-                      ? "font-medium text-destructive"
-                      : "text-muted-foreground"
-                  }
-                >
-                  {expired
-                    ? `Expired ${formatDate(job.expiresAt)}`
-                    : `Applications close ${formatDate(job.expiresAt)}`}
-                </li>
+                <Fact icon={FiClock} label={expired ? "Expired" : "Closes"}>
+                  <span className={expired ? "text-destructive" : undefined}>
+                    {formatDate(job.expiresAt)}
+                  </span>
+                  {daysLeftLabel && (
+                    <span
+                      className={`ml-2 text-xs font-normal ${
+                        closingSoon
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      ({daysLeftLabel})
+                    </span>
+                  )}
+                </Fact>
               )}
-            </ul>
+            </dl>
 
             {expired ? (
               <p className="rounded-md border p-3 text-sm text-muted-foreground">
@@ -277,6 +432,7 @@ export default async function JobPage({ params }) {
                 })}
               >
                 Apply on company site
+                <FiArrowRight aria-hidden="true" />
               </a>
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -293,6 +449,24 @@ export default async function JobPage({ params }) {
           </Card>
         </aside>
       </Container>
+
+      {/* Mobile apply bar: keeps the main action reachable on long listings */}
+      {showStickyApply && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
+          <a
+            href={applyUrl}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className={buttonVariants({
+              size: "lg",
+              className: "w-full",
+            })}
+          >
+            Apply on company site
+            <FiArrowRight aria-hidden="true" />
+          </a>
+        </div>
+      )}
     </>
   );
 }

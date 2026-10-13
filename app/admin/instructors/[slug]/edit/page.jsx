@@ -1,12 +1,14 @@
 // app/admin/instructors/[slug]/edit/page.jsx
 import { notFound, redirect } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { RecordIdentityCard } from "@/components/admin/RecordIdentityCard";
 import { InstructorForm } from "@/components/admin/instructors/InstructorForm";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { requirePermission } from "@/lib/auth/authorize";
 import { PERMISSIONS as P } from "@/lib/constants/permissions";
 import { adminSlug } from "@/lib/validations/common";
 import { instructorAdminRepository } from "@/repositories/admin/instructorAdminRepository";
+import { formatDateTime } from "@/lib/utils/format";
 
 export const metadata = { title: "Edit instructor" };
 
@@ -24,6 +26,13 @@ export default async function EditInstructorPage({ params }) {
         title={`Edit ${record.name}`}
         actions={<StatusBadge status={record.status} />}
       />
+      <RecordIdentityCard
+        name={record.name}
+        slug={record.slug}
+        updatedAt={record.updatedAt ? formatDateTime(record.updatedAt) : null}
+      >
+        <StatusBadge status={record.status} />
+      </RecordIdentityCard>
       <InstructorForm key={record.updatedAt} record={record} />
     </>
   );

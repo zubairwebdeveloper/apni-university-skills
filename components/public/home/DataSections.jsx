@@ -23,6 +23,9 @@ import { ReviewCard } from "@/components/public/ReviewCard";
 
 const grid = (cols) => `grid gap-5 sm:grid-cols-2 ${cols}`;
 
+// Subtle tinted band used to alternate sections in both themes.
+const TINT = "bg-muted/40 border-y border-border/60";
+
 // Technologies we teach. Each chip opens the course list filtered by that name.
 const popularTech = [
   "Next.js",
@@ -38,18 +41,20 @@ const popularTech = [
 // Quick links to search the catalog by technology.
 function TechChips({ label = "Browse by technology" }) {
   return (
-    <nav aria-label={label} className="mb-8">
-      <p className="mb-3 text-sm text-muted-foreground">{label}</p>
-      <ul className="flex flex-wrap gap-2">
+    <nav aria-label={label} className="mb-10">
+      <p className="mb-3 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <ul className="flex flex-wrap gap-2.5">
         {popularTech.map((t) => (
           <li key={t}>
             <Link
               href={`/courses?q=${encodeURIComponent(t)}`}
-              className="group inline-flex items-center gap-1.5 rounded-full border bg-card px-3.5 py-1.5 text-sm outline-none transition-all hover:-translate-y-0.5 hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group inline-flex min-h-10 items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-card-foreground shadow-sm outline-none transition-all hover:-translate-y-0.5 hover:border-primary hover:text-primary hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               {t}
               <FiArrowRight
-                className="size-3.5 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:transition-none"
+                className="size-3.5 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
                 aria-hidden="true"
               />
             </Link>
@@ -62,7 +67,7 @@ function TechChips({ label = "Browse by technology" }) {
 
 export function PopularCategories({ categories }) {
   return (
-    <Section labelledBy="cats-title">
+    <Section aria-labelledby="categories-title">
       <SectionHeader
         id="cats-title"
         eyebrow="Explore"
@@ -92,7 +97,7 @@ export function PopularCategories({ categories }) {
 
 export function FeaturedCourses({ courses }) {
   return (
-    <Section labelledBy="courses-title" className="bg-secondary/40">
+    <Section labelledBy="courses-title" className={TINT}>
       <SectionHeader
         id="courses-title"
         eyebrow="Featured"
@@ -115,11 +120,7 @@ export function FeaturedCourses({ courses }) {
           icon={FiBookOpen}
           title="Courses are coming soon"
           description="New courses are being prepared. Create an account to be ready on day one."
-          action={
-            <Link href="/register" className={buttonVariants()}>
-              Create free account
-            </Link>
-          }
+          
         />
       )}
     </Section>
@@ -159,25 +160,45 @@ export function HowItWorks() {
         title="From first lesson to first job in four steps"
         center
       />
-      <Stagger className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {steps.map((s, i) => {
-          const Icon = s.icon;
-          return (
-            <StaggerItem key={s.title}>
-              <div className="group relative h-full rounded-2xl border bg-card p-5 transition-all hover:-translate-y-1 hover:border-primary/60 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-transform group-hover:scale-110 motion-reduce:transition-none">
-                  <Icon className="size-5" aria-hidden="true" />
-                </span>
-                <h3 className="mt-4 font-semibold">
-                  <span className="sr-only">Step {i + 1}: </span>
-                  {s.title}
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">{s.text}</p>
-              </div>
-            </StaggerItem>
-          );
-        })}
-      </Stagger>
+      <div className="relative">
+        {/* Connecting line behind the cards on large screens */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-[12%] right-[12%] top-[2.75rem] hidden h-px bg-gradient-to-r from-transparent via-border to-transparent lg:block"
+        />
+        <Stagger
+          as="ol"
+          className="relative grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {steps.map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <StaggerItem key={s.title}>
+                <div className="group relative h-full rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm transition-all hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+                  <div className="flex items-center justify-between">
+                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 transition-transform group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+                      <Icon className="size-5" aria-hidden="true" />
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="font-mono text-sm tabular-nums text-muted-foreground"
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <h3 className="mt-5 text-lg font-semibold tracking-tight">
+                    <span className="sr-only">Step {i + 1}: </span>
+                    {s.title}
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                    {s.text}
+                  </p>
+                </div>
+              </StaggerItem>
+            );
+          })}
+        </Stagger>
+      </div>
     </Section>
   );
 }
@@ -222,7 +243,7 @@ export function JobsSection({ jobs }) {
 
 export function FeaturedInstructors({ instructors }) {
   return (
-    <Section labelledBy="inst-title" className="bg-secondary/40">
+    <Section labelledBy="inst-title" className={TINT}>
       <SectionHeader
         id="inst-title"
         eyebrow="Learn from the best"
@@ -277,7 +298,7 @@ export function BlogSection({
 }) {
   if (!posts.length) return null;
   return (
-    <Section labelledBy={id} className={tinted ? "bg-secondary/40" : ""}>
+    <Section labelledBy={id} className={tinted ? TINT : ""}>
       <SectionHeader
         id={id}
         eyebrow={eyebrow}
@@ -300,28 +321,33 @@ export function BlogSection({
 // Closing call to action at the bottom of the home page.
 export function CtaBanner() {
   return (
-    <section aria-labelledby="cta-title" className="py-16">
+    <section aria-labelledby="cta-title" className="py-16 sm:py-20">
       <Container>
-        <div className="relative overflow-hidden rounded-3xl border bg-primary px-6 py-12 text-center text-primary-foreground sm:px-12">
+        <div className="relative isolate overflow-hidden rounded-3xl border border-border bg-primary px-6 py-14 text-center text-primary-foreground shadow-xl sm:px-12 sm:py-16">
+          {/* Fine grid texture, purely decorative */}
           <span
-            className="pointer-events-none absolute -left-20 -top-20 size-64 rounded-full bg-primary-foreground/10 blur-3xl motion-safe:animate-pulse"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 opacity-[0.12] [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+          />
+          <span
+            className="pointer-events-none absolute -left-20 -top-20 -z-10 size-64 rounded-full bg-primary-foreground/10 blur-3xl motion-safe:animate-pulse"
             aria-hidden="true"
           />
           <span
-            className="pointer-events-none absolute -bottom-24 -right-16 size-72 rounded-full bg-primary-foreground/10 blur-3xl motion-safe:animate-pulse"
+            className="pointer-events-none absolute -bottom-24 -right-16 -z-10 size-72 rounded-full bg-primary-foreground/10 blur-3xl motion-safe:animate-pulse"
             aria-hidden="true"
           />
           <h2
             id="cta-title"
-            className="relative text-2xl font-semibold tracking-tight sm:text-3xl"
+            className="mx-auto max-w-2xl text-balance text-[clamp(1.75rem,4vw,3rem)] font-semibold leading-tight tracking-tight"
           >
             Build your first project this week
           </h2>
-          <p className="relative mx-auto mt-3 max-w-xl text-sm text-primary-foreground/80 sm:text-base">
+          <p className="mx-auto mt-4 max-w-xl text-pretty text-base text-primary-foreground/90 sm:text-lg">
             Create a free account, choose a technology and start with a lesson
             that ends in something you can run.
           </p>
-          <div className="relative mt-6 flex flex-wrap justify-center gap-3">
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link
               href="/register"
               className={buttonVariants({ variant: "secondary", size: "lg" })}
@@ -334,7 +360,7 @@ export function CtaBanner() {
                 variant: "outline",
                 size: "lg",
                 className:
-                  "border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground",
+                  "border-primary-foreground/50 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground",
               })}
             >
               Browse courses

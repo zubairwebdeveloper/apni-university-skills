@@ -1,43 +1,46 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "firebase/auth";
 import {
   AnimatePresence,
+  MotionConfig,
   motion,
-  useMotionValueEvent,
-  useScroll,
+  useMotionValue,
   useSpring,
 } from "framer-motion";
 import {
+  ArrowDownRight,
   ArrowRight,
-  ArrowUpRight,
   Bell,
   BookOpen,
   CheckCheck,
-  ClipboardList,
-  Crown,
+  ChevronDown,
+  Command,
+  Compass,
   Flame,
-  GraduationCap,
+  History,
   LayoutDashboard,
   LifeBuoy,
-  Library,
+  LogOut,
   Search,
   Settings,
   Sparkles,
-  TrendingUp,
   Trophy,
-  User,
-  Users,
+  Target,
+  UserRound,
   Video,
   X,
+  Zap,
+  ClipboardCheck,
+  Library,
+  Users,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,8 +50,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { auth } from "@/lib/firebase/client/auth";
 import { StudentMobileNav } from "./StudentMobileNav";
-import { AnimatedLogo } from "../layout/AnimatedLogo";
 import {
   NAV_LINKS,
   NOTIFICATIONS,
@@ -57,790 +60,1038 @@ import {
   USER_MENU,
 } from "@/lib/student-header-data";
 
+const RECENT_KEY = "student-recent-searches";
+const XP_PER_LEVEL = 500;
+
+// TODO: apne session API route ka sahi path likhein (jo cookie delete karta hai)
+const SESSION_ENDPOINT = "/api/auth/session";
+
 const ICONS = {
   dashboard: LayoutDashboard,
   book: BookOpen,
   video: Video,
   users: Users,
   library: Library,
-  user: User,
+  user: UserRound,
   trophy: Trophy,
   settings: Settings,
   help: LifeBuoy,
 };
 
-const NOTIFICATION_ICONS = {
-  course: BookOpen,
-  assignment: ClipboardList,
-  live: Video,
-};
-
-const XP_PER_LEVEL = 500;
-
-/* Shared hover style for dropdown rows (Radix uses data-[highlighted]) */
-const menuItemClass =
-  "group relative flex cursor-pointer items-center rounded-lg px-2 py-2 outline-none transition-colors " +
-  "focus:bg-primary/10 focus:text-primary data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary";
-
-const listVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.05, delayChildren: 0.05 } },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, x: -10 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.2 } },
-};
+const QUICK_ACTIONS = [
+  {
+    label: "Continue learning",
+    description: "Pick up where you left off",
+    href: "/student/courses",
+    icon: BookOpen,
+  },
+  {
+    label: "Join live class",
+    description: "Find upcoming sessions",
+    href: "/student/live",
+    icon: Video,
+  },
+  {
+    label: "Assignments",
+    description: "Review your next task",
+    href: "/student/assignments",
+    icon: ClipboardCheck,
+  },
+  {
+    label: "Learning library",
+    description: "Open notes and resources",
+    href: "/student/library",
+    icon: Library,
+  },
+];
 
 function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
+  const hour = new Date().getHours();
+
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+
   return "Good evening";
 }
 
-/* ---------- Desktop nav link: icon only, label expands on hover/active ---------- */
-function NavLink({ item, active, hoveredHref, setHoveredHref }) {
-  const Icon = ICONS[item.icon];
-  const hovered = hoveredHref === item.href;
+function Shortcut({ children }) {
+  return (
+    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-border bg-muted px-1.5 font-mono text-[10px] font-semibold text-muted-foreground">
+      {children}
+    </kbd>
+  );
+}
+
+function SearchDialog({
+  open,
+  onOpenChange,
+  onSearch,
+  suggestions = [],
+  recent = [],
+  onClearRecent,
+}) {
+  const [value, setValue] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const inputRef = useRef(null);
+
+  const results = useMemo(() => {
+    const query = value.trim().toLowerCase();
+
+    const matched = suggestions.filter((item) =>
+      String(item.label || "")
+        .toLowerCase()
+        .includes(query),
+    );
+
+    const recentItems = !query
+      ? recent.map((label) => ({
+          label,
+          hint: "Recent search",
+          icon: History,
+          kind: "recent",
+        }))
+      : [];
+
+    return [
+      ...recentItems,
+      ...matched.map((item) => ({
+        ...item,
+        kind: "suggestion",
+      })),
+    ].slice(0, 8);
+  }, [value, suggestions, recent]);
+
+  const currentActiveIndex = results.length
+    ? Math.min(activeIndex, results.length - 1)
+    : 0;
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const resetId = window.setTimeout(() => {
+      setValue("");
+      setActiveIndex(0);
+    }, 0);
+
+    const focusId = window.setTimeout(() => {
+      inputRef.current?.focus();
+    }, 60);
+
+    return () => {
+      window.clearTimeout(resetId);
+      window.clearTimeout(focusId);
+    };
+  }, [open]);
+
+  const submit = (label = value) => {
+    const query = String(label || "").trim();
+
+    if (!query) return;
+
+    onSearch(query);
+    onOpenChange(false);
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/50 px-3 pb-6 pt-[8vh] backdrop-blur-sm sm:px-6 sm:pt-[12vh]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              onOpenChange(false);
+            }
+          }}
+        >
+          <motion.section
+            role="dialog"
+            aria-modal="true"
+            aria-label="Global search"
+            initial={{ opacity: 0, y: 22, scale: 0.97, rotateX: 3 }}
+            animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 360, damping: 30 }}
+            className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-background shadow-2xl [transform-style:preserve-3d]"
+          >
+            <form
+              className="flex items-center gap-3 border-b border-border px-3 sm:px-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submit(results[currentActiveIndex]?.label || value);
+              }}
+            >
+              <Search className="size-5 shrink-0 text-primary" />
+
+              <Input
+                ref={inputRef}
+                value={value}
+                onChange={(event) => {
+                  setValue(event.target.value);
+                  setActiveIndex(0);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    onOpenChange(false);
+                  } else if (event.key === "ArrowDown" && results.length) {
+                    event.preventDefault();
+                    setActiveIndex((index) => (index + 1) % results.length);
+                  } else if (event.key === "ArrowUp" && results.length) {
+                    event.preventDefault();
+                    setActiveIndex(
+                      (index) => (index - 1 + results.length) % results.length,
+                    );
+                  }
+                }}
+                placeholder="Search courses, lessons, resources..."
+                className="h-14 min-w-0 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 sm:text-base"
+                aria-label="Search courses and student pages"
+                autoComplete="off"
+              />
+
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-95"
+                aria-label="Close search"
+              >
+                <X className="size-4" />
+              </button>
+            </form>
+
+            <div className="max-h-[min(60vh,28rem)] overflow-y-auto p-2 sm:p-3">
+              <div className="mb-2 flex items-center justify-between gap-2 px-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground sm:text-[11px]">
+                  {value
+                    ? "Search results"
+                    : recent.length
+                      ? "Recent & suggested"
+                      : "Suggested destinations"}
+                </p>
+
+                {!value && recent.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={onClearRecent}
+                    className="cursor-pointer text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    Clear recent
+                  </button>
+                )}
+              </div>
+
+              {results.length > 0 ? (
+                <div className="space-y-1">
+                  {results.map((item, index) => {
+                    const ItemIcon = item.icon || Compass;
+                    const active = currentActiveIndex === index;
+
+                    return (
+                      <button
+                        key={`${item.kind}-${item.label}-${index}`}
+                        type="button"
+                        onMouseEnter={() => setActiveIndex(index)}
+                        onClick={() => submit(item.label)}
+                        className={cn(
+                          "group flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200",
+                          active
+                            ? "bg-primary/10 text-foreground shadow-sm"
+                            : "hover:bg-muted/70",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground transition-all duration-200 sm:size-10",
+                            active &&
+                              "border-primary/20 bg-primary text-primary-foreground shadow-md shadow-primary/20",
+                          )}
+                        >
+                          <ItemIcon className="size-[17px] sm:size-[18px]" />
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold">
+                            {item.label}
+                          </span>
+
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                            {item.hint ||
+                              item.description ||
+                              "Open this destination"}
+                          </span>
+                        </span>
+
+                        {active ? (
+                          <ArrowRight className="size-4 shrink-0 text-primary" />
+                        ) : (
+                          <ArrowDownRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="px-4 py-10 text-center">
+                  <Search className="mx-auto mb-3 size-7 text-muted-foreground/60" />
+
+                  <p className="text-sm font-semibold">
+                    No matching suggestions
+                  </p>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Press Enter to search for “{value}”.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => submit(value)}
+                    className="mt-4 cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
+                  >
+                    Search all courses
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/30 px-3 py-3 text-[10px] text-muted-foreground sm:px-4 sm:text-[11px]">
+              <span className="flex items-center gap-1.5">
+                <Shortcut>↑</Shortcut>
+                <Shortcut>↓</Shortcut>
+                <span>Navigate</span>
+              </span>
+
+              <span className="flex items-center gap-1.5">
+                <Shortcut>↵</Shortcut>
+                <span>Open</span>
+                <Shortcut>Esc</Shortcut>
+                <span>Close</span>
+              </span>
+            </footer>
+          </motion.section>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function TargetIcon() {
+  return <Target className="mx-auto mb-1 size-3.5 text-emerald-500" />;
+}
+
+function QuickActionCard({ action, onNavigate }) {
+  const Icon = action.icon;
 
   return (
     <Link
-      href={item.href}
-      aria-label={item.label}
-      onMouseEnter={() => setHoveredHref(item.href)}
-      onFocus={() => setHoveredHref(item.href)}
-      className={cn(
-        "group relative flex items-center rounded-lg px-3 py-2 text-sm font-medium outline-none transition-colors",
-        active ? "text-primary" : "text-muted-foreground hover:text-primary",
-      )}
+      href={action.href}
+      onClick={onNavigate}
+      className="group flex cursor-pointer items-center gap-3 rounded-xl p-3 transition-all duration-200 hover:translate-x-0.5 hover:bg-muted/70 active:scale-[0.99]"
     >
-      {hovered && (
-        <motion.span
-          layoutId="nav-hover-pill"
-          className="absolute inset-0 rounded-lg bg-primary/10"
-          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-        />
-      )}
-      <span className="relative z-10 flex items-center">
-        <Icon className="size-[18px] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:scale-110" />
-        <AnimatePresence initial={false}>
-          {(active || hovered) && (
-            <motion.span
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: "auto", opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden whitespace-nowrap"
-            >
-              <span className="block pl-2">{item.label}</span>
-            </motion.span>
-          )}
-        </AnimatePresence>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-primary shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:rotate-[-3deg] group-hover:shadow-md">
+        <Icon className="size-[18px]" />
       </span>
-      {active && (
-        <motion.span
-          layoutId="nav-active-line"
-          className="absolute inset-x-3 -bottom-[14px] h-0.5 rounded-full bg-primary"
-          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-        />
-      )}
+
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{action.label}</span>
+
+        <span className="mt-0.5 block text-xs text-muted-foreground">
+          {action.description}
+        </span>
+      </span>
+
+      <ArrowRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100" />
     </Link>
   );
 }
 
-export function StudentHeader({ person }) {
+export function StudentHeader({ person, onSignOut }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchRef = useRef(null);
 
-  const [query, setQuery] = useState("");
-  const [focused, setFocused] = useState(false);
-  const [mobileSearch, setMobileSearch] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [hidden, setHidden] = useState(false);
   const [tickerIndex, setTickerIndex] = useState(0);
+  const [tickerPaused, setTickerPaused] = useState(false);
   const [greeting, setGreeting] = useState("Welcome");
-  const [hoveredHref, setHoveredHref] = useState(null);
+  const [recent, setRecent] = useState([]);
   const [readIds, setReadIds] = useState([]);
+  const [notifTab, setNotifTab] = useState("all");
 
-  const { scrollY, scrollYProgress } = useScroll();
-  const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 24 });
+  const pointerX = useMotionValue(0);
+  const pointerY = useMotionValue(0);
 
-  // Hide header on scroll down, show on scroll up
-  useMotionValueEvent(scrollY, "change", (latest) => {
-    const prev = scrollY.getPrevious() ?? 0;
-    setScrolled(latest > 8);
-    setHidden(latest > prev && latest > 160);
-  });
+  const rotateX = useSpring(pointerY, { stiffness: 180, damping: 22 });
+  const rotateY = useSpring(pointerX, { stiffness: 180, damping: 22 });
 
   const name = person?.name || person?.displayName || "Student";
-  const firstName = name.split(" ")[0];
-  const streak = person?.streak ?? 3;
-  const xp = person?.xp ?? 1250;
-  const coursesCount = person?.coursesCount ?? 4;
-  const dailyGoal = Math.min(person?.dailyGoalProgress ?? 65, 100);
+  const firstName = name.split(/\s+/)[0] || "Student";
+
+  const xp = Math.max(0, Number(person?.xp ?? 1250) || 0);
+  const streak = Math.max(0, Number(person?.streak ?? 3) || 0);
+  const coursesCount = Math.max(0, Number(person?.coursesCount ?? 4) || 0);
+
+  const dailyGoal = Math.min(
+    100,
+    Math.max(0, Number(person?.dailyGoalProgress ?? 65) || 0),
+  );
+
   const level = Math.floor(xp / XP_PER_LEVEL) + 1;
   const levelProgress = ((xp % XP_PER_LEVEL) / XP_PER_LEVEL) * 100;
 
   const unreadCount = NOTIFICATIONS.filter(
-    (n) => !readIds.includes(n.id),
+    (notification) => !readIds.includes(notification.id),
   ).length;
-  const trimmed = query.trim();
-  const filteredSuggestions = SEARCH_SUGGESTIONS.filter((s) =>
-    s.label.toLowerCase().includes(trimmed.toLowerCase()),
+
+  const visibleNotifications =
+    notifTab === "unread"
+      ? NOTIFICATIONS.filter(
+          (notification) => !readIds.includes(notification.id),
+        )
+      : NOTIFICATIONS;
+
+  const ticker = TECH_TICKER?.[tickerIndex] || TECH_TICKER?.[0];
+
+  const avatarInitials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setGreeting(getGreeting());
+
+      try {
+        const stored = JSON.parse(
+          window.localStorage.getItem(RECENT_KEY) || "[]",
+        );
+
+        if (Array.isArray(stored)) {
+          setRecent(
+            stored.filter((item) => typeof item === "string").slice(0, 5),
+          );
+        }
+      } catch {
+        // Ignore malformed or unavailable local storage.
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (tickerPaused || !TECH_TICKER || TECH_TICKER.length < 2) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      setTickerIndex((index) => (index + 1) % TECH_TICKER.length);
+    }, 3600);
+
+    return () => window.clearInterval(timer);
+  }, [tickerPaused]);
+
+  const saveRecent = useCallback((label) => {
+    setRecent((previous) => {
+      const next = [
+        label,
+        ...previous.filter(
+          (item) => item.toLowerCase() !== label.toLowerCase(),
+        ),
+      ].slice(0, 5);
+
+      try {
+        window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      } catch {
+        // Search still works if storage is unavailable.
+      }
+
+      return next;
+    });
+  }, []);
+
+  const clearRecent = useCallback(() => {
+    setRecent([]);
+
+    try {
+      window.localStorage.removeItem(RECENT_KEY);
+    } catch {
+      // Ignore unavailable local storage.
+    }
+  }, []);
+
+  const goSearch = useCallback(
+    (rawQuery) => {
+      const query = String(rawQuery || "").trim();
+
+      if (!query) return;
+
+      saveRecent(query);
+      setSearchOpen(false);
+
+      router.push(`/courses?q=${encodeURIComponent(query)}`);
+    },
+    [router, saveRecent],
   );
 
-  useEffect(() => setGreeting(getGreeting()), []);
-
+  // Alt + K opens search
   useEffect(() => {
-    const id = setInterval(
-      () => setTickerIndex((i) => (i + 1) % TECH_TICKER.length),
-      3500,
-    );
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        if (window.innerWidth < 768) setMobileSearch(true);
-        else searchRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "k"
+      ) {
+        event.preventDefault();
+        setSearchOpen(true);
       }
-      if (e.key === "Escape") setMobileSearch(false);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const goSearch = (q) => {
-    const value = q.trim();
-    if (!value) return;
-    setQuery(value);
-    setMobileSearch(false);
-    searchRef.current?.blur();
-    router.push(`/courses?q=${encodeURIComponent(value)}`);
-  };
+  const markRead = useCallback((id) => {
+    setReadIds((previous) =>
+      previous.includes(id) ? previous : [...previous, id],
+    );
+  }, []);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    goSearch(query);
-  };
+  const markAllRead = useCallback(() => {
+    setReadIds(NOTIFICATIONS.map((notification) => notification.id));
+  }, []);
 
-  const markRead = (id) =>
-    setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-  const markAllRead = () => setReadIds(NOTIFICATIONS.map((n) => n.id));
+  // Real sign out: pehle server cookie hatao, phir Firebase client, phir redirect.
+  // Warna client "logged in" rehta hai aur login/student ke beech loop ban sakta hai.
+  const handleSignOut = useCallback(async () => {
+    setProfileOpen(false);
+
+    if (onSignOut) {
+      onSignOut();
+      return;
+    }
+
+    try {
+      await fetch(SESSION_ENDPOINT, { method: "DELETE" });
+    } catch (error) {
+      console.error("Failed to clear server session:", error);
+    }
+
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Failed to sign out:", error);
+    }
+
+    router.replace("/login");
+    router.refresh();
+  }, [onSignOut, router]);
 
   const isActive = (href) =>
-    href === "/student" ? pathname === href : pathname?.startsWith(href);
+    href === "/student"
+      ? pathname === href
+      : pathname === href || pathname?.startsWith(`${href}/`);
 
-  const ticker = TECH_TICKER[tickerIndex];
+  const handlePointerMove = (event) => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    if (!rect.width || !rect.height) return;
+
+    const x = (event.clientX - rect.left) / rect.width - 0.5;
+    const y = (event.clientY - rect.top) / rect.height - 0.5;
+
+    pointerX.set(x * 4);
+    pointerY.set(y * -3);
+  };
+
+  const resetTilt = () => {
+    pointerX.set(0);
+    pointerY.set(0);
+  };
 
   return (
-    <motion.header
-      initial={{ y: -64, opacity: 0 }}
-      animate={{ y: hidden && !mobileSearch ? "-100%" : 0, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 140, damping: 20 }}
-      className={cn(
-        "sticky top-0 z-30 border-b bg-background/80 backdrop-blur-xl transition-shadow",
-        scrolled && "shadow-lg shadow-primary/5",
-      )}
-    >
-      {/* Scroll progress bar */}
-      <motion.div
-        style={{ scaleX: progress }}
-        className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-gradient-to-r from-primary via-primary/60 to-transparent"
-      />
-
-      <div className="flex h-16 items-center gap-2 px-3 sm:gap-3 sm:px-6 lg:px-8">
-        <StudentMobileNav person={person} />
-        <div className="lg:hidden">
-          <AnimatedLogo />
-        </div>
-
-        {/* Desktop nav links */}
-        <nav
-          className="hidden items-center gap-1 xl:flex"
-          onMouseLeave={() => setHoveredHref(null)}
-          aria-label="Student navigation"
+    <MotionConfig reducedMotion="user">
+      <header className="sticky top-0 z-50 w-full">
+        <motion.div
+          onMouseMove={handlePointerMove}
+          onMouseLeave={resetTilt}
+          style={{
+            transformPerspective: 1400,
+            rotateX: scrolled ? 0 : rotateX,
+            rotateY: scrolled ? 0 : rotateY,
+          }}
+          className={cn(
+            "relative border-b transition-[background-color,box-shadow,border-color] duration-300",
+            scrolled
+              ? "border-border/80 bg-background/95 shadow-sm backdrop-blur-xl"
+              : "border-border/50 bg-background",
+          )}
         >
-          {NAV_LINKS.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              active={isActive(item.href)}
-              hoveredHref={hoveredHref}
-              setHoveredHref={setHoveredHref}
-            />
-          ))}
-        </nav>
+          <div className="mx-auto flex min-h-[64px] max-w-[1600px] items-center gap-2 px-3 sm:min-h-[72px] sm:gap-3 sm:px-5 lg:px-8">
+            {/* Desktop navigation */}
+            <nav
+              className="ml-1 hidden min-w-0 flex-1 items-center gap-1 lg:flex"
+              aria-label="Student navigation"
+            >
+              {NAV_LINKS.map((item) => {
+                const Icon = ICONS[item.icon] || Compass;
+                const active = isActive(item.href);
 
-        {/* Inline search with suggestions (tablet / desktop) */}
-        <form onSubmit={handleSearch} className="ml-2 hidden md:block">
-          <motion.div
-            animate={{ width: focused ? 300 : 200 }}
-            transition={{ type: "spring", stiffness: 220, damping: 24 }}
-            className="relative"
-          >
-            <Search
-              className={cn(
-                "absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors",
-                focused ? "text-primary" : "text-muted-foreground",
-              )}
-            />
-            <Input
-              ref={searchRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              onKeyDown={(e) => e.key === "Escape" && e.currentTarget.blur()}
-              placeholder="Search courses..."
-              className="h-9 rounded-full bg-muted/50 pl-9 pr-12 transition-colors hover:bg-muted focus-visible:bg-background"
-            />
-            <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground lg:block">
-              Ctrl K
-            </kbd>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "group relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] font-semibold transition-all duration-200 ease-out xl:px-3",
+                      active
+                        ? "text-primary"
+                        : "text-muted-foreground hover:-translate-y-0.5 hover:bg-muted/70 hover:text-foreground active:translate-y-0",
+                    )}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="student-nav-active"
+                        className="absolute inset-0 rounded-xl bg-primary/10"
+                        transition={{
+                          type: "spring",
+                          stiffness: 380,
+                          damping: 30,
+                        }}
+                      />
+                    )}
 
-            <AnimatePresence>
-              {focused && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-xl"
+                    <Icon className="relative size-4 shrink-0 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:scale-105" />
+
+                    <span className="relative whitespace-nowrap">
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Search, notifications and profile */}
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="group hidden h-10 min-w-[190px] cursor-pointer items-center gap-2 rounded-xl border border-border/80 bg-muted/35 px-3 text-left text-sm text-muted-foreground shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/[0.04] hover:text-foreground hover:shadow-md hover:shadow-primary/5 active:translate-y-0 active:scale-[0.98] xl:flex 2xl:min-w-[250px]"
+                aria-label="Open global search (Alt plus K)"
+              >
+                <Search className="size-4 shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[-8deg] group-hover:text-primary" />
+
+                <span>Quick search</span>
+                <Shortcut>Alt</Shortcut>
+                <Shortcut>K</Shortcut>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Open search"
+                className="inline-flex size-10 cursor-pointer items-center justify-center rounded-xl border border-border/80 bg-background text-muted-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/5 hover:text-primary hover:shadow-md active:scale-95 xl:hidden"
+              >
+                <Search className="size-[18px] transition-transform duration-200" />
+              </button>
+
+              {/* Notifications */}
+              <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
+                {/* FIX: andar <button> nahi, trigger khud button hai */}
+                <DropdownMenuTrigger
+                  aria-label={`Notifications, ${unreadCount} unread`}
+                  className="group relative inline-flex size-10 cursor-pointer items-center justify-center rounded-xl border border-border/80 bg-background text-muted-foreground shadow-sm outline-none transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/5 hover:text-primary hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary active:scale-95"
                 >
-                  <p className="px-2 pb-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {trimmed ? "Suggestions" : "Popular in tech"}
-                  </p>
+                  <Bell className="size-[18px] transition-transform duration-300 group-hover:rotate-[-8deg]" />
 
-                  {trimmed && (
+                  {unreadCount > 0 && (
+                    <span className="absolute right-1.5 top-1.5 flex size-[17px] items-center justify-center rounded-full border-2 border-background bg-primary text-[9px] font-bold text-primary-foreground">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent
+                  align="end"
+                  sideOffset={10}
+                  className="w-[min(23rem,calc(100vw-1rem))] rounded-2xl p-0"
+                >
+                  <div className="flex items-center justify-between gap-3 border-b border-border p-4">
+                    <div>
+                      <p className="font-semibold">Notifications</p>
+
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {unreadCount
+                          ? `${unreadCount} unread updates`
+                          : "You're all caught up"}
+                      </p>
+                    </div>
+
                     <button
                       type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => goSearch(trimmed)}
-                      className="group flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-primary/10 hover:text-primary"
+                      onClick={markAllRead}
+                      className="inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-semibold text-primary transition-colors hover:underline"
                     >
-                      <Search className="size-4" />
-                      <span className="min-w-0 flex-1 truncate">
-                        Search for “{trimmed}”
-                      </span>
-                      <ArrowRight className="size-4 -translate-x-2 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                      <CheckCheck className="size-3.5" />
+                      Mark all read
                     </button>
-                  )}
+                  </div>
 
-                  {filteredSuggestions.map((s, i) => (
-                    <motion.button
-                      key={s.label}
-                      type="button"
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.03 }}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => goSearch(s.label)}
-                      className="group flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-primary/10 hover:text-primary"
-                    >
-                      <TrendingUp className="size-4 text-muted-foreground transition-colors group-hover:text-primary" />
-                      <span className="min-w-0 flex-1 truncate">{s.label}</span>
-                      <span className="text-xs text-muted-foreground transition-opacity group-hover:opacity-0">
-                        {s.hint}
-                      </span>
-                      <ArrowRight className="absolute right-4 size-4 -translate-x-2 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
-                    </motion.button>
-                  ))}
-
-                  {!filteredSuggestions.length && !trimmed && null}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </form>
-
-        {/* Tech ticker (extra large screens) */}
-        <div className="ml-2 hidden h-9 min-w-0 flex-1 items-center overflow-hidden 2xl:flex">
-          <Sparkles className="mr-2 size-4 shrink-0 text-primary" />
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={ticker.label}
-              initial={{ y: 16, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -16, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex min-w-0 items-center gap-2"
-            >
-              <Badge variant="secondary" className="shrink-0">
-                {ticker.tag}
-              </Badge>
-              <Link
-                href={ticker.href}
-                className="group flex min-w-0 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                <span className="truncate">{ticker.label}</span>
-                <ArrowUpRight className="size-3.5 shrink-0 opacity-0 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100" />
-              </Link>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Right side actions */}
-        <div className="ml-auto flex items-center gap-1 sm:gap-2">
-          {/* Mobile search toggle */}
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setMobileSearch((v) => !v)}
-            aria-label={mobileSearch ? "Close search" : "Open search"}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "icon" }),
-              "hover:bg-primary/10 hover:text-primary md:hidden",
-            )}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={mobileSearch ? "x" : "s"}
-                initial={{ rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: 90, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="inline-flex"
-              >
-                {mobileSearch ? (
-                  <X className="size-5" />
-                ) : (
-                  <Search className="size-5" />
-                )}
-              </motion.span>
-            </AnimatePresence>
-          </motion.button>
-
-          {/* Streak + XP (large screens) */}
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            className="hidden xl:block"
-          >
-            <Link
-              href="/student/achievements"
-              className="flex items-center gap-2 rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-            >
-              <span className="flex items-center gap-1">
-                <motion.span
-                  animate={{ scale: [1, 1.25, 1], rotate: [0, -8, 8, 0] }}
-                  transition={{
-                    duration: 1.6,
-                    repeat: Infinity,
-                    repeatDelay: 1.5,
-                  }}
-                  className="inline-flex"
-                >
-                  <Flame className="size-4 text-orange-500" />
-                </motion.span>
-                {streak} day streak
-              </span>
-              <span className="h-3 w-px bg-border" />
-              <span className="flex items-center gap-1">
-                <Trophy className="size-3.5 text-yellow-500" />
-                {xp} XP
-              </span>
-            </Link>
-          </motion.div>
-
-          {/* Notifications */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              aria-label="Notifications"
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "icon" }),
-                "relative hover:bg-primary/10 hover:text-primary",
-              )}
-            >
-              <motion.span
-                whileHover={{ rotate: [0, 14, -14, 10, -10, 0] }}
-                transition={{ duration: 0.6 }}
-                className="inline-flex origin-top"
-              >
-                <Bell className="size-5" />
-              </motion.span>
-              <AnimatePresence>
-                {unreadCount > 0 && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    exit={{ scale: 0 }}
-                    className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center"
-                  >
-                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
-                    <span className="relative flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
-                      {unreadCount}
-                    </span>
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              sideOffset={10}
-              className="w-[calc(100vw-1.5rem)] max-w-80 p-1.5 sm:w-80"
-            >
-              <DropdownMenuLabel className="flex items-center justify-between">
-                Notifications
-                <Badge variant="secondary">
-                  {unreadCount ? `${unreadCount} new` : "All caught up"}
-                </Badge>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-
-              <motion.div
-                variants={listVariants}
-                initial="hidden"
-                animate="show"
-              >
-                {NOTIFICATIONS.map((n) => {
-                  const Icon = NOTIFICATION_ICONS[n.type] ?? Bell;
-                  const isRead = readIds.includes(n.id);
-                  return (
-                    <DropdownMenuItem
-                      key={n.id}
-                      onSelect={() => {
-                        markRead(n.id);
-                        router.push(n.href);
-                      }}
-                      className={menuItemClass}
-                    >
-                      <motion.div
-                        variants={itemVariants}
-                        className="flex w-full items-center gap-3"
+                  <div className="flex gap-1 border-b border-border px-3 py-2">
+                    {["all", "unread"].map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setNotifTab(tab)}
+                        className={cn(
+                          "cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors",
+                          notifTab === tab
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:bg-muted",
+                        )}
                       >
-                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-all duration-200 group-focus:scale-110 group-focus:bg-primary group-focus:text-primary-foreground group-data-[highlighted]:scale-110 group-data-[highlighted]:bg-primary group-data-[highlighted]:text-primary-foreground">
-                          <Icon className="size-4 text-current" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="max-h-[min(55vh,24rem)] overflow-y-auto p-2">
+                    {visibleNotifications.length ? (
+                      visibleNotifications.map((notification) => {
+                        const read = readIds.includes(notification.id);
+
+                        const NotificationIcon =
+                          notification.type === "live"
+                            ? Video
+                            : notification.type === "assignment"
+                              ? ClipboardCheck
+                              : BookOpen;
+
+                        return (
+                          <button
+                            key={notification.id}
+                            type="button"
+                            onClick={() => {
+                              markRead(notification.id);
+
+                              if (notification.href) {
+                                setNotifOpen(false);
+                                router.push(notification.href);
+                              }
+                            }}
                             className={cn(
-                              "block truncate text-sm",
-                              isRead ? "font-normal" : "font-semibold",
+                              "flex w-full cursor-pointer gap-3 rounded-xl p-3 text-left transition-all duration-200 hover:translate-x-0.5 hover:bg-muted/70",
+                              !read && "bg-primary/[0.04]",
                             )}
                           >
-                            {n.title}
-                          </span>
-                          <span className="block text-xs text-muted-foreground transition-colors group-focus:text-primary/70 group-data-[highlighted]:text-primary/70">
-                            {n.time}
-                          </span>
-                        </span>
-                        {!isRead && (
-                          <span className="size-2 shrink-0 rounded-full bg-primary transition-opacity group-focus:opacity-0 group-data-[highlighted]:opacity-0" />
-                        )}
-                        <ArrowRight className="absolute right-3 size-4 -translate-x-2 text-current opacity-0 transition-all duration-200 group-focus:translate-x-0 group-focus:opacity-100 group-data-[highlighted]:translate-x-0 group-data-[highlighted]:opacity-100" />
-                      </motion.div>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </motion.div>
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                              <NotificationIcon className="size-4" />
+                            </span>
 
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  markAllRead();
-                }}
-                className="group flex cursor-pointer items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium outline-none transition-colors focus:bg-primary/10 focus:text-primary data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary"
-              >
-                <CheckCheck className="size-4 transition-transform group-data-[highlighted]:scale-110" />
-                Mark all as read
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-start justify-between gap-2">
+                                <span className="text-sm font-semibold">
+                                  {notification.title}
+                                </span>
 
-          {/* Browse courses */}
-          <motion.div whileTap={{ scale: 0.96 }}>
-            <Link
-              href="/courses"
-              className={cn(
-                buttonVariants({ variant: "default", size: "sm" }),
-                "group relative overflow-hidden transition-shadow hover:shadow-lg hover:shadow-primary/30",
-              )}
-            >
-              <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-              <BookOpen className="size-4" />
-              <span className="hidden lg:inline">Browse courses</span>
-              <ArrowRight className="hidden size-4 transition-transform group-hover:translate-x-1 lg:inline" />
-            </Link>
-          </motion.div>
+                                {!read && (
+                                  <span className="mt-1 size-1.5 shrink-0 rounded-full bg-primary" />
+                                )}
+                              </span>
 
-          {/* User menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              aria-label="User menu"
-              className="relative flex size-10 items-center justify-center rounded-full outline-none ring-offset-background transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              {/* Daily goal ring */}
-              <svg
-                viewBox="0 0 40 40"
-                className="absolute inset-0 size-full -rotate-90"
-                aria-hidden
-              >
-                <circle
-                  cx="20"
-                  cy="20"
-                  r="18"
-                  fill="none"
-                  strokeWidth="2.5"
-                  className="stroke-muted"
-                />
-                <motion.circle
-                  cx="20"
-                  cy="20"
-                  r="18"
-                  fill="none"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  className="stroke-primary"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: dailyGoal / 100 }}
-                  transition={{ duration: 1, ease: "easeOut", delay: 0.4 }}
-                />
-              </svg>
-              <Avatar className="size-8">
-                <AvatarImage src={person?.photoURL} alt={name} />
-                <AvatarFallback>{name.charAt(0).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <span className="absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-background bg-green-500" />
-            </DropdownMenuTrigger>
+                              <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                                {notification.description ||
+                                  notification.message}
+                              </span>
 
-            <DropdownMenuContent
-              align="end"
-              sideOffset={10}
-              className="w-[calc(100vw-1.5rem)] max-w-80 overflow-hidden p-0 sm:w-80"
-            >
-              {/* Profile banner */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-4">
-                <motion.div
-                  aria-hidden
-                  animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.7, 0.4] }}
-                  transition={{ duration: 4, repeat: Infinity }}
-                  className="pointer-events-none absolute -right-8 -top-8 size-28 rounded-full bg-primary/20 blur-2xl"
-                />
-                <div className="relative flex items-center gap-3">
-                  <Avatar className="size-12 ring-2 ring-background">
-                    <AvatarImage src={person?.photoURL} alt={name} />
-                    <AvatarFallback>
-                      {name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">{greeting},</p>
-                    <p className="truncate text-sm font-semibold">
-                      {firstName} 👋
-                    </p>
-                    {person?.email && (
-                      <p className="truncate text-xs text-muted-foreground">
-                        {person.email}
+                              {notification.time && (
+                                <span className="mt-1.5 block text-[10px] text-muted-foreground">
+                                  {notification.time}
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No notifications here.
                       </p>
                     )}
                   </div>
-                </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-                {/* Level progress */}
-                <div className="relative mt-4">
-                  <div className="mb-1.5 flex items-center justify-between text-xs">
-                    <span className="font-medium">Level {level}</span>
-                    <span className="text-muted-foreground">
-                      {xp % XP_PER_LEVEL} / {XP_PER_LEVEL} XP
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-background/70">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${levelProgress}%` }}
-                      transition={{
-                        duration: 0.8,
-                        ease: "easeOut",
-                        delay: 0.15,
-                      }}
-                      className="h-full rounded-full bg-gradient-to-r from-primary to-primary/60"
-                    />
-                  </div>
-                </div>
-
-                {/* Daily goal */}
-                <div className="relative mt-3">
-                  <div className="mb-1.5 flex items-center justify-between text-xs">
-                    <span className="font-medium">Daily goal</span>
-                    <span className="text-muted-foreground">{dailyGoal}%</span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-background/70">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${dailyGoal}%` }}
-                      transition={{
-                        duration: 0.8,
-                        ease: "easeOut",
-                        delay: 0.3,
-                      }}
-                      className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400"
-                    />
-                  </div>
-                </div>
-
-                {/* Quick stats */}
-                <div className="relative mt-4 grid grid-cols-3 gap-2">
-                  {[
-                    {
-                      icon: Flame,
-                      color: "text-orange-500",
-                      value: streak,
-                      label: "Streak",
-                    },
-                    {
-                      icon: Trophy,
-                      color: "text-yellow-500",
-                      value: xp,
-                      label: "Total XP",
-                    },
-                    {
-                      icon: GraduationCap,
-                      color: "text-primary",
-                      value: coursesCount,
-                      label: "Courses",
-                    },
-                  ].map((s, i) => (
-                    <motion.div
-                      key={s.label}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 + i * 0.06 }}
-                      whileHover={{ y: -2 }}
-                      className="rounded-lg border bg-background/80 px-2 py-2 text-center transition-colors hover:border-primary/40"
-                    >
-                      <s.icon className={cn("mx-auto size-4", s.color)} />
-                      <p className="mt-1 text-sm font-semibold leading-none">
-                        {s.value}
-                      </p>
-                      <p className="mt-1 text-[10px] text-muted-foreground">
-                        {s.label}
-                      </p>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-
-              <DropdownMenuSeparator className="my-0" />
-
-              {/* Menu items */}
-              <motion.div
-                variants={listVariants}
-                initial="hidden"
-                animate="show"
-                className="p-1.5"
-              >
-                {USER_MENU.map((item) => {
-                  const Icon = ICONS[item.icon];
-                  return (
-                    <DropdownMenuItem
-                      key={item.href}
-                      onSelect={() => router.push(item.href)}
-                      className={menuItemClass}
-                    >
-                      <motion.div
-                        variants={itemVariants}
-                        className="flex w-full items-center gap-3"
-                      >
-                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-all duration-200 group-focus:scale-110 group-focus:bg-primary group-focus:text-primary-foreground group-data-[highlighted]:scale-110 group-data-[highlighted]:bg-primary group-data-[highlighted]:text-primary-foreground">
-                          <Icon className="size-4 text-current" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2 text-sm font-medium">
-                            {item.label}
-                            {item.badge && (
-                              <Badge className="h-4 px-1.5 text-[10px]">
-                                {item.badge}
-                              </Badge>
-                            )}
-                          </span>
-                          <span className="block truncate text-xs text-muted-foreground transition-colors group-focus:text-primary/70 group-data-[highlighted]:text-primary/70">
-                            {item.description}
-                          </span>
-                        </span>
-                        <ArrowRight className="size-4 shrink-0 -translate-x-2 text-current opacity-0 transition-all duration-200 group-focus:translate-x-0 group-focus:opacity-100 group-data-[highlighted]:translate-x-0 group-data-[highlighted]:opacity-100" />
-                      </motion.div>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </motion.div>
-
-              <DropdownMenuSeparator className="my-0" />
-
-              {/* Upgrade card */}
-              <div className="p-2">
-                <DropdownMenuItem
-                  onSelect={() => router.push("/pricing")}
-                  className="group relative cursor-pointer overflow-hidden rounded-xl bg-gradient-to-r from-primary to-primary/70 p-3 text-primary-foreground outline-none focus:bg-primary focus:text-primary-foreground data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground"
+              {/* Student profile */}
+              <DropdownMenu open={profileOpen} onOpenChange={setProfileOpen}>
+                {/* FIX: andar <button> nahi, trigger khud button hai */}
+                <DropdownMenuTrigger
+                  aria-label="Open student profile menu"
+                  className="group flex cursor-pointer items-center gap-1.5 rounded-xl border border-transparent p-1 outline-none transition-all duration-200 hover:border-border hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-primary active:scale-[0.98] sm:gap-2 sm:pr-2"
                 >
-                  <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-focus:translate-x-full group-data-[highlighted]:translate-x-full" />
-                  <div className="relative flex w-full items-center gap-3">
-                    <Crown className="size-5 shrink-0 text-current" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">Upgrade to Pro</p>
-                      <p className="text-xs opacity-80">
-                        Unlock all tech courses
-                      </p>
+                  <Avatar className="size-9 border border-border shadow-sm transition duration-300 group-hover:scale-[1.04] group-hover:shadow-md">
+                    <AvatarImage
+                      src={person?.photoURL || person?.avatar || ""}
+                      alt={name}
+                    />
+
+                    <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+                      {avatarInitials || "S"}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <span className="hidden max-w-28 text-left xl:block">
+                    <span className="block truncate text-xs font-bold">
+                      {firstName}
+                    </span>
+
+                    <span className="block text-[10px] text-muted-foreground">
+                      Level {level}
+                    </span>
+                  </span>
+
+                  {/* Base UI trigger par data-popup-open lagata hai (data-state nahi) */}
+                  <ChevronDown className="hidden size-3.5 text-muted-foreground transition-transform duration-200 group-data-[popup-open]:rotate-180 xl:block" />
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent
+                  align="end"
+                  sideOffset={10}
+                  className="w-[min(16rem,calc(100vw-1rem))] rounded-2xl p-2 sm:w-64"
+                >
+                  <DropdownMenuLabel className="px-3 py-3 font-normal">
+                    <p className="truncate text-sm font-bold">{name}</p>
+
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      {person?.email || "Keep your learning streak alive"}
+                    </p>
+
+                    <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+                      <span className="text-muted-foreground">
+                        Level {level}
+                      </span>
+
+                      <span className="font-semibold">
+                        {xp % XP_PER_LEVEL}/{XP_PER_LEVEL} XP
+                      </span>
                     </div>
-                    <ArrowRight className="size-4 shrink-0 text-current transition-transform group-focus:translate-x-1 group-data-[highlighted]:translate-x-1" />
+
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${levelProgress}%` }}
+                        transition={{ duration: 0.6, ease: "easeOut" }}
+                        className="h-full rounded-full bg-primary"
+                      />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div className="rounded-lg bg-muted/70 p-2 text-center transition-colors hover:bg-muted">
+                        <Flame className="mx-auto mb-1 size-3.5 text-orange-500" />
+                        <span className="block text-xs font-bold">
+                          {streak} days
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Streak
+                        </span>
+                      </div>
+
+                      <div className="rounded-lg bg-muted/70 p-2 text-center transition-colors hover:bg-muted">
+                        <BookOpen className="mx-auto mb-1 size-3.5 text-primary" />
+                        <span className="block text-xs font-bold">
+                          {coursesCount}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Courses
+                        </span>
+                      </div>
+
+                      <div className="rounded-lg bg-muted/70 p-2 text-center transition-colors hover:bg-muted">
+                        <TargetIcon />
+                        <span className="block text-xs font-bold">
+                          {dailyGoal}%
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Daily goal
+                        </span>
+                      </div>
+                    </div>
+                  </DropdownMenuLabel>
+
+                  <DropdownMenuSeparator />
+
+                  <div className="px-1 py-1">
+                    <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                      Quick actions
+                    </p>
+
+                    {QUICK_ACTIONS.map((action) => (
+                      <QuickActionCard
+                        key={action.href}
+                        action={action}
+                        onNavigate={() => setProfileOpen(false)}
+                      />
+                    ))}
                   </div>
-                </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  {(USER_MENU || []).map((item) => {
+                    const Icon = ICONS[item.icon] || UserRound;
+
+                    return (
+                      <DropdownMenuItem
+                        key={item.href || item.label}
+                        // FIX: Base UI mein onSelect nahi, onClick hota hai
+                        onClick={() => {
+                          if (item.href) {
+                            router.push(item.href);
+                          }
+                        }}
+                        className="cursor-pointer rounded-lg py-2.5 transition-colors"
+                      >
+                        <Icon className="mr-2 size-4 text-muted-foreground" />
+                        {item.label}
+                      </DropdownMenuItem>
+                    );
+                  })}
+
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="cursor-pointer rounded-lg py-2.5 text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="mr-2 size-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {/* Mobile and tablet navigation */}
+          <div className="border-t border-border/60 lg:hidden">
+            <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-2 px-3 py-2 sm:px-5">
+              <div className="min-w-0 flex-1">
+                <StudentMobileNav />
               </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-primary active:scale-95 sm:px-3"
+                aria-label="Open global search"
+              >
+                <Search className="size-3.5" />
+
+                <span>Search</span>
+
+                <span className="hidden items-center gap-1 sm:inline-flex">
+                  <Shortcut>Alt</Shortcut>
+                  <Shortcut>K</Shortcut>
+                </span>
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Featured technology ticker */}
+        {ticker && (
+          <div className="border-b border-border/70 bg-muted/25">
+            <div className="mx-auto flex max-w-[1600px] items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6 lg:px-8">
+              <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-primary sm:tracking-[0.16em]">
+                <Sparkles className="size-3.5" />
+                <span>Explore</span>
+              </span>
+
+              <div className="h-4 w-px shrink-0 bg-border" />
+
+              <button
+                type="button"
+                onMouseEnter={() => setTickerPaused(true)}
+                onMouseLeave={() => setTickerPaused(false)}
+                onFocus={() => setTickerPaused(true)}
+                onBlur={() => setTickerPaused(false)}
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+                aria-label="Featured technology"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={ticker.label}
+                    initial={{ opacity: 0, y: 7 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -7 }}
+                    transition={{ duration: 0.22 }}
+                    className="truncate text-xs font-semibold"
+                  >
+                    {ticker.label}
+                  </motion.span>
+                </AnimatePresence>
+
+                {ticker.description && (
+                  <span className="hidden truncate text-xs text-muted-foreground md:inline">
+                    {ticker.description}
+                  </span>
+                )}
+              </button>
+
+              <span className="hidden shrink-0 items-center gap-1 text-[10px] text-muted-foreground sm:flex">
+                <Zap className="size-3 text-amber-500" />
+                Keep growing
+              </span>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* Global search */}
+      <SearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        onSearch={goSearch}
+        suggestions={SEARCH_SUGGESTIONS}
+        recent={recent}
+        onClearRecent={clearRecent}
+      />
+
+      {/* Keyboard shortcut hint */}
+      <div className="pointer-events-none fixed bottom-4 right-4 z-40 hidden items-center gap-2 rounded-xl border border-border/70 bg-background/85 px-3 py-2 text-[11px] text-muted-foreground shadow-lg backdrop-blur-md 2xl:flex">
+        <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Command className="size-3.5" />
+        </span>
+
+        <span>Quick search</span>
+        <Shortcut>Alt</Shortcut>
+        <Shortcut>K</Shortcut>
       </div>
 
-      {/* Mobile expandable search */}
-      <AnimatePresence initial={false}>
-        {mobileSearch && (
-          <motion.form
-            onSubmit={handleSearch}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t md:hidden"
-          >
-            <div className="px-3 pb-3 pt-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-primary" />
-                <Input
-                  autoFocus
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search courses, skills..."
-                  className="h-10 rounded-full bg-muted/50 pl-9"
-                />
-              </div>
-              <motion.div
-                variants={listVariants}
-                initial="hidden"
-                animate="show"
-                className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]"
-              >
-                {SEARCH_SUGGESTIONS.map((s) => (
-                  <motion.button
-                    key={s.label}
-                    type="button"
-                    variants={itemVariants}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => goSearch(s.label)}
-                    className="shrink-0 rounded-full border bg-muted/50 px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
-                  >
-                    {s.label}
-                  </motion.button>
-                ))}
-              </motion.div>
-            </div>
-          </motion.form>
-        )}
-      </AnimatePresence>
-    </motion.header>
+      {/* Screen-reader announcement */}
+      <div className="sr-only" aria-live="polite">
+        {greeting}, {firstName}. You have {unreadCount} unread notifications.
+      </div>
+    </MotionConfig>
   );
 }
+
+export default StudentHeader;

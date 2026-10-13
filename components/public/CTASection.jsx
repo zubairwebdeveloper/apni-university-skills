@@ -1,16 +1,16 @@
-// components/sections/CTASection.jsx  (put it where your current CTASection lives)
+// components/public/CTASection.jsx  (put it where your current CTASection lives)
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  AnimatePresence,
   animate,
   motion,
   useInView,
   useMotionTemplate,
   useMotionValue,
   useReducedMotion,
-  useScroll,
   useSpring,
   useTransform,
 } from "framer-motion";
@@ -19,103 +19,121 @@ import {
   FiAward,
   FiBookOpen,
   FiCheck,
-  FiCloud,
-  FiCode,
-  FiCpu,
-  FiDatabase,
-  FiTerminal,
+  FiGrid,
+  FiLayers,
+  FiPlayCircle,
   FiTool,
   FiTrendingUp,
-  FiUser,
   FiUserPlus,
   FiZap,
 } from "react-icons/fi";
 
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/motion/Reveal";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
 /* Content (edit to match your platform)                               */
 /* ------------------------------------------------------------------ */
 
-const highlights = [
+// Role to dashboard route. Anything unknown falls back to /student.
+const DASHBOARD_BY_ROLE = {
+  student: "/student",
+  instructor: "/instructor",
+  admin: "/admin",
+};
+
+const getDashboardHref = (user) => DASHBOARD_BY_ROLE[user?.role] ?? "/student";
+const getFirstName = (user) =>
+  (user?.name ?? "").trim().split(/\s+/)[0] || "learner";
+
+// Make sure each of these is true for your platform before shipping.
+const guestHighlights = [
   { icon: FiCheck, text: "No credit card required" },
   { icon: FiZap, text: "Start learning in minutes" },
   { icon: FiTrendingUp, text: "Learn at your own pace" },
 ];
 
-const steps = [
+const memberHighlights = [
+  { icon: FiPlayCircle, text: "Continue from your dashboard" },
+  { icon: FiCheck, text: "Your progress is saved" },
+  { icon: FiTrendingUp, text: "Learn at your own pace" },
+];
+
+const guestSteps = [
   {
     icon: FiUserPlus,
     title: "Create your account",
     text: "It takes less than a minute, and it's free.",
+    detail:
+      "Sign up with your email, confirm it, and your learner dashboard is ready.",
   },
   {
     icon: FiBookOpen,
     title: "Pick a course",
     text: "Start with a free one and move at your own speed.",
+    detail:
+      "Browse by technology, open any free course, and pick up where you left off whenever you like.",
   },
   {
     icon: FiTool,
     title: "Build real projects",
     text: "Finish with work you can show to employers.",
+    detail:
+      "Apply each lesson in a hands-on project, so your portfolio grows while you learn.",
   },
 ];
 
-const floaters = [
+const memberSteps = [
   {
-    Icon: FiCode,
-    className: "left-[6%] top-[14%]",
-    size: 26,
-    dur: 7,
-    delay: 0,
+    icon: FiGrid,
+    title: "Open your dashboard",
+    text: "Everything you've started is in one place.",
+    detail:
+      "See your courses, your progress and what to do next, without searching for it.",
   },
   {
-    Icon: FiCpu,
-    className: "right-[7%] top-[12%]",
-    size: 30,
-    dur: 9,
-    delay: 1,
+    icon: FiBookOpen,
+    title: "Continue learning",
+    text: "Pick up exactly where you stopped.",
+    detail:
+      "Jump back into your last lesson, or start another course whenever you're ready.",
   },
   {
-    Icon: FiCloud,
-    className: "left-[10%] bottom-[16%]",
-    size: 30,
-    dur: 8,
-    delay: 2,
-  },
-  {
-    Icon: FiTerminal,
-    className: "right-[9%] bottom-[18%]",
-    size: 26,
-    dur: 7.5,
-    delay: 0.5,
-  },
-  {
-    Icon: FiDatabase,
-    className: "left-[46%] top-[5%]",
-    size: 22,
-    dur: 10,
-    delay: 3,
-  },
-  {
-    Icon: FiAward,
-    className: "right-[30%] bottom-[6%]",
-    size: 24,
-    dur: 9,
-    delay: 1.5,
+    icon: FiAward,
+    title: "Show your skills",
+    text: "Finish projects and earn certificates.",
+    detail:
+      "Complete hands-on projects and build a portfolio you can share with employers.",
   },
 ];
 
-const avatarColors = [
-  "from-sky-400 to-indigo-500",
-  "from-pink-400 to-rose-500",
-  "from-amber-300 to-orange-500",
-  "from-emerald-400 to-teal-500",
-  "from-violet-400 to-fuchsia-500",
+// Learning paths shown as quick links under the buttons.
+const PATH_LINKS = [
+  { id: "web", label: "Full-Stack Web" },
+  { id: "ai", label: "AI & Automation" },
+  { id: "cloud", label: "Cloud" },
+  { id: "security", label: "Cybersecurity" },
+  { id: "devops", label: "DevOps" },
 ];
+
+// Technology topics shown in the scrolling strip (edit freely).
+const DEFAULT_TOPICS = [
+  "Artificial Intelligence",
+  "Web Development",
+  "Cloud Computing",
+  "Automation",
+  "Python",
+  "React & Next.js",
+  "Firebase",
+  "Docker",
+  "Machine Learning",
+  "UI/UX Design",
+];
+
+const STEP_MS = 4500;
 
 /* ------------------------------------------------------------------ */
 /* Small pieces                                                        */
@@ -152,9 +170,11 @@ function CountUp({ to, suffix = "", decimals = 0 }) {
   return <span ref={ref}>{`0${suffix}`}</span>;
 }
 
-// Five stars that pop in one by one; the last one is filled partly (e.g. 4.8)
+// Five stars; the last one can be partly filled (e.g. 4.8). Decorative only.
 function Stars({ value = 5 }) {
   const reduce = useReducedMotion();
+  const path =
+    "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z";
 
   return (
     <span
@@ -167,22 +187,17 @@ function Stars({ value = 5 }) {
           <motion.span
             key={i}
             className="relative inline-flex"
-            initial={reduce ? false : { scale: 0, rotate: -40 }}
-            whileInView={{ scale: 1, rotate: 0 }}
+            initial={reduce ? false : { scale: 0.4, opacity: 0 }}
+            whileInView={{ scale: 1, opacity: 1 }}
             viewport={{ once: true }}
-            transition={{
-              type: "spring",
-              stiffness: 420,
-              damping: 14,
-              delay: 0.3 + i * 0.1,
-            }}
+            transition={{ duration: 0.3, delay: 0.2 + i * 0.07 }}
           >
             <svg
               viewBox="0 0 24 24"
               className="size-3.5 opacity-30"
               fill="currentColor"
             >
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              <path d={path} />
             </svg>
             <svg
               viewBox="0 0 24 24"
@@ -190,7 +205,7 @@ function Stars({ value = 5 }) {
               fill="currentColor"
               style={{ clipPath: `inset(0 ${100 - fill}% 0 0)` }}
             >
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              <path d={path} />
             </svg>
           </motion.span>
         );
@@ -199,7 +214,7 @@ function Stars({ value = 5 }) {
   );
 }
 
-// Wraps a button so it leans slightly towards the cursor
+// Wraps a button so it leans slightly towards a mouse cursor (not touch)
 function Magnetic({ children, className }) {
   const reduce = useReducedMotion();
   const ref = useRef(null);
@@ -216,8 +231,8 @@ function Magnetic({ children, className }) {
       onMouseMove={(e) => {
         if (reduce || !ref.current) return;
         const r = ref.current.getBoundingClientRect();
-        x.set((e.clientX - (r.left + r.width / 2)) * 0.22);
-        y.set((e.clientY - (r.top + r.height / 2)) * 0.3);
+        x.set((e.clientX - (r.left + r.width / 2)) * 0.18);
+        y.set((e.clientY - (r.top + r.height / 2)) * 0.25);
       }}
       onMouseLeave={() => {
         x.set(0);
@@ -229,23 +244,27 @@ function Magnetic({ children, className }) {
   );
 }
 
-// Headline whose words blur in one after another
+// Headline whose words fade in one after another.
+// `key` on the caller forces a replay when the text changes (guest -> member).
 function AnimatedTitle({ id, text }) {
   const reduce = useReducedMotion();
   const words = String(text).split(" ");
 
   return (
-    <h2 id={id} className="relative mx-auto max-w-2xl text-3xl sm:text-4xl">
+    <h2
+      id={id}
+      className="relative mx-auto max-w-2xl text-balance text-[clamp(2rem,4vw,3.25rem)] font-semibold leading-tight tracking-tight"
+    >
       {words.map((w, i) => (
         <motion.span
           key={`${w}-${i}`}
           className="mr-[0.25em] inline-block"
-          initial={reduce ? false : { opacity: 0, y: 18, filter: "blur(6px)" }}
-          whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          initial={reduce ? false : { opacity: 0, y: 14 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
           transition={{
             duration: 0.5,
-            delay: 0.1 + i * 0.07,
+            delay: 0.08 + i * 0.06,
             ease: [0.22, 1, 0.36, 1],
           }}
         >
@@ -256,161 +275,599 @@ function AnimatedTitle({ id, text }) {
   );
 }
 
+// Scrolling strip of technology topics (static + wrapped for reduced motion)
+function TopicStrip({ topics, live, reduce }) {
+  if (!topics.length) return null;
+
+  if (reduce) {
+    return (
+      <ul className="relative mx-auto mt-10 flex max-w-3xl flex-wrap justify-center gap-2">
+        {topics.map((t) => (
+          <li
+            key={t}
+            className="rounded-full border border-border bg-background/70 px-3 py-1 text-xs text-muted-foreground"
+          >
+            {t}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  const loop = [...topics, ...topics];
+  return (
+    <div
+      className="relative mx-auto mt-10 max-w-3xl overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_15%,black_85%,transparent)] [-webkit-mask-image:linear-gradient(90deg,transparent,black_15%,black_85%,transparent)]"
+      aria-label="Technologies you can learn"
+    >
+      <motion.ul
+        className="flex w-max gap-2 will-change-transform"
+        animate={live ? { x: ["0%", "-50%"] } : undefined}
+        transition={{ duration: 32, repeat: Infinity, ease: "linear" }}
+      >
+        {loop.map((t, i) => (
+          <li
+            key={`${t}-${i}`}
+            aria-hidden={i >= topics.length ? "true" : undefined}
+            className="whitespace-nowrap rounded-full border border-border bg-background/70 px-3.5 py-1.5 text-xs text-muted-foreground backdrop-blur-sm"
+          >
+            {t}
+          </li>
+        ))}
+      </motion.ul>
+    </div>
+  );
+}
+
+// Interactive steps: click a step to read more; auto-advances while visible
+function StepTabs({ steps, live, reduce }) {
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (!live || paused) return;
+    const t = setTimeout(
+      () => setActive((a) => (a + 1) % steps.length),
+      STEP_MS,
+    );
+    return () => clearTimeout(t);
+  }, [active, live, paused, steps.length]);
+
+  const auto = live && !paused;
+
+  return (
+    <div
+      className="relative mx-auto mt-10 max-w-3xl"
+      onPointerEnter={() => setPaused(true)}
+      onPointerLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
+      <div
+        role="tablist"
+        aria-label="How it works"
+        className="grid gap-3 md:grid-cols-3"
+      >
+        {steps.map(({ icon: Icon, title: t, text: d }, i) => {
+          const on = i === active;
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              id={`cta-step-${i}`}
+              aria-selected={on}
+              aria-controls="cta-step-panel"
+              tabIndex={on ? 0 : -1}
+              onClick={() => setActive(i)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight")
+                  setActive((active + 1) % steps.length);
+                if (e.key === "ArrowLeft")
+                  setActive((active - 1 + steps.length) % steps.length);
+              }}
+              className={cn(
+                "relative cursor-pointer overflow-hidden rounded-2xl border bg-background/80 p-4 text-left backdrop-blur-sm transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--cta-a))] motion-reduce:transition-none",
+                on
+                  ? "border-[rgb(var(--cta-a)/0.6)] shadow-lg shadow-[rgb(var(--cta-a)/0.12)]"
+                  : "border-border hover:border-[rgb(var(--cta-b)/0.45)]",
+              )}
+            >
+              <span className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    "grid size-9 shrink-0 place-items-center rounded-xl ring-1 transition-colors duration-300 motion-reduce:transition-none",
+                    on
+                      ? "bg-[rgb(var(--cta-a))] text-white ring-transparent dark:text-[#080B12]"
+                      : "bg-[rgb(var(--cta-a)/0.12)] text-[rgb(var(--cta-a))] ring-[rgb(var(--cta-a)/0.2)]",
+                  )}
+                >
+                  <Icon className="size-4" aria-hidden="true" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs text-muted-foreground">
+                    Step {i + 1}
+                  </span>
+                  <span className="block text-sm font-semibold">{t}</span>
+                </span>
+              </span>
+              <span className="mt-2 block text-sm text-muted-foreground">
+                {d}
+              </span>
+
+              {/* progress bar for the active step */}
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-0 bottom-0 h-0.5 bg-border/60"
+              >
+                {on && (
+                  <motion.span
+                    key={`${active}-${auto}`}
+                    className="block h-full origin-left bg-gradient-to-r from-[rgb(var(--cta-a))] to-[rgb(var(--cta-b))]"
+                    initial={{ scaleX: auto && !reduce ? 0 : 1 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{
+                      duration: auto && !reduce ? STEP_MS / 1000 : 0,
+                      ease: "linear",
+                    }}
+                  />
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        id="cta-step-panel"
+        role="tabpanel"
+        aria-labelledby={`cta-step-${active}`}
+        aria-live="polite"
+        className="mt-3 min-h-[3.25rem] rounded-xl border border-dashed border-border bg-background/60 px-4 py-3 text-sm text-foreground/85 backdrop-blur-sm"
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.p
+            key={active}
+            initial={reduce ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduce ? undefined : { opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
+          >
+            {steps[active].detail}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+// Small glass chip that floats gently beside the card content (wide screens)
+function FloatChip({ icon: Icon, children, className, delay = 0, live }) {
+  return (
+    <motion.div
+      className={cn(
+        "absolute hidden items-center gap-2 rounded-xl border border-border bg-background/75 px-3 py-2 text-xs font-medium shadow-lg shadow-black/[0.05] backdrop-blur-md xl:flex",
+        className,
+      )}
+      animate={live ? { y: [0, -8, 0] } : undefined}
+      transition={{ duration: 6, delay, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <span className="grid size-6 place-items-center rounded-lg bg-[rgb(var(--cta-a)/0.14)] text-[rgb(var(--cta-a))]">
+        <Icon className="size-3.5" aria-hidden="true" />
+      </span>
+      {children}
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 3D background                                                       */
+/* Pure CSS 3D + framer-motion (no WebGL, no extra dependencies).      */
+/* Everything animates transform/opacity only and only while the card  */
+/* is on screen and reduced motion is off (`live`).                    */
+/* ------------------------------------------------------------------ */
+
+// Wireframe cube built from six CSS-3D faces
+function Cube({ size = 72, live, duration = 26, className, from = [-25, 35] }) {
+  const h = size / 2;
+  const faces = [
+    `rotateY(0deg) translateZ(${h}px)`,
+    `rotateY(90deg) translateZ(${h}px)`,
+    `rotateY(180deg) translateZ(${h}px)`,
+    `rotateY(-90deg) translateZ(${h}px)`,
+    `rotateX(90deg) translateZ(${h}px)`,
+    `rotateX(-90deg) translateZ(${h}px)`,
+  ];
+
+  return (
+    <div
+      className={className}
+      style={{ width: size, height: size, perspective: 700 }}
+    >
+      <motion.div
+        className="relative size-full"
+        style={{ transformStyle: "preserve-3d" }}
+        initial={{ rotateX: from[0], rotateY: from[1] }}
+        animate={
+          live
+            ? {
+                rotateX: [from[0], from[0] + 360],
+                rotateY: [from[1], from[1] + 360],
+              }
+            : undefined
+        }
+        transition={{ duration, repeat: Infinity, ease: "linear" }}
+      >
+        {faces.map((transform, i) => (
+          <span
+            key={i}
+            className="absolute inset-0 border border-[rgb(var(--cta-a)/0.55)] bg-[rgb(var(--cta-a)/0.06)]"
+            style={{ transform, backfaceVisibility: "visible" }}
+          />
+        ))}
+        {/* glowing core */}
+        <span
+          className="absolute left-1/2 top-1/2 size-1/4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgb(var(--cta-b))]"
+          style={{ boxShadow: "0 0 24px 6px rgb(var(--cta-b) / 0.55)" }}
+        />
+      </motion.div>
+    </div>
+  );
+}
+
+// Tilted orbit ring with a glowing dot travelling around it
+function OrbitRing({ size, live, duration, reverse, dotClass, className }) {
+  return (
+    <div
+      className={className}
+      style={{ width: size, height: size, transform: "rotateX(72deg)" }}
+    >
+      <motion.div
+        className="relative size-full rounded-full border border-[rgb(var(--cta-b)/0.28)]"
+        animate={live ? { rotate: reverse ? -360 : 360 } : undefined}
+        transition={{ duration, repeat: Infinity, ease: "linear" }}
+      >
+        <span
+          className={cn(
+            "absolute left-1/2 top-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
+            dotClass,
+          )}
+          style={{ boxShadow: "0 0 16px 4px currentColor" }}
+        />
+      </motion.div>
+    </div>
+  );
+}
+
+const PARTICLES = [
+  { x: "12%", y: "22%", s: 5, d: 7 },
+  { x: "28%", y: "70%", s: 4, d: 9 },
+  { x: "44%", y: "12%", s: 3, d: 8 },
+  { x: "63%", y: "78%", s: 5, d: 10 },
+  { x: "78%", y: "26%", s: 4, d: 7.5 },
+  { x: "90%", y: "62%", s: 3, d: 9.5 },
+];
+
+function Backdrop({ live, px, py }) {
+  // gentle parallax of the whole 3D stage following the cursor
+  const rotY = useTransform(px, [-0.5, 0.5], [-7, 7]);
+  const rotX = useTransform(py, [-0.5, 0.5], [6, -6]);
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+    >
+      {/* Soft base wash: emerald to blue */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(135deg, rgb(var(--cta-a) / 0.10), transparent 45%, rgb(var(--cta-b) / 0.10))",
+        }}
+      />
+
+      {/* Dot grid texture, fades out towards the bottom */}
+      <div
+        className="absolute inset-0 opacity-[0.35] [mask-image:linear-gradient(to_bottom,black_30%,transparent_85%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_85%)]"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgb(var(--cta-a) / 0.35) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
+      />
+
+      {/* Aurora glows */}
+      <motion.div
+        className="absolute -left-1/4 -top-1/2 h-[130%] w-3/4 will-change-transform"
+        style={{
+          background:
+            "radial-gradient(closest-side, rgb(var(--cta-a) / 0.22), transparent)",
+        }}
+        animate={
+          live
+            ? { x: [0, 70, 0], y: [0, 36, 0], scale: [1, 1.1, 1] }
+            : undefined
+        }
+        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        className="absolute -bottom-1/2 -right-1/4 h-[130%] w-3/4 will-change-transform"
+        style={{
+          background:
+            "radial-gradient(closest-side, rgb(var(--cta-b) / 0.22), transparent)",
+        }}
+        animate={
+          live
+            ? { x: [0, -60, 0], y: [0, -30, 0], scale: [1, 1.08, 1] }
+            : undefined
+        }
+        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      {/* 3D stage */}
+      <div className="absolute inset-0" style={{ perspective: 1000 }}>
+        <motion.div
+          className="absolute inset-0"
+          style={{
+            rotateX: rotX,
+            rotateY: rotY,
+            transformStyle: "preserve-3d",
+          }}
+        >
+          {/* Perspective grid floor that scrolls towards the viewer */}
+          <div
+            className="absolute inset-x-0 bottom-0 h-[62%] overflow-hidden text-[rgb(var(--cta-a))] [mask-image:linear-gradient(to_top,black_25%,transparent)] [-webkit-mask-image:linear-gradient(to_top,black_25%,transparent)]"
+            style={{ perspective: 480 }}
+          >
+            <div
+              className="absolute inset-x-[-60%] -top-[40%] h-[220%] origin-center opacity-[0.35]"
+              style={{ transform: "rotateX(64deg)" }}
+            >
+              <motion.div
+                className="absolute inset-x-0 -top-12 bottom-0 will-change-transform"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
+                  backgroundSize: "56px 56px",
+                }}
+                animate={live ? { y: [0, 56] } : undefined}
+                transition={{ duration: 3.2, repeat: Infinity, ease: "linear" }}
+              />
+            </div>
+          </div>
+
+          {/* Orbit rings (centre, behind the text) */}
+          <div
+            className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block"
+            style={{ transformStyle: "preserve-3d" }}
+          >
+            <OrbitRing
+              size={560}
+              live={live}
+              duration={26}
+              className="absolute -left-[280px] -top-[280px] text-[rgb(var(--cta-a))]"
+              dotClass="bg-[rgb(var(--cta-a))]"
+            />
+            <OrbitRing
+              size={820}
+              live={live}
+              duration={38}
+              reverse
+              className="absolute -left-[410px] -top-[410px] text-[rgb(var(--cta-b))]"
+              dotClass="bg-[rgb(var(--cta-b))]"
+            />
+          </div>
+
+          {/* Floating wireframe cubes */}
+          <div className="absolute left-[5%] top-[14%] hidden md:block">
+            <Cube size={84} live={live} duration={30} />
+          </div>
+          <div className="absolute bottom-[18%] right-[6%] hidden md:block">
+            <Cube size={58} live={live} duration={22} from={[40, -20]} />
+          </div>
+          <div className="absolute right-[14%] top-[10%] hidden lg:block">
+            <Cube size={34} live={live} duration={18} from={[10, 60]} />
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Drifting particles */}
+      {PARTICLES.map((p, i) => (
+        <motion.span
+          key={i}
+          className="absolute rounded-full bg-[rgb(var(--cta-a))] will-change-transform"
+          style={{
+            left: p.x,
+            top: p.y,
+            width: p.s,
+            height: p.s,
+            opacity: 0.55,
+          }}
+          animate={
+            live ? { y: [0, -18, 0], opacity: [0.25, 0.8, 0.25] } : undefined
+          }
+          transition={{
+            duration: p.d,
+            delay: i * 0.6,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Auth-aware buttons                                                  */
+/* Logged out: "Create free account" -> /register                      */
+/* Logged in:  "Go to dashboard"     -> /student (or role dashboard)   */
+/* ------------------------------------------------------------------ */
+
 /* ------------------------------------------------------------------ */
 /* Section                                                             */
 /* ------------------------------------------------------------------ */
 
+// `rating`, `learners` and `stats` are optional: they only render when you
+// pass real values (never placeholder numbers).
+// stats example: [{ value: 40, suffix: "+", label: "Courses" }]
 export function CTASection({
   title = "Start building your future today",
   text = "Create a free account, explore free courses, and take your first step toward a career in technology.",
-  rating = "4.8/5 from 2,000+ reviews",
-  ratingValue = 4.8, // drives the stars
-  learners = 50000, // placeholder: use your real number
-  primaryHref = "/register",
+  memberText = "Your dashboard is ready. Continue a course, start a new one, or build your next project.",
+  rating, // e.g. "4.8/5 from 120 reviews" (real data only)
+  ratingValue, // drives the stars, e.g. 4.8
+  learners, // real learner count, e.g. 1200
+  stats = [], // extra real numbers
+  topics = DEFAULT_TOPICS,
+  eyebrow = "Free to start",
+  primaryHref = "/courses",
   secondaryHref = "/courses",
+  dashboardHref, // optional override; defaults to the role dashboard or /student
 }) {
   const reduce = useReducedMotion();
   const cardRef = useRef(null);
+  const inView = useInView(cardRef, { margin: "150px" });
+  const live = inView && !reduce;
 
-  // Parallax for the glows while the card scrolls past
-  const { scrollYProgress } = useScroll({
-    target: cardRef,
-    offset: ["start end", "end start"],
-  });
-  const orbA = useTransform(scrollYProgress, [0, 1], [-50, 50]);
-  const orbB = useTransform(scrollYProgress, [0, 1], [40, -40]);
+  const { user, loading } = useCurrentUser();
+  const dashboard = dashboardHref ?? getDashboardHref(user);
 
-  // Spotlight that follows the cursor inside the card
+  const heading = user ? `Welcome back, ${getFirstName(user)}` : title;
+  const body = user ? memberText : text;
+  const badge = user ? "Signed in" : eyebrow;
+  const highlights = user ? memberHighlights : guestHighlights;
+  const steps = user ? memberSteps : guestSteps;
+
+  // Cursor spotlight + 3D parallax (mouse only)
   const mx = useMotionValue(-400);
   const my = useMotionValue(-400);
-  const spotlight = useMotionTemplate`radial-gradient(380px circle at ${mx}px ${my}px, rgb(255 255 255 / 0.14), transparent 70%)`;
+  const pxRaw = useMotionValue(0);
+  const pyRaw = useMotionValue(0);
+  const px = useSpring(pxRaw, { stiffness: 60, damping: 18 });
+  const py = useSpring(pyRaw, { stiffness: 60, damping: 18 });
+  const spotlight = useMotionTemplate`radial-gradient(360px circle at ${mx}px ${my}px, rgb(var(--cta-a) / 0.14), transparent 70%)`;
+
+  const showRating = Boolean(rating);
+  const allStats = [
+    ...(Number(learners) > 0
+      ? [{ value: Number(learners), suffix: "+", label: "Learners" }]
+      : []),
+    ...stats.filter((s) => Number(s?.value) > 0),
+  ];
 
   return (
     <section className="pb-16 sm:pb-20 lg:pb-24" aria-labelledby="final-cta">
       <Container>
         <Reveal>
-          {/* Border with a light that runs around the card */}
-          <div className="relative rounded-3xl bg-primary-foreground/10 p-[1.5px]">
-            <div
+          {/* Outer shell draws the animated gradient border */}
+          <div
+            ref={cardRef}
+            onPointerMove={(e) => {
+              if (e.pointerType !== "mouse" || reduce) return;
+              const r = e.currentTarget.getBoundingClientRect();
+              mx.set(e.clientX - r.left);
+              my.set(e.clientY - r.top);
+              pxRaw.set((e.clientX - r.left) / r.width - 0.5);
+              pyRaw.set((e.clientY - r.top) / r.height - 0.5);
+            }}
+            onPointerLeave={() => {
+              mx.set(-400);
+              my.set(-400);
+              pxRaw.set(0);
+              pyRaw.set(0);
+            }}
+            // Emerald + blue accents per theme (RGB triplets).
+            className="relative isolate overflow-hidden rounded-3xl bg-border p-px shadow-xl [--cta-a:5_150_105] [--cta-b:37_99_235] dark:[--cta-a:52_211_153] dark:[--cta-b:79_140_255]"
+          >
+            {/* Slowly rotating conic highlight that travels around the edge */}
+            <motion.div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl"
-            >
-              <motion.div
-                className="absolute -inset-[60%] bg-[conic-gradient(from_0deg,transparent_0deg,transparent_250deg,currentColor_335deg,transparent_360deg)] text-highlight"
-                animate={reduce ? undefined : { rotate: 360 }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-              />
-            </div>
+              className="pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[180%] -translate-x-1/2 -translate-y-1/2 will-change-transform"
+              style={{
+                background:
+                  "conic-gradient(from 0deg, transparent 0deg, rgb(var(--cta-a) / 0.9) 60deg, rgb(var(--cta-b) / 0.9) 120deg, transparent 180deg, transparent 360deg)",
+              }}
+              animate={live ? { rotate: 360 } : undefined}
+              transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+            />
 
-            <div
-              ref={cardRef}
-              onPointerMove={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                mx.set(e.clientX - r.left);
-                my.set(e.clientY - r.top);
-              }}
-              onPointerLeave={() => {
-                mx.set(-400);
-                my.set(-400);
-              }}
-              className="relative overflow-hidden rounded-[calc(1.5rem-1.5px)] bg-primary px-6 py-14 text-center text-primary-foreground sm:px-12 sm:py-16"
-            >
-              {/* ---------- Background ---------- */}
-              <div
-                className="pointer-events-none absolute inset-0"
-                aria-hidden="true"
-              >
-                {/* Grid that drifts slowly */}
+            <div className="relative isolate overflow-hidden rounded-[calc(1.5rem-1px)] bg-card px-6 py-14 text-center text-card-foreground sm:px-12 sm:py-16">
+              <Backdrop live={live} px={px} py={py} />
+
+              {!reduce && (
                 <motion.div
-                  className="absolute inset-0 opacity-[0.06]"
-                  animate={
-                    reduce
-                      ? undefined
-                      : { backgroundPosition: ["0px 0px", "36px 36px"] }
-                  }
-                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
-                    backgroundSize: "36px 36px",
-                    maskImage:
-                      "radial-gradient(ellipse at center, black 20%, transparent 70%)",
-                    WebkitMaskImage:
-                      "radial-gradient(ellipse at center, black 20%, transparent 70%)",
-                  }}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 -z-10"
+                  style={{ background: spotlight }}
                 />
+              )}
 
-                {/* Glows with scroll parallax */}
-                <motion.div
-                  style={{ y: orbA }}
-                  className="absolute -left-20 -top-20"
-                >
-                  <div className="size-72 rounded-full bg-highlight/20 blur-3xl motion-safe:animate-pulse" />
-                </motion.div>
-                <motion.div
-                  style={{ y: orbB }}
-                  className="absolute -bottom-24 -right-16"
-                >
-                  <div className="size-80 rounded-full bg-highlight/10 blur-3xl motion-safe:animate-pulse" />
-                </motion.div>
-
-                {/* Cursor spotlight */}
-                {!reduce && (
-                  <motion.div
-                    className="absolute inset-0"
-                    style={{ background: spotlight }}
-                  />
-                )}
-
-                {/* Floating tech icons (hidden on small screens) */}
-                {!reduce &&
-                  floaters.map(({ Icon, className, size, dur, delay }) => (
-                    <motion.span
-                      key={className}
-                      className={cn(
-                        "absolute hidden text-primary-foreground/15 md:block",
-                        className,
-                      )}
-                      animate={{ y: [0, -14, 0], rotate: [0, 8, -6, 0] }}
-                      transition={{
-                        duration: dur,
-                        delay,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                      }}
-                    >
-                      <Icon style={{ width: size, height: size }} />
-                    </motion.span>
-                  ))}
-              </div>
+              {/* Floating chips (wide screens only) */}
+              <FloatChip
+                icon={FiLayers}
+                live={live}
+                className="bottom-[22%] left-[3%]"
+              >
+                Project-based courses
+              </FloatChip>
+              <FloatChip
+                icon={FiAward}
+                live={live}
+                delay={1.4}
+                className="right-[3%] top-[34%]"
+              >
+                Certificates to share
+              </FloatChip>
 
               {/* ---------- Content ---------- */}
 
-              {/* Rating badge */}
-              <div className="relative mx-auto mb-5 inline-flex items-center gap-2 rounded-full bg-primary-foreground/10 px-4 py-1.5 text-xs font-medium backdrop-blur-sm">
-                <Stars value={ratingValue} />
-                <span className="text-primary-foreground/80">{rating}</span>
+              <div className="relative mx-auto mb-5 flex flex-wrap items-center justify-center gap-2">
+                {badge && (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-[rgb(var(--cta-a)/0.35)] bg-[rgb(var(--cta-a)/0.10)] px-3.5 py-1.5 text-xs font-medium">
+                    <span className="relative flex size-2">
+                      {!reduce && (
+                        <span className="absolute inline-flex size-full animate-ping rounded-full bg-[rgb(var(--cta-a))] opacity-60" />
+                      )}
+                      <span className="relative inline-flex size-2 rounded-full bg-[rgb(var(--cta-a))]" />
+                    </span>
+                    {badge}
+                  </span>
+                )}
+                {showRating && (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background/70 px-4 py-1.5 text-xs font-medium backdrop-blur-sm">
+                    {Number(ratingValue) > 0 && (
+                      <Stars value={Number(ratingValue)} />
+                    )}
+                    <span className="text-muted-foreground">{rating}</span>
+                  </span>
+                )}
               </div>
 
-              <AnimatedTitle id="final-cta" text={title} />
+              {/* key replays the word animation once auth resolves */}
+              <AnimatedTitle key={heading} id="final-cta" text={heading} />
 
-              <p className="relative mx-auto mt-4 max-w-xl text-primary-foreground/80">
-                {text}
+              <p className="relative mx-auto mt-4 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg">
+                {body}
               </p>
 
               {/* Trust highlights */}
-              <ul className="relative mx-auto mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+              <ul
+                key={user ? "member" : "guest"}
+                className="relative mx-auto mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+              >
                 {highlights.map(({ icon: Icon, text: h }, i) => (
                   <motion.li
                     key={h}
                     initial={reduce ? false : { opacity: 0, y: 10 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ delay: 0.4 + i * 0.1 }}
-                    className="flex items-center gap-1.5 text-sm text-primary-foreground/85"
+                    transition={{ delay: reduce ? 0 : 0.3 + i * 0.1 }}
+                    className="flex items-center gap-1.5 text-sm text-foreground/85"
                   >
                     <Icon
-                      className="size-4 text-highlight"
+                      className="size-4 text-[rgb(var(--cta-a))]"
                       aria-hidden="true"
                     />
                     {h}
@@ -418,152 +875,58 @@ export function CTASection({
                 ))}
               </ul>
 
-              {/* How it works */}
-              <div className="relative mx-auto mt-10 max-w-3xl">
-                {/* Line that connects the steps and draws itself */}
-                <div
-                  aria-hidden="true"
-                  className="absolute left-[16%] right-[16%] top-1/2 hidden h-px md:block"
-                >
-                  <div className="h-px w-full border-t border-dashed border-primary-foreground/25" />
-                  <motion.div
-                    className="absolute inset-y-0 left-0 w-full origin-left bg-highlight/70"
-                    initial={reduce ? false : { scaleX: 0 }}
-                    whileInView={{ scaleX: 1 }}
-                    viewport={{ once: true }}
-                    transition={{
-                      duration: 1.4,
-                      delay: 0.6,
-                      ease: "easeInOut",
-                    }}
-                  />
-                </div>
+             
 
-                <ol className="relative grid gap-4 md:grid-cols-3">
-                  {steps.map(({ icon: Icon, title: t, text: d }, i) => (
-                    <motion.li
-                      key={t}
-                      initial={reduce ? false : { opacity: 0, y: 24 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: "-40px" }}
-                      transition={{ duration: 0.5, delay: 0.2 + i * 0.12 }}
-                      whileHover={reduce ? undefined : { y: -4 }}
-                      className="group relative rounded-2xl border border-primary-foreground/15 bg-primary/80 p-5 text-left backdrop-blur-sm transition-colors duration-300 hover:border-highlight/50 motion-reduce:transition-none"
-                    >
-                      <span className="absolute right-4 top-3 font-sans text-xs font-semibold tabular-nums text-primary-foreground/30">
-                        0{i + 1}
-                      </span>
-                      <span className="grid size-10 place-items-center rounded-xl bg-highlight/20 text-highlight transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:bg-highlight group-hover:text-highlight-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0 motion-reduce:group-hover:scale-100">
-                        <Icon className="size-5" aria-hidden="true" />
-                      </span>
-                      <h3 className="mt-3 text-sm font-semibold">{t}</h3>
-                      <p className="mt-1 text-sm text-primary-foreground/70">
-                        {d}
-                      </p>
-                    </motion.li>
-                  ))}
-                </ol>
-              </div>
-
-              {/* Buttons */}
-              <div className="relative mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Magnetic className="relative w-full sm:w-auto">
-                  {/* Soft pulse behind the main button */}
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 -z-10 rounded-lg bg-highlight/40 motion-safe:animate-ping [animation-duration:2.6s]"
-                  />
+              {/* Quick links to the learning paths */}
+              <nav
+                aria-label="Learning paths"
+                className="relative mx-auto mt-5 flex max-w-2xl flex-wrap items-center justify-center gap-x-2 gap-y-2 text-xs"
+              >
+                <span className="text-muted-foreground">Jump to a path:</span>
+                {PATH_LINKS.map((p) => (
                   <Link
-                    href={primaryHref}
-                    className={buttonVariants({
-                      size: "lg",
-                      className:
-                        "group relative w-full cursor-pointer overflow-hidden bg-highlight text-highlight-foreground transition-all hover:bg-highlight/90 hover:shadow-lg hover:shadow-highlight/30 active:scale-95 motion-reduce:active:scale-100 sm:w-auto",
-                    })}
+                    key={p.id}
+                    href={`/courses?category=${p.id}`}
+                    className="rounded-full border border-border bg-background/60 px-3 py-1 font-medium text-foreground/85 backdrop-blur-sm transition-colors hover:border-[rgb(var(--cta-a)/0.6)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--cta-a))] motion-reduce:transition-none"
                   >
-                    {/* Shine sweep */}
-                    <span
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-y-0 -left-full w-1/2 skew-x-[-20deg] bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-700 group-hover:translate-x-[320%] motion-reduce:hidden"
-                    />
-                    <span className="relative">Create free account</span>
-                    {/* Arrow keeps nudging forward */}
-                    <motion.span
-                      className="relative ml-1.5 inline-flex"
-                      animate={reduce ? undefined : { x: [0, 5, 0] }}
-                      transition={{
-                        duration: 0.9,
-                        repeat: Infinity,
-                        repeatDelay: 1.1,
-                        ease: "easeInOut",
-                      }}
-                    >
-                      <FiArrowRight
-                        className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
-                        aria-hidden="true"
-                      />
-                    </motion.span>
+                    {p.label}
                   </Link>
-                </Magnetic>
+                ))}
+              </nav>
 
-                <Magnetic className="w-full sm:w-auto">
-                  <Link
-                    href={secondaryHref}
-                    className={buttonVariants({
-                      size: "lg",
-                      variant: "outline",
-                      className:
-                        "w-full cursor-pointer border-primary-foreground/30 bg-transparent text-primary-foreground transition-all hover:-translate-y-0.5 hover:bg-primary-foreground/10 hover:text-primary-foreground active:scale-95 motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 sm:w-auto",
-                    })}
-                  >
-                    Browse courses
-                  </Link>
-                </Magnetic>
-              </div>
+              {/* How it works (interactive); remounts when the steps change */}
+              <StepTabs
+                key={user ? "member-steps" : "guest-steps"}
+                steps={steps}
+                live={live}
+                reduce={reduce}
+              />
 
-              {/* Social proof: avatars + live counter */}
-              <div className="relative mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <ul className="flex items-center" aria-hidden="true">
-                  {avatarColors.map((c, i) => (
-                    <motion.li
-                      key={c}
-                      initial={
-                        reduce ? false : { opacity: 0, scale: 0, x: -10 }
-                      }
-                      whileInView={{ opacity: 1, scale: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      whileHover={reduce ? undefined : { y: -4, zIndex: 10 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 400,
-                        damping: 18,
-                        delay: 0.5 + i * 0.08,
-                      }}
-                      className={cn(
-                        "grid size-9 place-items-center rounded-full bg-gradient-to-br text-white ring-2 ring-primary",
-                        c,
-                        i > 0 && "-ml-2.5",
-                      )}
+              {/* Technology topics */}
+              <TopicStrip topics={topics} live={live} reduce={reduce} />
+
+              {/* Real numbers only */}
+              {allStats.length > 0 && (
+                <dl className="relative mx-auto mt-10 flex max-w-3xl flex-wrap items-stretch justify-center gap-3">
+                  {allStats.map((s) => (
+                    <div
+                      key={s.label}
+                      className="min-w-[8.5rem] flex-1 rounded-2xl border border-border bg-background/70 px-4 py-3 backdrop-blur-sm"
                     >
-                      <FiUser className="size-4" />
-                    </motion.li>
+                      <dt className="text-xs text-muted-foreground">
+                        {s.label}
+                      </dt>
+                      <dd className="text-2xl font-semibold tabular-nums text-[rgb(var(--cta-a))]">
+                        <CountUp
+                          to={Number(s.value)}
+                          suffix={s.suffix || ""}
+                          decimals={s.decimals || 0}
+                        />
+                      </dd>
+                    </div>
                   ))}
-                  <li className="-ml-2.5 grid size-9 place-items-center rounded-full bg-primary-foreground text-[10px] font-bold text-primary ring-2 ring-primary">
-                    +
-                  </li>
-                </ul>
-                <p className="text-sm text-primary-foreground/80">
-                  <span className="font-semibold text-primary-foreground">
-                    <CountUp to={learners} suffix="+" />
-                  </span>{" "}
-                  learners are already learning with us
-                </p>
-              </div>
-
-              <p className="relative mt-6 text-xs text-primary-foreground/60">
-                Free forever plan available &middot; Cancel anytime &middot; No
-                hidden fees
-              </p>
+                </dl>
+              )}
             </div>
           </div>
         </Reveal>

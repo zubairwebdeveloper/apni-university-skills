@@ -46,20 +46,21 @@ const BENEFITS = [
   { icon: FiBell, text: "Early news about new courses" },
 ];
 
+// Example issue shown in the preview card (labelled "Example issue").
 const SAMPLE = [
   {
     tag: "AI",
-    color: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
+    color: "bg-primary/10 text-primary",
     title: "5 AI tools worth trying this week",
   },
   {
     tag: "Web",
-    color: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
+    color: "bg-highlight/20 text-foreground",
     title: "A simple roadmap for learning web development",
   },
   {
     tag: "Career",
-    color: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+    color: "bg-accent text-accent-foreground",
     title: "How to get ready for your first tech job",
   },
 ];
@@ -88,16 +89,16 @@ function suggestEmail(value) {
   return fix ? `${v.slice(0, at)}@${fix}` : null;
 }
 
-// Confetti directions (fixed, no randomness)
+// Confetti directions (fixed, no randomness). Brand tokens only.
 const CONFETTI = Array.from({ length: 16 }, (_, i) => ({
   angle: (i / 16) * Math.PI * 2,
   dist: 52 + (i % 4) * 14,
   color: [
     "bg-primary",
-    "bg-amber-400",
-    "bg-pink-500",
-    "bg-emerald-500",
-    "bg-sky-400",
+    "bg-highlight",
+    "bg-primary/60",
+    "bg-highlight/60",
+    "bg-foreground/50",
   ][i % 5],
   size: 5 + (i % 3) * 2,
   rot: (i % 2 ? 1 : -1) * (120 + i * 20),
@@ -132,7 +133,7 @@ function CountUp({ to, suffix = "" }) {
   return <span ref={ref}>{`0${suffix}`}</span>;
 }
 
-// Little burst of confetti around the button
+// Little burst of confetti around the button (not rendered when reduced motion is on)
 function Confetti() {
   return (
     <span
@@ -163,10 +164,13 @@ function Confetti() {
 /* The form (same logic as before)                                     */
 /* ------------------------------------------------------------------ */
 
-function SubscribeForm({ showTrust, subscribers }) {
+function SubscribeForm({ subscribers }) {
   const reduce = useReducedMotion();
   const [subscribed, setSubscribed] = useState(false);
   const [burst, setBurst] = useState(0);
+
+  // Only show a count when a real, positive number is supplied.
+  const showCount = Number(subscribers) > 0;
 
   const form = useForm({
     resolver: zodResolver(newsletterSchema),
@@ -185,11 +189,17 @@ function SubscribeForm({ showTrust, subscribers }) {
       form.reset();
       setSubscribed(true);
       setBurst((n) => n + 1);
-      setTimeout(() => setSubscribed(false), 4000);
     } else {
       toast.error(res.error);
     }
   }
+
+  // Return the button to normal after a few seconds (cleaned up on unmount)
+  useEffect(() => {
+    if (!subscribed) return;
+    const t = setTimeout(() => setSubscribed(false), 4000);
+    return () => clearTimeout(t);
+  }, [subscribed]);
 
   // Remove the confetti once it has finished
   useEffect(() => {
@@ -242,8 +252,8 @@ function SubscribeForm({ showTrust, subscribers }) {
                       initial={reduce ? false : { opacity: 0, scale: 0.7 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.7 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-2.5 top-1/2 z-10 -translate-y-1/2 rounded border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground"
+                      transition={{ duration: reduce ? 0 : 0.15 }}
+                      className="absolute right-2.5 top-1/2 z-10 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground"
                     >
                       ↵
                     </motion.kbd>
@@ -270,15 +280,15 @@ function SubscribeForm({ showTrust, subscribers }) {
                       reduce ? false : { opacity: 0, y: -6, scale: 0.96 }
                     }
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.2 }}
+                    exit={{ opacity: 0, y: reduce ? 0 : -6 }}
+                    transition={{ duration: reduce ? 0 : 0.2 }}
                     onClick={() =>
                       form.setValue("email", emailFix, {
                         shouldValidate: true,
                         shouldDirty: true,
                       })
                     }
-                    className="mt-1 inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs outline-none transition-colors duration-200 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                    className="mt-1 inline-flex min-h-8 w-fit cursor-pointer items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs outline-none transition-colors duration-200 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
                   >
                     Did you mean{" "}
                     <span className="font-semibold text-primary">
@@ -293,13 +303,15 @@ function SubscribeForm({ showTrust, subscribers }) {
         />
 
         <div className="relative sm:w-auto">
-          {burst > 0 && <Confetti key={burst} />}
+          {burst > 0 && !reduce && <Confetti key={burst} />}
           <Button
             type="submit"
             disabled={submitting}
             className={cn(
               "group relative w-full cursor-pointer overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-80 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 sm:w-auto",
-              subscribed && "bg-emerald-600 hover:bg-emerald-600",
+              // Success state: green-700 + white keeps contrast in both themes
+              subscribed &&
+                "bg-green-700 text-white hover:bg-green-700 disabled:opacity-100",
             )}
           >
             {/* Shine sweep */}
@@ -309,7 +321,10 @@ function SubscribeForm({ showTrust, subscribers }) {
             />
             {submitting ? (
               <span className="relative flex items-center gap-2">
-                <FiLoader className="size-4 animate-spin" aria-hidden="true" />
+                <FiLoader
+                  className="size-4 motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
                 Subscribing…
               </span>
             ) : subscribed ? (
@@ -330,12 +345,17 @@ function SubscribeForm({ showTrust, subscribers }) {
         </div>
       </form>
 
-      {/* Supporting trust line */}
-      {showTrust && (
+      {/* Announces success to screen readers (the toast may be missed) */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {subscribed ? "You are subscribed to the newsletter." : ""}
+      </p>
+
+      {/* Trust line: only with a real subscriber count, never a placeholder */}
+      {showCount && (
         <p className="mt-3 text-center text-xs text-muted-foreground sm:text-left">
           Join{" "}
           <span className="font-semibold text-foreground">
-            <CountUp to={subscribers} suffix="+" />
+            <CountUp to={Number(subscribers)} suffix="+" />
           </span>{" "}
           learners getting weekly tips on AI, web dev, and careers.
         </p>
@@ -355,18 +375,18 @@ function SamplePreview() {
     <motion.div
       aria-hidden="true"
       initial={reduce ? false : { opacity: 0, x: 30, rotate: 5 }}
-      whileInView={{ opacity: 1, x: 0, rotate: 2 }}
+      whileInView={{ opacity: 1, x: 0, rotate: reduce ? 0 : 2 }}
       whileHover={reduce ? undefined : { rotate: 0, y: -4 }}
       viewport={{ once: true }}
       transition={{ type: "spring", stiffness: 160, damping: 18 }}
       className="hidden w-full max-w-xs justify-self-center lg:block"
     >
       <motion.div
-        animate={reduce ? undefined : { y: [0, -8, 0] }}
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-        className="overflow-hidden rounded-2xl border bg-background shadow-xl shadow-primary/10"
+        animate={reduce ? undefined : { y: [0, -6, 0] }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+        className="overflow-hidden rounded-2xl border border-border bg-background shadow-xl shadow-primary/10"
       >
-        <div className="flex items-center gap-2 border-b bg-muted/50 px-4 py-2.5">
+        <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2.5">
           <span className="grid size-6 place-items-center rounded-md bg-primary text-primary-foreground">
             <FiSend className="size-3" />
           </span>
@@ -376,14 +396,14 @@ function SamplePreview() {
           </div>
         </div>
 
-        <ul className="divide-y">
+        <ul className="divide-y divide-border">
           {SAMPLE.map((s, i) => (
             <motion.li
               key={s.title}
               initial={reduce ? false : { opacity: 0, x: 12 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: 0.3 + i * 0.12 }}
+              transition={{ delay: reduce ? 0 : 0.3 + i * 0.12 }}
               className="space-y-1.5 px-4 py-3"
             >
               <span
@@ -410,17 +430,14 @@ function SamplePreview() {
 
 // variant="card"   -> full section card with benefits and a sample issue
 // variant="inline" -> compact form (good for the footer)
-export function Newsletter({
-  variant = "card",
-  subscribers = 10000, // placeholder: use your real number
-  className,
-}) {
+// subscribers      -> pass a REAL count to show the trust line; omit to hide it
+export function Newsletter({ variant = "card", subscribers, className }) {
   const reduce = useReducedMotion();
 
   if (variant === "inline") {
     return (
       <div className={cn("mx-auto w-full max-w-md", className)}>
-        <SubscribeForm showTrust subscribers={subscribers} />
+        <SubscribeForm subscribers={subscribers} />
       </div>
     );
   }
@@ -431,48 +448,23 @@ export function Newsletter({
       initial={reduce ? false : { opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: reduce ? 0 : 0.6, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "relative mx-auto w-full max-w-4xl overflow-hidden rounded-3xl border bg-card p-6 shadow-lg shadow-primary/5 sm:p-10",
+        "relative mx-auto w-full max-w-4xl overflow-hidden rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-lg shadow-primary/5 sm:p-10",
         className,
       )}
     >
-      {/* Background */}
+      {/* Background: static, low-cost glows */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
-        <motion.div
-          animate={reduce ? undefined : { x: [0, 30, 0], y: [0, -20, 0] }}
-          transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -left-16 -top-16 size-64 rounded-full bg-primary/15 blur-3xl"
-        />
-        <motion.div
-          animate={reduce ? undefined : { x: [0, -30, 0], y: [0, 20, 0] }}
-          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -bottom-20 -right-10 size-72 rounded-full bg-primary/10 blur-3xl"
-        />
-        {!reduce &&
-          [FiMail, FiSend, FiBell].map((Icon, i) => (
-            <motion.span
-              key={i}
-              className="absolute hidden text-primary/15 md:block"
-              style={{ left: `${[8, 44, 90][i]}%`, top: `${[78, 6, 40][i]}%` }}
-              animate={{ y: [0, -12, 0], rotate: [0, 10, -6, 0] }}
-              transition={{
-                duration: 7 + i * 2,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: i,
-              }}
-            >
-              <Icon className="size-6" />
-            </motion.span>
-          ))}
+        <div className="absolute -left-16 -top-16 size-64 rounded-full bg-primary/15 blur-3xl" />
+        <div className="absolute -bottom-20 -right-10 size-72 rounded-full bg-highlight/10 blur-3xl" />
       </div>
 
       <div className="relative grid items-center gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12">
         <div>
           {/* Eyebrow */}
-          <div className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-xs font-medium backdrop-blur">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-1 font-mono text-xs font-medium uppercase tracking-widest backdrop-blur">
             <span className="relative flex size-2">
               <span className="absolute inline-flex size-full rounded-full bg-primary/70 motion-safe:animate-ping" />
               <span className="relative inline-flex size-2 rounded-full bg-primary" />
@@ -480,33 +472,24 @@ export function Newsletter({
             Weekly newsletter
           </div>
 
-          {/* Heading with an animated mail icon */}
+          {/* Heading with a mail badge */}
           <div className="mt-4 flex items-start gap-4">
-            <motion.span
+            <span
               aria-hidden="true"
               className="relative grid size-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30"
-              animate={
-                reduce ? undefined : { y: [0, -5, 0], rotate: [0, -6, 6, 0] }
-              }
-              transition={{
-                duration: 3.2,
-                repeat: Infinity,
-                repeatDelay: 1.2,
-                ease: "easeInOut",
-              }}
             >
               <FiMail className="size-6" />
-              <span className="absolute -right-1 -top-1 size-3 rounded-full bg-amber-400 ring-2 ring-card" />
-            </motion.span>
+              <span className="absolute -right-1 -top-1 size-3 rounded-full bg-highlight ring-2 ring-card" />
+            </span>
 
             <div>
               <h2
                 id="newsletter-title"
-                className="font-sans text-2xl font-semibold sm:text-3xl"
+                className="text-balance   font-sans text-[clamp(1.5rem,3vw,2rem)] font-semibold leading-tight tracking-tight"
               >
                 Learn something new every week
               </h2>
-              <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
+              <p className="mt-1.5 text-pretty text-sm text-muted-foreground sm:text-base">
                 Short, practical tips on AI, web development and careers, sent
                 straight to your inbox.
               </p>
@@ -521,7 +504,7 @@ export function Newsletter({
                 initial={reduce ? false : { opacity: 0, x: -14 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: 0.2 + i * 0.1 }}
+                transition={{ delay: reduce ? 0 : 0.2 + i * 0.1 }}
                 className="group flex items-center gap-3 text-sm"
               >
                 <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition-all duration-200 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:scale-100">
@@ -534,7 +517,7 @@ export function Newsletter({
 
           {/* Form */}
           <div className="mt-6">
-            <SubscribeForm showTrust subscribers={subscribers} />
+            <SubscribeForm subscribers={subscribers} />
           </div>
         </div>
 

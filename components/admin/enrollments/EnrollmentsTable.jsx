@@ -1,8 +1,8 @@
 // components/admin/enrollments/EnrollmentsTable.jsx
 "use client";
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 import { FiEye, FiFolder, FiRotateCcw, FiSlash } from "react-icons/fi";
-import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DataTable } from "@/components/admin/table/DataTable";
@@ -13,6 +13,44 @@ import {
   reinstateEnrollment,
 } from "@/app/actions/admin/enrollments";
 
+function initials(name) {
+  const parts = String(name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  return (
+    parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")
+  ).toUpperCase();
+}
+
+function ProgressBar({ value = 0 }) {
+  const reduce = useReducedMotion();
+  const pct = Math.max(0, Math.min(100, Number(value) || 0));
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        aria-label={`Progress ${pct}%`}
+      >
+        <motion.div
+          className={`h-full rounded-full ${pct >= 100 ? "bg-emerald-500" : "bg-primary"}`}
+          initial={reduce ? false : { width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </div>
+      <span className="w-9 text-xs tabular-nums text-muted-foreground">
+        {pct}%
+      </span>
+    </div>
+  );
+}
+
 export function EnrollmentsTable({ rows, perms }) {
   const canStudents = perms.includes("students.read");
   const canCourses = perms.includes("courses.read");
@@ -21,24 +59,32 @@ export function EnrollmentsTable({ rows, perms }) {
     {
       key: "student",
       header: "Student",
-      className: "min-w-44",
+      className: "min-w-52",
       cell: (r) => (
-        <div className="min-w-0">
-          {r.student?.slug && canStudents ? (
-            <Link
-              href={`/admin/students/${r.student.slug}`}
-              className="font-medium hover:underline"
-            >
-              {r.student.name}
-            </Link>
-          ) : (
-            <span className="font-medium">
-              {r.student?.name ?? "Unknown student"}
-            </span>
-          )}
-          <p className="truncate text-xs text-muted-foreground">
-            {r.student?.email}
-          </p>
+        <div className="flex items-center gap-3">
+          <span
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+            aria-hidden="true"
+          >
+            {initials(r.student?.name)}
+          </span>
+          <div className="min-w-0">
+            {r.student?.slug && canStudents ? (
+              <Link
+                href={`/admin/students/${r.student.slug}`}
+                className="font-medium hover:underline"
+              >
+                {r.student.name}
+              </Link>
+            ) : (
+              <span className="font-medium">
+                {r.student?.name ?? "Unknown student"}
+              </span>
+            )}
+            <p className="truncate text-xs text-muted-foreground">
+              {r.student?.email}
+            </p>
+          </div>
         </div>
       ),
     },
@@ -66,25 +112,23 @@ export function EnrollmentsTable({ rows, perms }) {
     {
       key: "progress",
       header: "Progress",
-      className: "w-36",
-      cell: (r) => (
-        <div className="flex items-center gap-2">
-          <Progress
-            value={r.progress ?? 0}
-            aria-label={`Progress ${r.progress ?? 0}%`}
-            className="h-1.5"
-          />
-          <span className="w-9 text-xs tabular-nums text-muted-foreground">
-            {r.progress ?? 0}%
-          </span>
-        </div>
-      ),
+      className: "w-40",
+      cell: (r) => <ProgressBar value={r.progress ?? 0} />,
     },
     {
       key: "paid",
       header: "Paid",
       className: "whitespace-nowrap",
-      cell: (r) => (r.price > 0 ? formatPrice(r.price, r.currency) : "Free"),
+      cell: (r) =>
+        r.price > 0 ? (
+          <span className="font-medium tabular-nums">
+            {formatPrice(r.price, r.currency)}
+          </span>
+        ) : (
+          <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            Free
+          </span>
+        ),
     },
     {
       key: "enrolled",
@@ -150,4 +194,3 @@ export function EnrollmentsTable({ rows, perms }) {
     />
   );
 }
-

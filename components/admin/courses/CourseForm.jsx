@@ -18,6 +18,7 @@ import {
   applyActionError,
 } from "@/components/admin/forms/fields";
 import { ImageField } from "@/components/admin/forms/ImageField";
+import { CourseMediaPreview } from "@/components/admin/courses/CourseMediaPreview";
 import { LANGUAGES, LEVELS } from "@/config/courses";
 import { SUPPORTED_CURRENCIES } from "@/config/currencies";
 import { courseSchema } from "@/lib/validations/course";
@@ -31,6 +32,9 @@ const defaults = (c) => ({
   categoryId: c?.categoryId ?? "",
   instructorId: c?.instructorId ?? "",
   thumbnail: c?.thumbnail ?? "",
+  videoId: c?.videoId ?? "",
+  videoThumbnail: c?.videoThumbnail ?? "",
+  externalUrl: c?.externalUrl ?? "",
   level: c?.level ?? "beginner",
   language: c?.language ?? "English",
   isFree: c?.isFree ?? false,
@@ -61,6 +65,10 @@ export function CourseForm({ record = null, categories, instructors }) {
   });
   const faqs = useFieldArray({ control: form.control, name: "faqs" });
   const isFree = useWatch({ control: form.control, name: "isFree" });
+  const media = useWatch({
+    control: form.control,
+    name: ["videoId", "videoThumbnail", "externalUrl"],
+  });
 
   async function onSubmit(values) {
     const res = edit
@@ -164,10 +172,46 @@ export function CourseForm({ record = null, categories, instructors }) {
         <ImageField
           control={form.control}
           name="thumbnail"
-          label="Course thumbnail"
+          label="Course thumbnail (optional)"
           kind="courses"
-          description="16:9 works best. Required to publish."
+          description="16:9 works best. You can add it later."
         />
+      </FormSection>
+
+      <FormSection
+        title="Video and links"
+        description="Add a YouTube video and an optional online link for this course."
+      >
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-5">
+            <TextField
+              control={form.control}
+              name="videoId"
+              label="YouTube video link or ID"
+              autoComplete="off"
+              description="Paste a YouTube link or the 11-character video ID. Only the ID is saved."
+            />
+            <TextField
+              control={form.control}
+              name="externalUrl"
+              label="Online link (optional)"
+              autoComplete="off"
+              description="A full link starting with https://"
+            />
+            <ImageField
+              control={form.control}
+              name="videoThumbnail"
+              label="Video image (optional)"
+              kind="courses"
+              description="Leave empty to use the YouTube thumbnail."
+            />
+          </div>
+          <CourseMediaPreview
+            videoUrl={media[0]}
+            thumbnailUrl={media[1]}
+            externalUrl={media[2]}
+          />
+        </div>
       </FormSection>
 
       <FormSection title="Pricing and duration">
@@ -301,4 +345,3 @@ export function CourseForm({ record = null, categories, instructors }) {
     </form>
   );
 }
-

@@ -1,6 +1,7 @@
 // app/(public)/faq/page.jsx
 import Link from "next/link";
 import {
+  FiArrowRight,
   FiAward,
   FiBookOpen,
   FiCheckCircle,
@@ -15,7 +16,6 @@ import {
   FiZap,
 } from "react-icons/fi";
 
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Container } from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -118,11 +118,11 @@ export default function FAQPage() {
         description="Quick answers about courses, payments, certificates and your account."
         breadcrumbs={[{ label: "Home", href: "/" }, { label: "FAQ" }]}
       >
-        <ul className="mt-5 flex flex-wrap gap-2.5">
+        <ul className="mt-5 flex flex-wrap gap-2">
           {chips.map(({ icon: Icon, text }) => (
             <li
               key={text}
-              className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3.5 py-1.5 text-sm font-medium backdrop-blur"
+              className="inline-flex items-center gap-2 rounded-full border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground"
             >
               <Icon aria-hidden="true" className="size-4 text-primary" />
               {text}
@@ -137,164 +137,175 @@ export default function FAQPage() {
           className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
         />
 
-        {/* Help topics */}
-        <Container className="relative pt-10">
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {helpTopics.map(({ icon: Icon, title, text, href, cta }, i) => (
-              <li key={title} className="min-w-0">
-                <Reveal delay={i * 0.08} className="h-full">
+        {/* Search and answers come first: this is why people are here */}
+        <Container className="relative max-w-3xl pb-12 pt-10 sm:pb-16 sm:pt-14">
+          <h2 className="text-balance text-3xl sm:text-4xl">
+            Find your answer fast
+          </h2>
+          <div className="mt-6">
+            <FaqExplorer faqs={faqs} />
+          </div>
+        </Container>
+
+        {/* Other places to go: one bordered strip, divided into cells */}
+        <section
+          aria-labelledby="topics-title"
+          className="border-t bg-muted/30 py-14 sm:py-16"
+        >
+          <Container>
+            <h2 id="topics-title" className="text-2xl sm:text-3xl">
+              Looking for something else?
+            </h2>
+            <ul className="mt-6 grid grid-cols-1 divide-y divide-border overflow-hidden rounded-2xl border bg-card sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
+              {helpTopics.map(({ icon: Icon, title, text, href, cta }, i) => (
+                <li
+                  key={title}
+                  className={`min-w-0 ${
+                    i > 1 ? "sm:border-t sm:border-border lg:border-t-0" : ""
+                  } ${i % 2 === 1 ? "sm:border-l sm:border-border lg:border-l-0" : ""}`}
+                >
                   <Link
                     href={href}
-                    className="group flex  h-full flex-col rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                    className="group flex h-full flex-col p-5 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
                   >
-                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                      <Icon aria-hidden="true" className="size-5" />
-                    </span>
-                    <h2 className="mt-4 font-sans text-base font-semibold">
+                    <Icon aria-hidden="true" className="size-6 text-primary" />
+                    <h3 className="mt-4 font-sans text-base font-semibold text-foreground">
                       {title}
-                    </h2>
+                    </h3>
                     <p className="mt-1 flex-1 text-sm text-muted-foreground">
                       {text}
                     </p>
-                    <span className="mt-3 text-sm font-medium text-primary">
-                      {cta} <span aria-hidden="true">→</span>
+                    <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                      {cta}
+                      <FiArrowRight
+                        aria-hidden="true"
+                        className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                      />
                     </span>
                   </Link>
-                </Reveal>
-              </li>
-            ))}
-          </ul>
-        </Container>
-
-        {/* Explorer */}
-        <Container className="relative max-w-3xl py-10 sm:py-12">
-          <Reveal className="mb-6 text-center">
-            <Badge variant="secondary" className="mb-3">
-              Search the answers
-            </Badge>
-            <h2 className="text-2xl sm:text-3xl">Find your answer fast</h2>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <FaqExplorer faqs={faqs} />
-          </Reveal>
-        </Container>
-
-        {/* Quick facts */}
-        <section
-          aria-labelledby="facts-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
-        >
-          <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <h2 id="facts-title" className="text-2xl sm:text-3xl">
-                The short version
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                Four things people ask about most.
-              </p>
-            </Reveal>
-            <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {quickFacts.map(({ icon: Icon, title, text }, i) => (
-                <li key={title} className="min-w-0">
-                  <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group h-full rounded-2xl border bg-card p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="mx-auto grid size-12 place-items-center rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:scale-100">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold">
-                        {title}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {text}
-                      </p>
-                    </div>
-                  </Reveal>
                 </li>
               ))}
             </ul>
           </Container>
         </section>
 
-        {/* Get help */}
+        {/* Quick facts: open columns */}
+        <section
+          aria-labelledby="facts-title"
+          className="border-t py-14 sm:py-20"
+        >
+          <Container>
+            <h2
+              id="facts-title"
+              className="max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              The short version
+            </h2>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              Four things people ask about most.
+            </p>
+            <ul className="mt-10 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+              {quickFacts.map(({ icon: Icon, title, text }) => (
+                <li
+                  key={title}
+                  className="min-w-0 border-t-2 border-primary pt-5"
+                >
+                  <Icon aria-hidden="true" className="size-6 text-primary" />
+                  <h3 className="mt-3 font-sans text-base font-semibold text-foreground">
+                    {title}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+                    {text}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Container>
+        </section>
+
+        {/* Get help: a true sequence */}
         <section
           aria-labelledby="help-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t bg-muted/30 py-14 sm:py-20"
         >
-          <Container className="max-w-4xl">
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                Need more help?
-              </Badge>
-              <h2 id="help-title" className="text-2xl sm:text-3xl">
-                Getting help takes three steps
-              </h2>
-            </Reveal>
-            <ol className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-              {helpSteps.map(({ icon: Icon, title, text }, i) => (
-                <li key={title} className="min-w-0">
-                  <Reveal delay={i * 0.1} className="h-full">
-                    <div className="relative h-full rounded-2xl border bg-card p-5 text-center">
-                      <span className="absolute right-4 top-3 font-serif text-4xl font-semibold text-primary/10">
-                        {i + 1}
-                      </span>
-                      <span className="mx-auto grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <h3 className="mt-3 font-sans text-base font-semibold">
+          <Container>
+            <h2
+              id="help-title"
+              className="max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              Getting help takes three steps
+            </h2>
+
+            <Reveal>
+              <ol className="relative mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
+                <span
+                  aria-hidden="true"
+                  className="absolute left-5 right-5 top-5 hidden h-px bg-border sm:block"
+                />
+                {helpSteps.map(({ icon: Icon, title, text }, i) => (
+                  <li
+                    key={title}
+                    className="relative flex gap-4 sm:block sm:pr-4"
+                  >
+                    <span
+                      className={`relative z-10 grid size-10 shrink-0 place-items-center rounded-full ${
+                        i === helpSteps.length - 1
+                          ? "bg-highlight text-foreground"
+                          : "bg-primary text-primary-foreground"
+                      }`}
+                    >
+                      <Icon aria-hidden="true" className="size-5" />
+                    </span>
+                    <div className="sm:mt-5">
+                      <h3 className="font-sans text-base font-semibold text-foreground">
+                        <span className="sr-only">Step {i + 1}: </span>
                         {title}
                       </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="mt-1 max-w-xs text-sm text-muted-foreground sm:text-base">
                         {text}
                       </p>
                     </div>
-                  </Reveal>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                ))}
+              </ol>
+            </Reveal>
           </Container>
         </section>
 
         {/* Contact banner */}
-        <section className="border-t bg-muted/20 py-12 sm:py-14">
+        <section className="border-t py-14 sm:py-16">
           <Container>
-            <Reveal>
-              <div className="relative overflow-hidden rounded-3xl border bg-card p-8 sm:p-10">
-                <span
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between md:gap-10">
+              <div className="flex items-start gap-4">
+                <FiMail
                   aria-hidden="true"
-                  className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
+                  className="mt-1 size-7 shrink-0 text-primary"
                 />
-                <div className="flex flex-col items-start gap-5 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-start gap-4">
-                    <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                      <FiMail aria-hidden="true" className="size-5" />
-                    </span>
-                    <div>
-                      <h2 className="text-xl sm:text-2xl">
-                        Still have a question?
-                      </h2>
-                      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                        Send us a message and we will get back to you. You can
-                        also read our Terms for refund and payment details.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <Link
-                      href="/contact"
-                      className={buttonVariants({ variant: "default" })}
-                    >
-                      Contact us
-                    </Link>
-                    <Link
-                      href="/terms"
-                      className={buttonVariants({ variant: "outline" })}
-                    >
-                      Read Terms
-                    </Link>
-                  </div>
+                <div>
+                  <h2 className="text-balance text-2xl sm:text-3xl">
+                    Still have a question?
+                  </h2>
+                  <p className="mt-2 max-w-xl text-muted-foreground">
+                    Send us a message and we will get back to you. You can also
+                    read our Terms for refund and payment details.
+                  </p>
                 </div>
               </div>
-            </Reveal>
+              <div className="flex flex-wrap gap-3 md:shrink-0">
+                <Link
+                  href="/contact"
+                  className={buttonVariants({ variant: "default", size: "lg" })}
+                >
+                  Contact us
+                </Link>
+                <Link
+                  href="/terms"
+                  className={buttonVariants({ variant: "outline", size: "lg" })}
+                >
+                  Read Terms
+                </Link>
+              </div>
+            </div>
           </Container>
         </section>
 

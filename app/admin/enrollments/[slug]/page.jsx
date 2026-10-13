@@ -2,8 +2,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import {
+  EnrollmentTimeline,
+  ProgressRing,
+} from "@/components/admin/enrollments/EnrollmentVisuals";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { requirePermission } from "@/lib/auth/authorize";
 import { can, PERMISSIONS as P } from "@/lib/constants/permissions";
@@ -50,6 +53,25 @@ export default async function AdminEnrollmentPage({ params }) {
   const done = progress.exists
     ? (progress.get("completedLessonIds") ?? []).length
     : 0;
+
+  // Only dates that exist on the record; nothing is invented.
+  const timeline = [
+    { label: "Enrolled", value: formatDateTime(e.enrolledAt) },
+    e.lastActivityAt && {
+      label: "Last activity",
+      value: formatDateTime(e.lastActivityAt),
+    },
+    e.completedAt && {
+      label: "Completed",
+      value: formatDateTime(e.completedAt),
+      tone: "done",
+    },
+    e.cancelledAt && {
+      label: "Cancelled",
+      value: formatDateTime(e.cancelledAt),
+      tone: "danger",
+    },
+  ].filter(Boolean);
 
   return (
     <>
@@ -113,31 +135,22 @@ export default async function AdminEnrollmentPage({ params }) {
         </Card>
         <Card className="gap-4 p-5">
           <h2 className="text-lg">Progress</h2>
-          <div className="flex items-center gap-3">
-            <Progress
-              value={e.progress ?? 0}
-              aria-label={`Progress ${e.progress ?? 0}%`}
+          <div className="flex flex-col items-center gap-6 sm:flex-row">
+            <ProgressRing value={e.progress ?? 0} caption="complete" />
+            <Facts
+              items={[
+                ["Lessons completed", progress.exists ? done : "—"],
+                [
+                  "Certificate",
+                  cert
+                    ? cert.exists
+                      ? cert.get("certificateNumber")
+                      : "Not issued"
+                    : null,
+                ],
+              ]}
             />
-            <span className="text-sm tabular-nums">{e.progress ?? 0}%</span>
           </div>
-          <Facts
-            items={[
-              ["Lessons completed", progress.exists ? done : "—"],
-              ["Last activity", formatDateTime(e.lastActivityAt)],
-              [
-                "Completed",
-                e.completedAt ? formatDateTime(e.completedAt) : null,
-              ],
-              [
-                "Certificate",
-                cert
-                  ? cert.exists
-                    ? cert.get("certificateNumber")
-                    : "Not issued"
-                  : null,
-              ],
-            ]}
-          />
         </Card>
         <Card className="gap-4 p-5">
           <h2 className="text-lg">Payment</h2>
@@ -175,9 +188,9 @@ export default async function AdminEnrollmentPage({ params }) {
             </p>
           )}
         </Card>
-        <Card className="gap-1.5 p-5 text-xs text-muted-foreground lg:col-span-2">
-          <p>Enrolled {formatDateTime(e.enrolledAt)}</p>
-          {e.cancelledAt && <p>Cancelled {formatDateTime(e.cancelledAt)}</p>}
+        <Card className="gap-4 p-5 lg:col-span-2">
+          <h2 className="text-lg">Timeline</h2>
+          <EnrollmentTimeline items={timeline} />
         </Card>
       </div>
     </>

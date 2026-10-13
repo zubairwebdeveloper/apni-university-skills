@@ -1,5 +1,6 @@
 // components/admin/categories/CategoryForm.jsx
 "use client";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,6 +8,7 @@ import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { TextField } from "@/components/shared/TextField";
 import {
+  CharCount,
   FormFooter,
   FormSection,
   LinesField,
@@ -59,6 +61,39 @@ export function CategoryForm({ record = null }) {
     router.refresh();
   }
 
+  const { isDirty, isSubmitting, isSubmitSuccessful } = form.formState;
+
+  // Warn before closing or reloading the tab with unsaved edits.
+  // (In-app link clicks are not intercepted by the browser event.)
+  useEffect(() => {
+    if (!isDirty || isSubmitting || isSubmitSuccessful) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty, isSubmitting, isSubmitSuccessful]);
+
+  // Ctrl/Cmd+S saves. The ref keeps the listener pointing at the latest handler.
+  const submitRef = useRef(null);
+  submitRef.current = form.handleSubmit(onSubmit);
+  useEffect(() => {
+    const onKey = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        submitRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const slug = form.watch("slug")?.trim();
+  const description = form.watch("description");
+  const seoTitle = form.watch("seoTitle");
+  const seoDescription = form.watch("seoDescription");
+
   return (
     <form
       onSubmit={form.handleSubmit(onSubmit)}
@@ -72,9 +107,16 @@ export function CategoryForm({ record = null }) {
           name="slug"
           label="Slug"
           description={
-            edit
-              ? "Changing the slug keeps the old URL working through a redirect."
-              : "Leave blank to generate it from the name."
+            <>
+              {edit
+                ? "Changing the slug keeps the old URL working through a redirect."
+                : "Leave blank to generate it from the name."}
+              {slug && (
+                <span className="mt-1 block break-all font-mono text-xs">
+                  Public URL: /categories/{slug}
+                </span>
+              )}
+            </>
           }
           autoComplete="off"
         />
@@ -83,7 +125,12 @@ export function CategoryForm({ record = null }) {
           name="description"
           label="Description"
           rows={3}
-          description="Shown at the top of the category page."
+          description={
+            <>
+              Shown at the top of the category page.
+              <CharCount value={description} />
+            </>
+          }
         />
       </FormSection>
       <FormSection title="Appearance">
@@ -131,7 +178,12 @@ export function CategoryForm({ record = null }) {
           control={form.control}
           name="seoTitle"
           label="SEO title"
-          description="Up to 70 characters. Defaults to “{name} courses”."
+          description={
+            <>
+              Up to 70 characters. Defaults to “{"{name}"} courses”.
+              <CharCount value={seoTitle} max={70} />
+            </>
+          }
         />
         <TextField
           control={form.control}
@@ -139,15 +191,20 @@ export function CategoryForm({ record = null }) {
           label="SEO description"
           component={Textarea}
           rows={2}
-          description="Up to 160 characters."
+          description={
+            <>
+              Up to 160 characters.
+              <CharCount value={seoDescription} max={160} />
+            </>
+          }
         />
       </FormSection>
       <FormFooter
         submitting={form.formState.isSubmitting}
+        dirty={isDirty}
         cancelHref="/admin/categories"
         submitLabel={edit ? "Save changes" : "Create category"}
       />
     </form>
   );
 }
-

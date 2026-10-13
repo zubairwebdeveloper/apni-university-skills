@@ -1,9 +1,11 @@
 // app/admin/careers/page.jsx
 import Link from "next/link";
+import { FiCompass } from "react-icons/fi";
 import { buttonVariants } from "@/components/ui/button";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DataTableToolbar } from "@/components/admin/table/DataTableToolbar";
 import { CareersTable } from "@/components/admin/careers/CareersTable";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { CursorPagination } from "@/components/shared/CursorPagination";
 import { requirePermission } from "@/lib/auth/authorize";
 import {
@@ -35,19 +37,57 @@ export default async function AdminCareersPage({ searchParams }) {
     filters: rangeFilter(p.range),
   });
   const { after, keyword, ...linkParams } = p;
+
+  const canCreate = can(user.role, P.CAREERS_CREATE);
+
+  // What is narrowing the list right now (status, date range, search)
+  const activeFilterCount = [p.status, p.range].filter(Boolean).length;
+  const searching = Boolean(keyword);
+  const filtered = activeFilterCount > 0 || searching;
+
+  const summary = [
+    {
+      label: filtered ? "Matching guides" : "All guides",
+      value: typeof total === "number" ? total : "–",
+    },
+    { label: "On this page", value: items.length },
+    {
+      label: "Filters applied",
+      value: activeFilterCount + (searching ? 1 : 0),
+    },
+  ];
+
   return (
     <>
       <AdminPageHeader
         title="Careers"
         description="Role guides with roadmaps, skills, interview preparation and portfolio ideas."
         actions={
-          can(user.role, P.CAREERS_CREATE) && (
+          canCreate && (
             <Link href="/admin/careers/create" className={buttonVariants()}>
               New guide
             </Link>
           )
         }
       />
+
+      {/* Summary: a compact read-out of the current view */}
+      <dl className="mb-4 grid grid-cols-3 divide-x divide-border rounded-xl border bg-card">
+        {summary.map((s) => (
+          <div
+            key={s.label}
+            className="flex flex-col-reverse items-center gap-0.5 px-3 py-3 text-center sm:flex-row sm:justify-center sm:gap-3"
+          >
+            <dt className="text-xs text-muted-foreground sm:text-sm">
+              {s.label}
+            </dt>
+            <dd className="font-serif text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
+              {s.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
       <DataTableToolbar
         searchPlaceholder="Search by title, summary or skill…"
         total={total}
@@ -67,16 +107,51 @@ export default async function AdminCareersPage({ searchParams }) {
           },
         ]}
       />
+
       <div className="mt-4">
-        <CareersTable rows={items} perms={permissionsFor(user.role)} />
-        <CursorPagination
-          basePath="/admin/careers"
-          params={linkParams}
-          after={after}
-          nextCursor={nextCursor}
-        />
+        {items.length > 0 ? (
+          <>
+            <CareersTable rows={items} perms={permissionsFor(user.role)} />
+            <CursorPagination
+              basePath="/admin/careers"
+              params={linkParams}
+              after={after}
+              nextCursor={nextCursor}
+            />
+          </>
+        ) : (
+          <EmptyState
+            icon={FiCompass}
+            title={
+              filtered ? "No guides match this view" : "No career guides yet"
+            }
+            description={
+              filtered
+                ? "Try removing a filter or searching for something else."
+                : "Create your first role guide to get started."
+            }
+            action={
+              filtered ? (
+                <Link
+                  href="/admin/careers"
+                  className={buttonVariants({ variant: "outline" })}
+                >
+                  Clear filters
+                </Link>
+              ) : (
+                canCreate && (
+                  <Link
+                    href="/admin/careers/create"
+                    className={buttonVariants()}
+                  >
+                    New guide
+                  </Link>
+                )
+              )
+            }
+          />
+        )}
       </div>
     </>
   );
 }
-

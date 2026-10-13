@@ -5,6 +5,8 @@ import {
   NotificationsExtras,
   NotificationsView,
 } from "@/components/student/NotificationsView";
+import { NotificationsBackdrop } from "@/components/student/NotificationsBackdrop";
+import { NotificationsStats } from "@/components/student/NotificationsStats";
 import { StudentPageHeader } from "@/components/student/StudentPageHeader";
 import { requireUser } from "@/lib/auth/session";
 import { safeNext } from "@/lib/utils/url";
@@ -38,10 +40,17 @@ export default async function StudentNotificationsPage() {
     dateLabel: formatDateTime(n.createdAt),
   }));
 
-  const hasUnread = items.some((n) => !n.read);
+  const unread = items.filter((n) => !n.read).length;
+  const hasUnread = unread > 0;
+  const latest = items.reduce(
+    (a, b) => (b.createdAt > (a?.createdAt ?? 0) ? b : a),
+    null,
+  );
 
   return (
-    <>
+    <div className="relative isolate">
+      <NotificationsBackdrop />
+
       <StudentPageHeader
         title="Notifications"
         description="Announcements and updates from our team."
@@ -59,11 +68,18 @@ export default async function StudentNotificationsPage() {
           <NotificationsExtras />
         </>
       ) : (
-        <NotificationsView
-          items={items}
-          now={Math.max(0, ...items.map((item) => item.createdAt))}
-        />
+        <>
+          <NotificationsStats
+            total={items.length}
+            unread={unread}
+            latestLabel={latest?.dateLabel}
+          />
+          <NotificationsView
+            items={items}
+            now={Math.max(0, ...items.map((item) => item.createdAt))}
+          />
+        </>
       )}
-    </>
+    </div>
   );
 }

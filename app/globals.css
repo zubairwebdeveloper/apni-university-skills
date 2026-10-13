@@ -171,3 +171,46 @@
     transition-duration: 0.01ms !important;
   }
 }
+/* Native scrollbar hidden: page */
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Native scrollbar hidden: any area you mark with .no-scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Other scroll areas (tables, dropdowns, code) keep a slim branded bar */
+[data-snake-y],
+[data-snake-x] {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+[data-snake-y]::-webkit-scrollbar,
+[data-snake-x]::-webkit-scrollbar {
+  display: none;
+}
+@theme {
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}

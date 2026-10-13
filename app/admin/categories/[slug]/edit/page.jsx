@@ -1,5 +1,7 @@
 // app/admin/categories/[slug]/edit/page.jsx
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { FiArrowLeft } from "react-icons/fi";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { CategoryForm } from "@/components/admin/categories/CategoryForm";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -19,8 +21,16 @@ export default async function EditCategoryPage({ params }) {
   if (record.status === "deleted") redirect("/admin/categories?status=deleted");
   return (
     <>
+      <Link
+        href="/admin/categories"
+        className="mb-4 inline-flex min-h-9 items-center gap-1.5 rounded-md text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+      >
+        <FiArrowLeft aria-hidden="true" className="size-4" />
+        Back to categories
+      </Link>
       <AdminPageHeader
         title={`Edit ${record.name}`}
+        description={record.slug ? `Slug: ${record.slug}` : undefined}
         actions={<StatusBadge status={record.status} />}
       />
       <CategoryForm key={record.updatedAt} record={record} />

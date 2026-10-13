@@ -2,10 +2,17 @@
 import Link from "next/link";
 import {
   FiArrowRight,
+  FiBookOpen,
+  FiBriefcase,
   FiChevronDown,
+  FiCode,
+  FiEdit3,
   FiEye,
   FiLock,
+  FiMessageSquare,
+  FiRefreshCw,
   FiShield,
+  FiSlash,
   FiUsers,
 } from "react-icons/fi";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +58,30 @@ const stats = [
   { value: 100, suffix: "%", label: "Beginner friendly" },
 ];
 
+// Who this track is actually built for (new)
+const audiences = [
+  {
+    icon: FiBookOpen,
+    title: "Curious beginners",
+    text: "No coding background needed to start. Learn what AI actually is before touching any code.",
+  },
+  {
+    icon: FiCode,
+    title: "Developers",
+    text: "Add AI APIs, agents and automation to the skills you already have.",
+  },
+  {
+    icon: FiRefreshCw,
+    title: "Career switchers",
+    text: "Move toward AI-adjacent roles with a path that builds real, demonstrable projects.",
+  },
+  {
+    icon: FiBriefcase,
+    title: "Working professionals",
+    text: "Use AI tools to work faster in your current job, no matter the field.",
+  },
+];
+
 const promptTips = [
   {
     title: "Give it a role",
@@ -69,6 +100,60 @@ const promptTips = [
     weak: "Compare React and Vue.",
     strong:
       "Compare React and Vue in a table with 5 rows: learning curve, speed, jobs, ecosystem, best use.",
+  },
+  {
+    title: "Iterate instead of restarting",
+    weak: "That's wrong, try again.",
+    strong:
+      "That's close, but keep it under 100 words and remove the second example. Keep everything else the same.",
+  },
+];
+
+// Short, beginner-facing glossary (new)
+const glossary = [
+  {
+    term: "LLM",
+    text: "A large language model. The kind of AI behind tools like ChatGPT and Claude, trained on huge amounts of text.",
+  },
+  {
+    term: "Prompt",
+    text: "The instruction or question you give an AI model. Better prompts generally lead to better answers.",
+  },
+  {
+    term: "Token",
+    text: "A small chunk of text, roughly a word or part of a word, that models read and generate one at a time.",
+  },
+  {
+    term: "Fine-tuning",
+    text: "Further training a model on a specific dataset so it performs better at a narrow task.",
+  },
+  {
+    term: "AI agent",
+    text: "A system that uses an AI model to take actions, like calling tools or APIs, not just answer questions.",
+  },
+  {
+    term: "Hallucination",
+    text: "When a model confidently produces an answer that sounds right but is actually false.",
+  },
+];
+
+// Common early mistakes (new)
+const mistakes = [
+  {
+    title: "Trusting every answer",
+    text: "Treating AI output as fact without checking it against a real source.",
+  },
+  {
+    title: "Vague prompts",
+    text: "Asking broad, one-line questions and expecting a precise, usable answer back.",
+  },
+  {
+    title: "One-shot thinking",
+    text: "Giving up after one bad response instead of refining the prompt and trying again.",
+  },
+  {
+    title: "Sharing sensitive data",
+    text: "Pasting private, personal, or client information into a public AI tool.",
   },
 ];
 
@@ -93,6 +178,16 @@ const responsible = [
     title: "Keep humans in charge",
     text: "Use AI to help you decide, not to decide for you, especially for work that affects people.",
   },
+  {
+    icon: FiEdit3,
+    title: "Credit and disclose",
+    text: "Be upfront when AI helped produce something, especially in academic or professional work.",
+  },
+  {
+    icon: FiSlash,
+    title: "Know when not to use it",
+    text: "Some decisions, like medical, legal or financial ones, need a qualified human, not a model.",
+  },
 ];
 
 const faqs = [
@@ -111,6 +206,14 @@ const faqs = [
   {
     q: "How long until I can build something real?",
     a: "Most beginners can build a simple chatbot or automation within the first month if they practice a little every day.",
+  },
+  {
+    q: "What's the difference between using AI tools and building with AI?",
+    a: "Using AI tools means working with products like chat assistants. Building with AI means writing code that calls AI models through an API to power your own app.",
+  },
+  {
+    q: "Do I need a powerful computer to learn AI?",
+    a: "No. Most beginner projects use hosted APIs, so the heavy computation happens on someone else's servers, not your laptop.",
   },
 ];
 
@@ -147,7 +250,7 @@ export default async function AIPage() {
           {stats.map((s) => (
             <div
               key={s.label}
-              className="rounded-xl border bg-card/70 p-3 text-center backdrop-blur sm:p-4"
+              className="rounded-xl border border-border bg-card/70 p-3 text-center backdrop-blur sm:p-4"
             >
               <dd className="font-serif text-xl font-semibold text-primary sm:text-2xl">
                 <CountUp to={s.value} suffix={s.suffix} />
@@ -174,6 +277,33 @@ export default async function AIPage() {
           </Reveal>
         </Section>
 
+        {/* Who it's for (new) */}
+        <Section labelledBy="who" className="bg-secondary/40">
+          <SectionHeader
+            id="who"
+            eyebrow="Who this is for"
+            title="Built for more than one starting point"
+            description="Wherever you're coming from, there's a way in."
+          />
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {audiences.map(({ icon: Icon, title, text }, i) => (
+              <li key={title} className="min-w-0">
+                <Reveal delay={i * 0.07} className="h-full">
+                  <div className="group h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
+                      <Icon aria-hidden="true" className="size-5" />
+                    </span>
+                    <h3 className="mt-4 font-sans text-base font-semibold text-foreground">
+                      {title}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ul>
+        </Section>
+
         <Section labelledBy="paths" className="bg-secondary/40">
           <SectionHeader
             id="paths"
@@ -188,7 +318,7 @@ export default async function AIPage() {
                   className="group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <Card className="h-full gap-2 p-6 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-lg motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
-                    <h3 className="font-serif text-lg font-semibold">
+                    <h3 className="font-serif text-lg font-semibold text-foreground">
                       {p.title}
                     </h3>
                     <p className="text-sm text-muted-foreground">{p.text}</p>
@@ -217,7 +347,7 @@ export default async function AIPage() {
             {aiTopics.map((t) => (
               <StaggerItem key={t.title} className="min-w-0">
                 <Card className="h-full gap-3 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                  <h3 className="font-serif text-lg font-semibold">
+                  <h3 className="font-serif text-lg font-semibold text-foreground">
                     {t.title}
                   </h3>
                   <p className="text-sm text-muted-foreground">{t.text}</p>
@@ -263,7 +393,7 @@ export default async function AIPage() {
         {/* Tools */}
         <section
           aria-labelledby="tools-title"
-          className="border-y bg-muted/30 py-8"
+          className="border-y border-border bg-muted/30 py-8"
         >
           <Container>
             <h2
@@ -284,20 +414,20 @@ export default async function AIPage() {
             title="Better prompts, better answers"
             description="Small changes in how you ask make a big difference."
           />
-          <Stagger className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <Stagger className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             {promptTips.map((t) => (
               <StaggerItem key={t.title} className="min-w-0">
                 <Card className="h-full gap-4 p-6">
-                  <h3 className="font-serif text-lg font-semibold">
+                  <h3 className="font-serif text-lg font-semibold text-foreground">
                     {t.title}
                   </h3>
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-foreground">
                     <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-destructive">
                       Weak
                     </p>
                     {t.weak}
                   </div>
-                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-foreground">
                     <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">
                       Strong
                     </p>
@@ -309,6 +439,37 @@ export default async function AIPage() {
           </Stagger>
         </Section>
 
+        {/* Glossary (new) */}
+        <Section labelledBy="glossary" className="bg-secondary/40">
+          <SectionHeader
+            id="glossary"
+            eyebrow="Speak the language"
+            title="AI terms worth knowing"
+            description="Six words you'll see constantly once you start learning AI."
+          />
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {glossary.map(({ term, text }, i) => (
+              <li key={term} className="min-w-0">
+                <Reveal delay={Math.min(i * 0.06, 0.4)} className="h-full">
+                  <div className="flex h-full items-start gap-3 rounded-xl border border-border bg-card p-4">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
+                      <FiMessageSquare aria-hidden="true" className="size-4" />
+                    </span>
+                    <div>
+                      <h3 className="font-sans text-sm font-semibold text-foreground">
+                        {term}
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {text}
+                      </p>
+                    </div>
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ul>
+        </Section>
+
         <Section labelledBy="roles" className="bg-secondary/40">
           <SectionHeader
             id="roles"
@@ -318,8 +479,10 @@ export default async function AIPage() {
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {aiRoles.map(([role, text], i) => (
               <Reveal key={role} delay={(i % 2) * 0.08} className="min-w-0">
-                <div className="h-full rounded-xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                  <dt className="font-serif text-lg font-semibold">{role}</dt>
+                <div className="h-full rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+                  <dt className="font-serif text-lg font-semibold text-foreground">
+                    {role}
+                  </dt>
                   <dd className="mt-1 text-sm text-muted-foreground">{text}</dd>
                 </div>
               </Reveal>
@@ -348,6 +511,37 @@ export default async function AIPage() {
           )}
         </Section>
 
+        {/* Common mistakes (new) */}
+        <Section labelledBy="mistakes">
+          <SectionHeader
+            id="mistakes"
+            eyebrow="Learn from others"
+            title="Mistakes most beginners make"
+            description="Avoiding these will save you time in your first few weeks."
+          />
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {mistakes.map(({ title, text }, i) => (
+              <li key={title} className="min-w-0">
+                <Reveal delay={i * 0.08} className="h-full">
+                  <div className="flex h-full items-start gap-3 rounded-xl border border-border bg-card p-5">
+                    <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-destructive/10 text-xs font-bold text-destructive">
+                      !
+                    </span>
+                    <div>
+                      <h3 className="font-sans text-base font-semibold text-foreground">
+                        {title}
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {text}
+                      </p>
+                    </div>
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ul>
+        </Section>
+
         {/* Responsible AI */}
         <Section labelledBy="responsible" className="bg-secondary/40">
           <SectionHeader
@@ -356,15 +550,15 @@ export default async function AIPage() {
             title="Responsible AI habits"
             description="Good AI skills include knowing when not to trust it."
           />
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {responsible.map(({ icon: Icon, title, text }, i) => (
               <li key={title} className="min-w-0">
                 <Reveal delay={i * 0.08} className="h-full">
-                  <div className="group h-full rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+                  <div className="group h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
                     <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
                       <Icon aria-hidden="true" className="size-5" />
                     </span>
-                    <h3 className="mt-4 font-sans text-base font-semibold">
+                    <h3 className="mt-4 font-sans text-base font-semibold text-foreground">
                       {title}
                     </h3>
                     <p className="mt-1 text-sm text-muted-foreground">{text}</p>
@@ -424,8 +618,8 @@ export default async function AIPage() {
           <div className="mx-auto max-w-3xl space-y-3">
             {faqs.map(({ q, a }, i) => (
               <Reveal key={q} delay={i * 0.06}>
-                <details className="group rounded-xl border bg-card px-4 py-3 open:shadow-md">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
+                <details className="group rounded-xl border border-border bg-card px-4 py-3 open:shadow-md">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
                     {q}
                     <FiChevronDown
                       aria-hidden="true"
@@ -440,11 +634,11 @@ export default async function AIPage() {
         </Section>
 
         {/* CTA */}
-        <section className="border-t py-12 sm:py-16">
+        <section className="border-t border-border py-12 sm:py-16">
           <Container>
             <Reveal>
-              <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-r from-primary/10 via-card to-highlight/20 p-6 text-center sm:p-10">
-                <h2 className="text-2xl sm:text-3xl">
+              <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-r from-primary/10 via-card to-highlight/20 p-6 text-center dark:from-primary/15 dark:via-card dark:to-highlight/10 sm:p-10">
+                <h2 className="text-2xl text-foreground sm:text-3xl">
                   Start building with AI today
                 </h2>
                 <p className="mx-auto mt-2 max-w-xl text-muted-foreground">

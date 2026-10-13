@@ -16,6 +16,11 @@ import {
 import { Section } from "@/components/layout/Container";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 
+const EASE = [0.22, 1, 0.36, 1];
+
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 // Shared tech list (names match the courses search, e.g. /courses?q=React).
 export const technologies = [
   { name: "Next.js", icon: SiNextdotjs, color: null },
@@ -121,22 +126,36 @@ export function LearningPaths() {
         hrefLabel="Browse all courses"
       />
 
-      <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
+      <motion.div
+        {...(reduce
+          ? {}
+          : {
+              initial: { opacity: 0, y: 16 },
+              whileInView: { opacity: 1, y: 0 },
+              viewport: { once: true, margin: "-60px" },
+              transition: { duration: 0.55, ease: EASE },
+            })}
+        className="grid gap-6 lg:grid-cols-[18rem_1fr]"
+      >
         {/* Path picker */}
-        <ul className="flex flex-row gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+        <ul
+          className="-mx-1 flex snap-x flex-row gap-2 overflow-x-auto px-1 pb-2 [scrollbar-width:none] lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
+          aria-label="Learning paths"
+        >
           {paths.map((p) => {
             const on = p.id === active;
             return (
-              <li key={p.id} className="shrink-0 lg:shrink">
+              <li key={p.id} className="shrink-0 snap-start lg:shrink">
                 <button
                   type="button"
                   aria-pressed={on}
                   onClick={() => setActive(p.id)}
-                  className="relative w-full rounded-xl border bg-card p-4 text-left outline-none transition-colors hover:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring"
+                  className={`relative min-h-12 w-full rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-colors duration-200 hover:border-primary/50 active:bg-muted/60 motion-reduce:transition-none ${FOCUS}`}
                 >
                   {on && (
                     <motion.span
                       layoutId="path-active"
+                      aria-hidden="true"
                       className="absolute inset-0 rounded-xl border-2 border-primary bg-primary/5"
                       transition={
                         reduce
@@ -145,9 +164,14 @@ export function LearningPaths() {
                       }
                     />
                   )}
-                  <span className="relative block font-medium">{p.label}</span>
-                  <span className="relative mt-1 hidden text-sm text-muted-foreground lg:block">
+                  <span className="relative block font-medium text-card-foreground">
+                    {p.label}
+                  </span>
+                  <span className="relative mt-1 hidden text-sm leading-5 text-muted-foreground lg:block">
                     {p.summary}
+                  </span>
+                  <span className="relative mt-2 hidden font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground lg:block">
+                    {p.steps.length} technologies
                   </span>
                 </button>
               </li>
@@ -157,10 +181,10 @@ export function LearningPaths() {
 
         {/* Timeline */}
         <div
-          className="rounded-2xl border bg-card p-5 sm:p-6"
+          className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-7"
           aria-live="polite"
         >
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground lg:hidden">
               {path.summary}
             </p>
@@ -170,11 +194,11 @@ export function LearningPaths() {
             </p>
           </div>
 
-          <ol key={path.id} className="relative flex flex-col gap-6">
+          <ol key={path.id} className="relative flex flex-col gap-4">
             {/* The line draws itself each time the path changes. */}
             <motion.span
               aria-hidden="true"
-              className="absolute bottom-4 left-5 top-4 w-px origin-top bg-border"
+              className="absolute bottom-6 left-5 top-6 w-px origin-top bg-border"
               initial={reduce ? false : { scaleY: 0 }}
               animate={{ scaleY: 1 }}
               transition={{ duration: 0.6, ease: "easeOut" }}
@@ -187,16 +211,22 @@ export function LearningPaths() {
                   key={s.tech}
                   initial={reduce ? false : { opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.12 * i, duration: 0.35 }}
+                  transition={{ delay: reduce ? 0 : 0.12 * i, duration: 0.35 }}
                   style={{ "--brand": t.color ?? "var(--primary)" }}
                   className="relative flex gap-4"
                 >
-                  <span className="relative z-10 grid size-10 shrink-0 place-items-center rounded-full border bg-card text-[color:var(--brand)]">
+                  <span className="relative z-10 mt-2 grid size-10 shrink-0 place-items-center rounded-full border border-border bg-card text-[color:var(--brand)] shadow-sm ring-4 ring-card">
                     <Icon className="size-5" aria-hidden="true" />
                   </span>
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="font-semibold">
+                  <div className="-my-0.5 flex-1 rounded-xl border border-transparent p-3 transition-colors duration-200 hover:border-border hover:bg-muted/40 motion-reduce:transition-none">
+                    <p
+                      aria-hidden="true"
+                      className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground"
+                    >
+                      Step {String(i + 1).padStart(2, "0")}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="font-semibold text-card-foreground">
                         <span className="sr-only">Step {i + 1}: </span>
                         {s.tech}
                       </h3>
@@ -204,15 +234,18 @@ export function LearningPaths() {
                         {s.weeks} weeks
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
                       {s.what}
                     </p>
                     <Link
                       href={`/courses?q=${encodeURIComponent(s.tech)}`}
-                      className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[color:var(--brand)] outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                      className={`group mt-2 inline-flex min-h-9 items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline ${FOCUS}`}
                     >
                       See {s.tech} courses
-                      <FiArrowRight aria-hidden="true" />
+                      <FiArrowRight
+                        aria-hidden="true"
+                        className="transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transform-none motion-reduce:transition-none"
+                      />
                     </Link>
                   </div>
                 </motion.li>
@@ -220,7 +253,7 @@ export function LearningPaths() {
             })}
           </ol>
         </div>
-      </div>
+      </motion.div>
     </Section>
   );
 }
@@ -243,9 +276,12 @@ export function TechMarquee() {
               href={`/courses?q=${encodeURIComponent(t.name)}`}
               tabIndex={hidden ? -1 : undefined}
               style={{ "--brand": t.color ?? "var(--primary)" }}
-              className="flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm text-muted-foreground outline-none transition-colors hover:border-[color:var(--brand)] hover:text-[color:var(--brand)] focus-visible:ring-2 focus-visible:ring-ring"
+              className={`flex min-h-10 items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground transition-colors duration-200 hover:border-[color:var(--brand)] hover:text-foreground active:bg-muted/60 motion-reduce:transition-none ${FOCUS}`}
             >
-              <Icon className="size-4" aria-hidden="true" />
+              <Icon
+                className="size-4 text-[color:var(--brand)]"
+                aria-hidden="true"
+              />
               {t.name}
             </Link>
           </li>
@@ -257,7 +293,7 @@ export function TechMarquee() {
   // Reduced motion: a static, wrapped list instead of a moving row.
   if (reduce) {
     return (
-      <div className="border-y bg-secondary/40 py-6">
+      <div className="border-y border-border bg-secondary/40 py-6">
         <div className="mx-auto flex max-w-5xl flex-wrap justify-center gap-3 px-4">
           {row(false)}
         </div>
@@ -267,7 +303,7 @@ export function TechMarquee() {
 
   return (
     <div
-      className="overflow-hidden border-y bg-secondary/40 py-6"
+      className="overflow-hidden border-y border-border bg-secondary/40 py-6"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}

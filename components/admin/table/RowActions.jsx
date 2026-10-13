@@ -1,12 +1,22 @@
-// components/admin/table/RowActions.jsx
-// items: [{ key, label, icon?, href?, run?, success?, destructive?, hidden?, separatorBefore?, confirm?: { title, description, confirmLabel? } }]
-// The dialog lives OUTSIDE the menu so focus restores correctly after the menu closes.
 "use client";
-import { Fragment, useState } from "react";
+
+import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner"; // agar aap dusra toast use karte hain to badal dein
 import { FiMoreHorizontal } from "react-icons/fi";
-import { toast } from "sonner";
-import { buttonVariants } from "@/components/ui/button";
+
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,68 +24,113 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { cn } from "@/lib/utils";
 
 export function RowActions({ label, items }) {
   const router = useRouter();
-  const [confirm, setConfirm] = useState(null);
+  const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(null); // item jis ka confirm pending hai
+
   const visible = items.filter((i) => !i.hidden);
   if (!visible.length) return null;
 
-  async function exec(item) {
-    const res = await item.run();
-    if (!res?.ok) return toast.error(res?.error ?? "Something went wrong.");
-    toast.success(item.success ?? "Done");
-    router.refresh();
-  }
-  const select = (item) =>
-    item.href
-      ? router.push(item.href)
-      : item.confirm
-        ? setConfirm(item)
-        : exec(item);
+  const execute = (item) => {
+    startTransition(async () => {
+      try {
+        const res = await item.run?.();
+        // adminAction ka result { ok, error } jaisa ho sakta hai: apne shape ke mutabiq adjust karein
+        if (res && res.ok === false) {
+          toast.error(res.error || "Something went wrong.");
+          return;
+        }
+        toast.success(item.success || "Done.");
+        router.refresh();
+      } catch (error) {
+        toast.error(error?.message || "Something went wrong.");
+      }
+    });
+  };
+
+  const onPick = (item) => {
+    if (item.confirm) setConfirming(item);
+    else execute(item);
+  };
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "icon" }),
-            "size-8",
-          )}
-          aria-label={`Actions for ${label}`}
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Actions for ${label}`}
+              disabled={pending}
+            />
+          }
         >
-          <FiMoreHorizontal aria-hidden="true" />
+          <FiMoreHorizontal aria-hidden="true" className="size-4" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
+
+        <DropdownMenuContent align="end">
           {visible.map((item) => {
             const Icon = item.icon;
+            const content = (
+              <>
+                {Icon && <Icon aria-hidden="true" className="mr-2 size-4" />}
+                {item.label}
+              </>
+            );
+
             return (
-              <Fragment key={item.key}>
+              <div key={item.key}>
                 {item.separatorBefore && <DropdownMenuSeparator />}
-                <DropdownMenuItem
-                  variant={item.destructive ? "destructive" : undefined}
-                  onSelect={() => select(item)}
-                >
-                  {Icon && <Icon aria-hidden="true" />}
-                  {item.label}
-                </DropdownMenuItem>
-              </Fragment>
+                {item.href ? (
+                  <DropdownMenuItem render={<Link href={item.href} />}>
+                    {content}
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => onPick(item)}
+                    className={cn(
+                      item.destructive &&
+                        "text-destructive focus:text-destructive",
+                    )}
+                  >
+                    {content}
+                  </DropdownMenuItem>
+                )}
+              </div>
             );
           })}
         </DropdownMenuContent>
       </DropdownMenu>
-      <ConfirmDialog
-        open={!!confirm}
-        onOpenChange={(o) => !o && setConfirm(null)}
-        title={confirm?.confirm?.title}
-        description={confirm?.confirm?.description}
-        confirmLabel={confirm?.confirm?.confirmLabel ?? confirm?.label}
-        destructive={confirm?.destructive}
-        onConfirm={() => exec(confirm)}
-      />
+
+      <AlertDialog
+        open={Boolean(confirming)}
+        onOpenChange={(o) => !o && setConfirming(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirming?.confirm?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirming?.confirm?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const item = confirming;
+                setConfirming(null);
+                execute(item);
+              }}
+            >
+              {confirming?.confirm?.confirmLabel || "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
-

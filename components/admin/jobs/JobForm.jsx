@@ -1,5 +1,6 @@
 // components/admin/jobs/JobForm.jsx
 "use client";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +25,8 @@ import { jobSchema } from "@/lib/validations/jobs";
 import { utcDate } from "@/lib/utils/date";
 import { createJob, updateJob } from "@/app/actions/admin/jobs";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const defaults = (j) => ({
   title: j?.title ?? "",
   slug: j?.slug ?? "",
@@ -44,6 +47,15 @@ const defaults = (j) => ({
   featured: !!j?.featured,
   expiresAt: utcDate(j?.expiresAt),
 });
+
+// Number of non-empty lines in a "one per line" field
+const lineCount = (text) =>
+  (text ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean).length;
+
+const itemsLabel = (n) => `${n} ${n === 1 ? "item" : "items"}`;
 
 export function JobForm({ record = null }) {
   const router = useRouter();
@@ -69,6 +81,82 @@ export function JobForm({ record = null }) {
     router.refresh();
   }
 
+  const { isDirty, isSubmitting, isSubmitSuccessful } = form.formState;
+
+  // Warn before closing or reloading the tab with unsaved edits.
+  // (In-app link clicks are not intercepted by the browser event.)
+  useEffect(() => {
+    if (!isDirty || isSubmitting || isSubmitSuccessful) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty, isSubmitting, isSubmitSuccessful]);
+
+  // Ctrl/Cmd+S saves. The ref keeps the listener pointing at the latest handler.
+  const submitRef = useRef(null);
+  submitRef.current = form.handleSubmit(onSubmit);
+  useEffect(() => {
+    const onKey = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        submitRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // "Now" is read after mount so server and client render the same markup
+  const [now, setNow] = useState(null);
+  useEffect(() => setNow(Date.now()), []);
+
+  const salaryMin = form.watch("salaryMin");
+  const salaryMax = form.watch("salaryMax");
+  const minNum = Number(salaryMin);
+  const maxNum = Number(salaryMax);
+  const salaryOutOfOrder =
+    salaryMin !== "" &&
+    salaryMax !== "" &&
+    Number.isFinite(minNum) &&
+    Number.isFinite(maxNum) &&
+    minNum > maxNum;
+
+  // Expiry: the listing is archived at the end of the chosen day (UTC)
+  const expiresAt = form.watch("expiresAt");
+  let expiryNote = null;
+  if (expiresAt && now !== null) {
+    const end = Date.parse(`${expiresAt}T23:59:59Z`);
+    if (Number.isFinite(end)) {
+      const days = Math.ceil((end - now) / DAY_MS);
+      expiryNote =
+        end < now
+          ? "This date has already passed."
+          : days === 1
+            ? "About 1 day from now."
+            : `About ${days} days from now.`;
+    }
+  }
+
+  // Show where candidates will actually land
+  const applyUrl = form.watch("applyUrl")?.trim();
+  let applyHost = null;
+  if (applyUrl) {
+    try {
+      const u = new URL(applyUrl);
+      if (u.protocol === "http:" || u.protocol === "https:")
+        applyHost = u.hostname;
+    } catch {
+      applyHost = null;
+    }
+  }
+
+  const responsibilities = form.watch("responsibilities");
+  const requirements = form.watch("requirements");
+  const skills = form.watch("skills");
+
   return (
     <form
       onSubmit={form.handleSubmit(onSubmit)}
@@ -88,9 +176,16 @@ export function JobForm({ record = null }) {
           label="Slug"
           autoComplete="off"
           description={
-            edit
-              ? "Changing it keeps the old URL working via redirect."
-              : "Leave blank to generate from the title and company."
+            <>
+              {edit
+                ? "Changing it keeps the old URL working via redirect."
+                : "Leave blank to generate from the title and company."}
+              {form.watch("slug")?.trim() && (
+                <span className="mt-1 block break-all font-mono text-xs">
+                  Public URL: /jobs/{form.watch("slug").trim()}
+                </span>
+              )}
+            </>
           }
         />
         <div className="grid gap-5 sm:grid-cols-2">
@@ -162,6 +257,11 @@ export function JobForm({ record = null }) {
             options={SUPPORTED_CURRENCIES.map((c) => ({ value: c, label: c }))}
           />
         </div>
+        {salaryOutOfOrder && (
+          <p role="alert" className="text-sm font-medium text-destructive">
+            The minimum is higher than the maximum. Check the two values.
+          </p>
+        )}
       </FormSection>
 
       <FormSection title="Details">
@@ -179,14 +279,14 @@ export function JobForm({ record = null }) {
             name="responsibilities"
             label="Responsibilities"
             rows={6}
-            description="One per line."
+            description={`One per line. ${itemsLabel(lineCount(responsibilities))}.`}
           />
           <LinesField
             control={form.control}
             name="requirements"
             label="Requirements"
             rows={6}
-            description="One per line."
+            description={`One per line. ${itemsLabel(lineCount(requirements))}.`}
           />
         </div>
         <LinesField
@@ -194,7 +294,7 @@ export function JobForm({ record = null }) {
           name="skills"
           label="Skills"
           rows={4}
-          description={`One per line. Known skills use standard casing, e.g. ${SKILLS.slice(0, 4).join(", ")}.`}
+          description={`One per line. Known skills use standard casing, e.g. ${SKILLS.slice(0, 4).join(", ")}. ${itemsLabel(lineCount(skills))}.`}
         />
       </FormSection>
 
@@ -204,14 +304,35 @@ export function JobForm({ record = null }) {
           name="applyUrl"
           label="Application link"
           type="url"
-          description="Candidates apply on this external page."
+          description={
+            <>
+              Candidates apply on this external page.
+              {applyHost && (
+                <span className="mt-1 block text-xs">
+                  Candidates will be sent to{" "}
+                  <span className="font-mono font-medium text-foreground">
+                    {applyHost}
+                  </span>
+                  .
+                </span>
+              )}
+            </>
+          }
         />
         <div className="grid gap-5 sm:grid-cols-2 sm:items-end">
           <DateField
             control={form.control}
             name="expiresAt"
             label="Expires on (optional)"
-            description="The listing is archived automatically at the end of this day (UTC)."
+            description={
+              <>
+                The listing is archived automatically at the end of this day
+                (UTC).
+                {expiryNote && (
+                  <span className="mt-1 block text-xs">{expiryNote}</span>
+                )}
+              </>
+            }
           />
           <SwitchField
             control={form.control}
@@ -222,10 +343,10 @@ export function JobForm({ record = null }) {
       </FormSection>
       <FormFooter
         submitting={form.formState.isSubmitting}
+        dirty={isDirty}
         cancelHref="/admin/jobs"
         submitLabel={edit ? "Save changes" : "Create job"}
       />
     </form>
   );
 }
-

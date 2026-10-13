@@ -8,10 +8,13 @@ import { courseAdminRepository } from "@/repositories/admin/courseAdminRepositor
 import { categoryAdminRepository } from "@/repositories/admin/categoryAdminRepository";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { CouponForm } from "@/components/admin/coupons/CouponForm";
+import { CouponTicket } from "@/components/admin/coupons/CouponTicket";
 import { requirePermission } from "@/lib/auth/authorize";
 import { PERMISSIONS as P } from "@/lib/constants/permissions";
-// ...same imports as create...
+import { formatDateTime } from "@/lib/utils/format";
+
 export const metadata = { title: "Edit coupon" };
+
 export default async function EditCouponPage({ params }) {
   await requirePermission(P.COUPONS_UPDATE);
   const parsed = adminSlug.safeParse((await params).slug);
@@ -41,6 +44,12 @@ export default async function EditCouponPage({ params }) {
         title={`Edit ${record.code}`}
         actions={<StatusBadge status={record.status} />}
       />
+      <CouponTicket
+        code={record.code}
+        updatedAt={record.updatedAt ? formatDateTime(record.updatedAt) : null}
+      >
+        <StatusBadge status={record.status} />
+      </CouponTicket>
       <CouponForm
         key={record.updatedAt}
         record={record}

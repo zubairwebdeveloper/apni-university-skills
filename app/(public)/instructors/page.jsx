@@ -1,26 +1,26 @@
 // app/(public)/instructors/page.jsx
 import Link from "next/link";
 import {
+  FiArrowRight,
   FiAward,
   FiBriefcase,
   FiChevronDown,
   FiCompass,
-  FiGlobe,
   FiLayers,
   FiMic,
   FiSearch,
   FiTarget,
-  FiTrendingUp,
-  FiUsers,
   FiZap,
 } from "react-icons/fi";
 
-import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import { Container } from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { JsonLd } from "@/components/shared/JsonLd";
 import { CTASection } from "@/components/public/CTASection";
 import { InstructorsExplorer } from "@/components/public/InstructorsExplorer";
+import { TiltCard } from "@/components/public/TiltCard";
 import { Reveal } from "@/components/public/PricingMotion";
 import {
   getInstructorSkills,
@@ -30,6 +30,8 @@ import {
 import { instructorService } from "@/services/instructorService";
 
 export const revalidate = 300;
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export const metadata = {
   title: "Instructors",
@@ -124,40 +126,49 @@ export default async function InstructorsPage() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 14);
 
+  // Spotlight: only instructors with real student numbers, so nothing is invented
+  const spotlight = instructors
+    .map((i) => ({ instructor: i, students: getInstructorStudents(i) }))
+    .filter((x) => x.students > 0 && x.instructor.slug)
+    .sort((a, b) => b.students - a.students)
+    .slice(0, 3);
+
   const stats = [
-    {
-      icon: FiUsers,
-      value: formatNumber(instructors.length),
-      label: "Instructors",
-    },
+    { value: formatNumber(instructors.length), label: "Instructors" },
     ...(totalStudents > 0
-      ? [
-          {
-            icon: FiTrendingUp,
-            value: formatNumber(totalStudents),
-            label: "Students taught",
-          },
-        ]
+      ? [{ value: formatNumber(totalStudents), label: "Students taught" }]
       : []),
-    {
-      icon: FiGlobe,
-      value: formatNumber(skillCounts.size),
-      label: "Expertise areas",
-    },
+    { value: formatNumber(skillCounts.size), label: "Expertise areas" },
   ];
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Apni University instructors",
+    itemListElement: instructors
+      .filter((i) => i.slug && i.name)
+      .map((i, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: i.name,
+        url: `${siteUrl}/instructors/${i.slug}`,
+      })),
+  };
 
   return (
     <>
+      <JsonLd data={jsonLd} />
+
       <PageHeader
         title="Learn from practitioners"
         description="Our instructors build and ship technology for a living."
         breadcrumbs={[{ label: "Home", href: "/" }, { label: "Instructors" }]}
       >
-        <ul className="mt-5 flex flex-wrap gap-2.5">
+        <ul className="mt-5 flex flex-wrap gap-2">
           {chips.map(({ icon: Icon, text }) => (
             <li
               key={text}
-              className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3.5 py-1.5 text-sm font-medium backdrop-blur"
+              className="inline-flex items-center gap-2 rounded-full border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground"
             >
               <Icon aria-hidden="true" className="size-4 text-primary" />
               {text}
@@ -172,258 +183,318 @@ export default async function InstructorsPage() {
           className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
         />
 
-        {/* Stats */}
+        {/* Stats: one quiet strip */}
         {instructors.length > 0 && (
-          <Container className="relative pt-10">
-            <ul
-              className={`grid grid-cols-1 gap-4 ${
-                stats.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"
+          <Container className="relative pt-10 sm:pt-12">
+            <dl
+              className={`grid divide-x divide-border border-y border-border ${
+                stats.length === 3 ? "grid-cols-3" : "grid-cols-2"
               }`}
             >
-              {stats.map(({ icon: Icon, value, label }, i) => (
-                <li key={label} className="min-w-0">
-                  <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group flex h-full items-center gap-4 rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <div>
-                        <p className="font-serif text-3xl font-semibold leading-none">
-                          {value}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {label}
-                        </p>
-                      </div>
-                    </div>
-                  </Reveal>
-                </li>
+              {stats.map((s) => (
+                <div
+                  key={s.label}
+                  className="flex flex-col-reverse items-center gap-1 px-2 py-5 text-center sm:flex-row sm:justify-center sm:gap-3 sm:py-6"
+                >
+                  <dt className="text-xs text-muted-foreground sm:text-sm">
+                    {s.label}
+                  </dt>
+                  <dd className="font-serif text-2xl font-semibold tabular-nums text-foreground sm:text-4xl">
+                    {s.value}
+                  </dd>
+                </div>
               ))}
-            </ul>
+            </dl>
           </Container>
         )}
 
-        {/* Explorer */}
-        <Container className="relative py-10">
-          <Reveal>
-            <InstructorsExplorer instructors={instructors} />
-          </Reveal>
+        {/* Explorer: the main job of this page, so nothing delays it */}
+        <Container className="relative py-10 sm:py-12">
+          <InstructorsExplorer instructors={instructors} />
         </Container>
+
+        {/* Spotlight: real data only, with a 3D depth treatment on desktop */}
+        {spotlight.length >= 2 && (
+          <section
+            aria-labelledby="spotlight-title"
+            className="border-t bg-muted/30 py-14 sm:py-20"
+          >
+            <Container>
+              <h2
+                id="spotlight-title"
+                className="max-w-xl text-balance text-3xl sm:text-4xl"
+              >
+                Most students taught
+              </h2>
+              <p className="mt-3 max-w-xl text-muted-foreground">
+                The instructors whose courses have reached the most learners.
+              </p>
+
+              <ul className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {spotlight.map(({ instructor: i, students }) => (
+                  <li key={i.slug} className="min-w-0">
+                    <Link
+                      href={`/instructors/${i.slug}`}
+                      className="group block h-full rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      <TiltCard className="h-full" max={8}>
+                        <div className="flex h-full flex-col items-center rounded-3xl border bg-card p-6 text-center shadow-sm transition-colors [transform-style:preserve-3d] group-hover:border-primary/40 motion-reduce:transition-none sm:p-8">
+                          <div className="relative size-24 [transform-style:preserve-3d] sm:size-28">
+                            <span
+                              aria-hidden="true"
+                              className="absolute inset-0 rounded-full bg-highlight/40 [transform:translateZ(-14px)_translate(8px,8px)]"
+                            />
+                            <Avatar className="size-full border-4 border-background shadow-lg [transform:translateZ(40px)]">
+                              <AvatarImage src={i.avatar} alt="" />
+                              <AvatarFallback className="font-serif text-3xl">
+                                {i.name?.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                          </div>
+                          <h3 className="mt-6 font-serif text-xl font-semibold text-foreground [transform:translateZ(24px)]">
+                            {i.name}
+                          </h3>
+                          {i.designation && (
+                            <p className="mt-1 text-sm text-muted-foreground [transform:translateZ(16px)]">
+                              {i.designation}
+                            </p>
+                          )}
+                          <p className="mt-4 text-sm font-medium text-foreground [transform:translateZ(16px)]">
+                            <span className="font-serif text-lg tabular-nums">
+                              {formatNumber(students)}
+                            </span>{" "}
+                            students
+                          </p>
+                          <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-medium text-primary">
+                            View profile
+                            <FiArrowRight
+                              aria-hidden="true"
+                              className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                            />
+                          </span>
+                        </div>
+                      </TiltCard>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Container>
+          </section>
+        )}
 
         {/* Top expertise */}
         {topSkills.length > 0 && (
           <section
             aria-labelledby="skills-title"
-            className="border-t bg-muted/20 py-12 sm:py-16"
+            className="border-t py-14 sm:py-20"
           >
             <Container>
-              <Reveal className="mx-auto max-w-2xl text-center">
-                <Badge variant="secondary" className="mb-3">
-                  What they teach
-                </Badge>
-                <h2 id="skills-title" className="text-2xl sm:text-3xl">
-                  Expertise across our team
-                </h2>
-                <p className="mt-3 text-muted-foreground">
-                  These are the skills our instructors work with every day.
-                </p>
-              </Reveal>
-              <Reveal delay={0.1}>
-                <ul className="mt-8 flex flex-wrap justify-center gap-2.5">
-                  {topSkills.map(([skill, count]) => (
-                    <li key={skill}>
-                      <span className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                        {skill}
-                        <span className="rounded-full bg-primary/10 px-1.5 text-xs text-primary">
-                          {count}
-                        </span>
+              <h2
+                id="skills-title"
+                className="max-w-xl text-balance text-3xl sm:text-4xl"
+              >
+                Expertise across our team
+              </h2>
+              <p className="mt-3 max-w-xl text-muted-foreground">
+                These are the skills our instructors work with every day. The
+                number shows how many instructors share each one.
+              </p>
+              <ul className="mt-8 flex flex-wrap gap-2.5">
+                {topSkills.map(([skill, count]) => (
+                  <li key={skill}>
+                    <span className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium text-foreground">
+                      {skill}
+                      <span className="rounded-full bg-primary/10 px-1.5 text-xs text-primary">
+                        {count}
                       </span>
-                    </li>
-                  ))}
-                </ul>
-              </Reveal>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </Container>
           </section>
         )}
 
-        {/* Why practitioners */}
+        {/* Why practitioners: open columns */}
         <section
           aria-labelledby="why-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t bg-muted/30 py-14 sm:py-20"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                Why it matters
-              </Badge>
-              <h2 id="why-title" className="text-2xl sm:text-3xl">
-                Why learn from practitioners
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                People who do the work every day teach what the job is really
-                like.
-              </p>
-            </Reveal>
-            <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {benefits.map(({ icon: Icon, title, text }, i) => (
-                <li key={title} className="min-w-0">
-                  <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group h-full rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold">
-                        {title}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {text}
-                      </p>
-                    </div>
-                  </Reveal>
+            <h2
+              id="why-title"
+              className="max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              Why learn from practitioners
+            </h2>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              People who do the work every day teach what the job is really
+              like.
+            </p>
+            <ul className="mt-10 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+              {benefits.map(({ icon: Icon, title, text }) => (
+                <li
+                  key={title}
+                  className="min-w-0 border-t-2 border-primary pt-5"
+                >
+                  <Icon aria-hidden="true" className="size-6 text-primary" />
+                  <h3 className="mt-3 font-sans text-base font-semibold text-foreground">
+                    {title}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+                    {text}
+                  </p>
                 </li>
               ))}
             </ul>
           </Container>
         </section>
 
-        {/* How we choose */}
+        {/* How we choose: numbered criteria */}
         <section
           aria-labelledby="select-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t py-14 sm:py-20"
         >
-          <Container className="max-w-4xl">
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                Quality first
-              </Badge>
-              <h2 id="select-title" className="text-2xl sm:text-3xl">
-                How we choose our instructors
-              </h2>
-            </Reveal>
-            <ol className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-              {selection.map(({ title, text }, i) => (
-                <li key={title} className="min-w-0">
-                  <Reveal delay={i * 0.1} className="h-full">
-                    <div className="h-full rounded-2xl border bg-card p-5 text-center">
-                      <span className="mx-auto grid size-10 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                        {i + 1}
-                      </span>
-                      <h3 className="mt-3 font-sans text-base font-semibold">
+          <Container>
+            <h2
+              id="select-title"
+              className="max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              How we choose our instructors
+            </h2>
+
+            <Reveal>
+              <ol className="relative mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
+                <span
+                  aria-hidden="true"
+                  className="absolute left-5 right-5 top-5 hidden h-px bg-border sm:block"
+                />
+                {selection.map(({ title, text }, i) => (
+                  <li
+                    key={title}
+                    className="relative flex gap-4 sm:block sm:pr-4"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`relative z-10 grid size-10 shrink-0 place-items-center rounded-full border font-serif text-base font-semibold ${
+                        i === selection.length - 1
+                          ? "border-highlight bg-highlight text-foreground"
+                          : "border-primary bg-background text-primary"
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                    <div className="sm:mt-5">
+                      <h3 className="font-sans text-base font-semibold text-foreground">
+                        <span className="sr-only">Step {i + 1}: </span>
                         {title}
                       </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="mt-1 max-w-xs text-sm text-muted-foreground sm:text-base">
                         {text}
                       </p>
                     </div>
-                  </Reveal>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                ))}
+              </ol>
+            </Reveal>
           </Container>
         </section>
 
         {/* Teach banner */}
-        <section className="border-t py-12 sm:py-14">
+        <section className="border-t bg-muted/30 py-14 sm:py-16">
           <Container>
-            <Reveal>
-              <div className="relative overflow-hidden rounded-3xl border bg-card p-8 sm:p-10">
-                <span
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between md:gap-10">
+              <div className="flex items-start gap-4">
+                <FiMic
                   aria-hidden="true"
-                  className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
+                  className="mt-1 size-7 shrink-0 text-primary"
                 />
-                <div className="flex flex-col items-start gap-5 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-start gap-4">
-                    <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                      <FiMic aria-hidden="true" className="size-5" />
-                    </span>
-                    <div>
-                      <h2 className="text-xl sm:text-2xl">
-                        Want to teach at Apni University?
-                      </h2>
-                      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                        If you have real experience and enjoy sharing it, tell
-                        us about your background and the topic you would like to
-                        teach.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <Link
-                      href="/contact"
-                      className={buttonVariants({ variant: "default" })}
-                    >
-                      Contact us
-                    </Link>
-                    <Link
-                      href="/courses"
-                      className={buttonVariants({ variant: "outline" })}
-                    >
-                      <FiSearch aria-hidden="true" />
-                      Browse courses
-                    </Link>
-                  </div>
+                <div>
+                  <h2 className="text-balance text-2xl sm:text-3xl">
+                    Want to teach at Apni University?
+                  </h2>
+                  <p className="mt-2 max-w-xl text-muted-foreground">
+                    If you have real experience and enjoy sharing it, tell us
+                    about your background and the topic you would like to teach.
+                  </p>
                 </div>
               </div>
-            </Reveal>
+              <div className="flex flex-wrap gap-3 md:shrink-0">
+                <Link
+                  href="/contact"
+                  className={buttonVariants({ variant: "default", size: "lg" })}
+                >
+                  Contact us
+                </Link>
+                <Link
+                  href="/courses"
+                  className={buttonVariants({ variant: "outline", size: "lg" })}
+                >
+                  <FiSearch aria-hidden="true" />
+                  Browse courses
+                </Link>
+              </div>
+            </div>
           </Container>
         </section>
 
         {/* Careers banner */}
-        <section className="border-t bg-muted/20 py-10 sm:py-12">
+        <section className="border-t py-10 sm:py-12">
           <Container>
-            <Reveal>
-              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-4">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                    <FiCompass aria-hidden="true" className="size-5" />
-                  </span>
-                  <div>
-                    <h2 className="text-lg sm:text-xl">
-                      Not sure where to start?
-                    </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Pick a career path first, then learn the skills with the
-                      right instructor.
-                    </p>
-                  </div>
+            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-4">
+                <FiCompass
+                  aria-hidden="true"
+                  className="mt-0.5 size-6 shrink-0 text-primary"
+                />
+                <div>
+                  <h2 className="text-lg sm:text-xl">
+                    Not sure where to start?
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+                    Pick a career path first, then learn the skills with the
+                    right instructor.
+                  </p>
                 </div>
-                <Link
-                  href="/careers"
-                  className={buttonVariants({ variant: "outline" })}
-                >
-                  Explore career paths
-                </Link>
               </div>
-            </Reveal>
+              <Link
+                href="/careers"
+                className={buttonVariants({ variant: "outline" })}
+              >
+                Explore career paths
+              </Link>
+            </div>
           </Container>
         </section>
 
-        {/* FAQ */}
+        {/* FAQ: heading left, accordion right */}
         <section
           aria-labelledby="faq-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t bg-muted/30 py-14 sm:py-20"
         >
-          <Container className="max-w-3xl">
-            <Reveal className="text-center">
-              <h2 id="faq-title" className="text-2xl sm:text-3xl">
+          <Container>
+            <div className="grid gap-8 lg:grid-cols-12 lg:gap-16">
+              <h2
+                id="faq-title"
+                className="text-balance text-3xl sm:text-4xl lg:col-span-4"
+              >
                 Instructor questions
               </h2>
-            </Reveal>
-            <div className="mt-8 space-y-3">
-              {faqs.map(({ q, a }, i) => (
-                <Reveal key={q} delay={i * 0.06}>
-                  <details className="group rounded-xl border bg-card px-4 py-3 open:shadow-md">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
+
+              <div className="divide-y divide-border border-y border-border lg:col-span-8">
+                {faqs.map(({ q, a }) => (
+                  <details key={q} className="group py-1">
+                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-left text-base font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                       {q}
                       <FiChevronDown
                         aria-hidden="true"
-                        className="size-4 shrink-0 text-primary transition-transform duration-300 group-open:rotate-180 motion-reduce:transition-none"
+                        className="size-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
                       />
                     </summary>
-                    <p className="mt-3 text-sm text-muted-foreground">{a}</p>
+                    <p className="max-w-2xl pb-4 text-muted-foreground">{a}</p>
                   </details>
-                </Reveal>
-              ))}
+                ))}
+              </div>
             </div>
           </Container>
         </section>

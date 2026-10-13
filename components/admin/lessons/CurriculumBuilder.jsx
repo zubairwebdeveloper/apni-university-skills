@@ -1,12 +1,14 @@
 // components/admin/lessons/CurriculumBuilder.jsx
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Reorder, useDragControls } from "framer-motion";
+import { MotionConfig, Reorder, useDragControls } from "framer-motion";
 import {
   FiArrowDown,
   FiArrowUp,
+  FiChevronDown,
+  FiChevronRight,
   FiEdit2,
   FiEye,
   FiMenu,
@@ -46,6 +48,8 @@ const swap = (a, i, j) => {
 };
 const signature = (sections) =>
   JSON.stringify(sections.map((s) => [s.title, s.lessons.map((l) => l.id)]));
+const minutesOf = (lessons) =>
+  lessons.reduce((n, l) => n + (Number(l.duration) || 0), 0);
 
 function LessonRow({
   lesson,
@@ -176,6 +180,7 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
   const [sections, setSections] = useState(initialSections);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [collapsed, setCollapsed] = useState(() => new Set());
   const dirty = signature(sections) !== signature(initialSections);
 
   const patch = (si, fn) =>
@@ -193,6 +198,14 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
             ? { ...s, lessons: [...s.lessons, lesson] }
             : s,
       );
+    });
+
+  const toggleSection = (key) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
 
   async function save() {
@@ -215,6 +228,37 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
     router.refresh();
   }
 
+  // Warn before closing or reloading the tab with an unsaved order.
+  // (In-app link clicks are not intercepted by the browser event.)
+  useEffect(() => {
+    if (!dirty || saving) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty, saving]);
+
+  // Ctrl/Cmd+S saves the order when there is something to save.
+  // The ref keeps the listener pointing at the latest state.
+  const saveRef = useRef(null);
+  saveRef.current = canEdit && dirty && !saving ? save : null;
+  useEffect(() => {
+    const onKey = (event) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "s" &&
+        saveRef.current
+      ) {
+        event.preventDefault();
+        saveRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   if (!sections.length && !trash.length)
     return (
       <Card className="items-center gap-3 p-10 text-center">
@@ -222,172 +266,263 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
         <p className="text-sm text-muted-foreground">
           Add the first lesson to start building the curriculum.
         </p>
+        {perms.includes("lessons.create") && (
+          <Link
+            href={`/admin/lessons/create?course=${course.slug}`}
+            className={buttonVariants()}
+          >
+            <FiPlus aria-hidden="true" />
+            Add lesson
+          </Link>
+        )}
       </Card>
     );
 
-  return (
-    <div className="space-y-6">
-      {canEdit && (
-        <div
-          className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-sm"
-          role="status"
-        >
-          <p className="flex-1 text-muted-foreground">
-            {dirty
-              ? "You have unsaved order changes. Lesson actions are hidden until you save or discard."
-              : "Drag the handle or use the arrows to reorder. Empty sections are removed when you save."}
-          </p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={!dirty || saving}
-            onClick={() => setSections(initialSections)}
-          >
-            Discard
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={!dirty || saving}
-            onClick={save}
-          >
-            {saving ? "Saving…" : "Save order"}
-          </Button>
-        </div>
-      )}
+  // Course-level read-out and a check for repeated section names
+  const allLessons = sections.flatMap((s) => s.lessons);
+  const totalMinutes = minutesOf(allLessons);
+  const previewCount = allLessons.filter((l) => l.isPreview).length;
+  const names = sections
+    .map((s) => s.title.trim().toLowerCase())
+    .filter(Boolean);
+  const hasDuplicateNames = new Set(names).size !== names.length;
+  const allCollapsed =
+    sections.length > 0 && sections.every((s) => collapsed.has(s.key));
 
-      {sections.map((s, si) => (
-        <Card key={s.key} className="gap-3 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            {canEdit ? (
-              <Input
-                value={s.title}
-                onChange={(e) =>
-                  patch(si, (x) => ({ ...x, title: e.target.value }))
-                }
-                maxLength={80}
-                aria-label={`Section ${si + 1} name`}
-                className="min-w-0 flex-1 basis-48 font-medium"
-              />
-            ) : (
-              <h2 className="flex-1 text-base font-medium">{s.title}</h2>
-            )}
-            <span className="text-xs text-muted-foreground">
-              {s.lessons.length} {s.lessons.length === 1 ? "lesson" : "lessons"}
-            </span>
-            {canEdit && (
+  return (
+    <MotionConfig reducedMotion="user">
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            {sections.length} {sections.length === 1 ? "section" : "sections"}
+            <span aria-hidden="true"> · </span>
+            {allLessons.length} {allLessons.length === 1 ? "lesson" : "lessons"}
+            {totalMinutes > 0 && (
               <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  disabled={si === 0}
-                  onClick={() => moveSection(si, -1)}
-                  aria-label={`Move section ${s.title} up`}
-                >
-                  <FiArrowUp aria-hidden="true" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  disabled={si === sections.length - 1}
-                  onClick={() => moveSection(si, 1)}
-                  aria-label={`Move section ${s.title} down`}
-                >
-                  <FiArrowDown aria-hidden="true" />
-                </Button>
+                <span aria-hidden="true"> · </span>
+                {formatDuration(totalMinutes)}
               </>
             )}
+            {previewCount > 0 && (
+              <>
+                <span aria-hidden="true"> · </span>
+                {previewCount} free{" "}
+                {previewCount === 1 ? "preview" : "previews"}
+              </>
+            )}
+          </p>
+          {sections.length > 1 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setCollapsed(
+                  allCollapsed
+                    ? new Set()
+                    : new Set(sections.map((s) => s.key)),
+                )
+              }
+            >
+              {allCollapsed ? "Expand all" : "Collapse all"}
+            </Button>
+          )}
+        </div>
+
+        {canEdit && (
+          <div
+            className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-sm"
+            role="status"
+          >
+            <p className="flex-1 text-muted-foreground">
+              {dirty
+                ? "You have unsaved order changes. Lesson actions are hidden until you save or discard. Press Ctrl+S (Cmd+S on Mac) to save."
+                : "Drag the handle or use the arrows to reorder. Empty sections are removed when you save."}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={!dirty || saving}
+              onClick={() => setSections(initialSections)}
+            >
+              Discard
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!dirty || saving}
+              onClick={save}
+            >
+              {saving ? "Saving…" : "Save order"}
+            </Button>
           </div>
-          {s.lessons.length > 0 && (
-            <Reorder.Group
-              as="ul"
-              axis="y"
-              values={s.lessons}
-              onReorder={(v) => patch(si, (x) => ({ ...x, lessons: v }))}
-              className="space-y-2"
-            >
-              {s.lessons.map((l, li) => (
-                <LessonRow
-                  key={l.id}
-                  lesson={l}
-                  courseSlug={course.slug}
-                  perms={perms}
-                  dirty={dirty}
-                  canEdit={canEdit}
-                  first={li === 0}
-                  last={li === s.lessons.length - 1}
-                  otherSections={sections.filter((o) => o.key !== s.key)}
-                  onUp={() => moveLesson(si, li, -1)}
-                  onDown={() => moveLesson(si, li, 1)}
-                  onMove={(k) => toSection(si, li, k)}
-                  onPreview={setPreview}
-                />
-              ))}
-            </Reorder.Group>
-          )}
-          {perms.includes("lessons.create") && !dirty && (
-            <Link
-              href={`/admin/lessons/create?course=${course.slug}&section=${encodeURIComponent(s.title)}`}
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "w-fit",
-              )}
-            >
-              <FiPlus aria-hidden="true" />
-              Add lesson to this section
-            </Link>
-          )}
-        </Card>
-      ))}
+        )}
 
-      {trash.length > 0 && !dirty && (
-        <Card className="gap-3 p-4">
-          <h2 className="text-base font-medium">Trash</h2>
-          <ul className="space-y-2">
-            {trash.map((l) => (
-              <li
-                key={l.id}
-                className="flex items-center gap-3 rounded-lg border p-2 text-sm"
-              >
-                <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                  {l.title}
+        {canEdit && hasDuplicateNames && (
+          <p role="alert" className="text-sm font-medium text-destructive">
+            Two sections have the same name. Lessons in sections that share a
+            name are grouped together, so give each section its own name.
+          </p>
+        )}
+
+        {sections.map((s, si) => {
+          const isCollapsed = collapsed.has(s.key);
+          const sectionMinutes = minutesOf(s.lessons);
+          return (
+            <Card key={s.key} className="gap-3 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-expanded={!isCollapsed}
+                  aria-label={`${isCollapsed ? "Expand" : "Collapse"} section ${s.title || si + 1}`}
+                  onClick={() => toggleSection(s.key)}
+                >
+                  {isCollapsed ? (
+                    <FiChevronRight aria-hidden="true" />
+                  ) : (
+                    <FiChevronDown aria-hidden="true" />
+                  )}
+                </Button>
+                {canEdit ? (
+                  <Input
+                    value={s.title}
+                    onChange={(e) =>
+                      patch(si, (x) => ({ ...x, title: e.target.value }))
+                    }
+                    maxLength={80}
+                    aria-label={`Section ${si + 1} name`}
+                    className="min-w-0 flex-1 basis-48 font-medium"
+                  />
+                ) : (
+                  <h2 className="flex-1 text-base font-medium">{s.title}</h2>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  {s.lessons.length}{" "}
+                  {s.lessons.length === 1 ? "lesson" : "lessons"}
+                  {sectionMinutes > 0 && (
+                    <>
+                      <span aria-hidden="true"> · </span>
+                      {formatDuration(sectionMinutes)}
+                    </>
+                  )}
                 </span>
-                <RowActions
-                  label={l.title}
-                  items={lifecycleItems({
-                    row: l,
-                    perms,
-                    prefix: "lessons",
-                    noun: "Lesson",
-                    run: (a) =>
-                      runLessonAction({ ...a, courseSlug: course.slug }),
-                  })}
-                />
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+                {canEdit && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      disabled={si === 0}
+                      onClick={() => moveSection(si, -1)}
+                      aria-label={`Move section ${s.title} up`}
+                    >
+                      <FiArrowUp aria-hidden="true" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      disabled={si === sections.length - 1}
+                      onClick={() => moveSection(si, 1)}
+                      aria-label={`Move section ${s.title} down`}
+                    >
+                      <FiArrowDown aria-hidden="true" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              {!isCollapsed && s.lessons.length > 0 && (
+                <Reorder.Group
+                  as="ul"
+                  axis="y"
+                  values={s.lessons}
+                  onReorder={(v) => patch(si, (x) => ({ ...x, lessons: v }))}
+                  className="space-y-2"
+                >
+                  {s.lessons.map((l, li) => (
+                    <LessonRow
+                      key={l.id}
+                      lesson={l}
+                      courseSlug={course.slug}
+                      perms={perms}
+                      dirty={dirty}
+                      canEdit={canEdit}
+                      first={li === 0}
+                      last={li === s.lessons.length - 1}
+                      otherSections={sections.filter((o) => o.key !== s.key)}
+                      onUp={() => moveLesson(si, li, -1)}
+                      onDown={() => moveLesson(si, li, 1)}
+                      onMove={(k) => toSection(si, li, k)}
+                      onPreview={setPreview}
+                    />
+                  ))}
+                </Reorder.Group>
+              )}
+              {!isCollapsed && perms.includes("lessons.create") && !dirty && (
+                <Link
+                  href={`/admin/lessons/create?course=${course.slug}&section=${encodeURIComponent(s.title)}`}
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "sm" }),
+                    "w-fit",
+                  )}
+                >
+                  <FiPlus aria-hidden="true" />
+                  Add lesson to this section
+                </Link>
+              )}
+            </Card>
+          );
+        })}
 
-      <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{preview?.title}</DialogTitle>
-            <DialogDescription>
-              Admin preview of the video, regardless of publish state.
-            </DialogDescription>
-          </DialogHeader>
-          {preview?.videoUrl && (
-            <VideoPlayer url={preview.videoUrl} title={preview.title} />
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        {trash.length > 0 && !dirty && (
+          <Card className="gap-3 p-4">
+            <h2 className="text-base font-medium">Trash</h2>
+            <ul className="space-y-2">
+              {trash.map((l) => (
+                <li
+                  key={l.id}
+                  className="flex items-center gap-3 rounded-lg border p-2 text-sm"
+                >
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {l.title}
+                  </span>
+                  <RowActions
+                    label={l.title}
+                    items={lifecycleItems({
+                      row: l,
+                      perms,
+                      prefix: "lessons",
+                      noun: "Lesson",
+                      run: (a) =>
+                        runLessonAction({ ...a, courseSlug: course.slug }),
+                    })}
+                  />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+          <DialogContent className="sm:max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>{preview?.title}</DialogTitle>
+              <DialogDescription>
+                Admin preview of the video, regardless of publish state.
+              </DialogDescription>
+            </DialogHeader>
+            {preview?.videoUrl && (
+              <VideoPlayer url={preview.videoUrl} title={preview.title} />
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    </MotionConfig>
   );
 }
-

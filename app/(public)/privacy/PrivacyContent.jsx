@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion, useScroll, useSpring } from "framer-motion";
+import {
+  MotionConfig,
+  motion,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+} from "framer-motion";
 import {
   ArrowRight,
   ArrowUp,
   BookOpen,
   CheckCircle2,
   ChevronRight,
+  Clock,
   Cookie,
   Database,
   FileCheck2,
@@ -16,11 +23,15 @@ import {
   HelpCircle,
   LockKeyhole,
   Mail,
+  Search,
   ShieldCheck,
   ShieldOff,
-  Sparkles,
   UserRound,
+  X,
 } from "lucide-react";
+
+import { buttonVariants } from "@/components/ui/button";
+import { TiltCard } from "@/components/public/TiltCard";
 
 const sections = [
   {
@@ -229,36 +240,31 @@ const faqs = [
 
 const toc = sections.map(({ id, heading }) => ({ id, heading }));
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  show: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      delay: Math.min(i * 0.05, 0.4),
-      duration: 0.5,
-      ease: "easeOut",
-    },
-  }),
-};
-
-const fadeIn = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { duration: 0.6 } },
-};
+// Estimated from the real policy text, at roughly 220 words per minute
+const wordCount = [
+  ...sections.flatMap((s) => [s.heading, ...s.body]),
+  ...faqs.flatMap((f) => [f.q, f.a]),
+]
+  .join(" ")
+  .split(/\s+/)
+  .filter(Boolean).length;
+const readMinutes = Math.max(1, Math.round(wordCount / 220));
 
 function ScrollProgressBar() {
+  const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, {
+  const spring = useSpring(scrollYProgress, {
     stiffness: 120,
     damping: 25,
     restDelta: 0.001,
   });
+  const scaleX = reduce ? scrollYProgress : spring;
 
   return (
     <motion.div
+      aria-hidden="true"
       style={{ scaleX }}
-      className="fixed inset-x-0 top-0 z-50 h-1 origin-left bg-gradient-to-r from-primary via-primary/70 to-accent"
+      className="fixed inset-x-0 top-0 z-50 h-1 origin-left bg-primary"
     />
   );
 }
@@ -268,400 +274,516 @@ function BackToTop() {
 
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 600);
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const goTop = () => {
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  };
+
   return (
-    <motion.button
+    <button
       type="button"
-      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      initial={{ opacity: 0, scale: 0.6 }}
-      animate={
-        visible
-          ? { opacity: 1, scale: 1 }
-          : { opacity: 0, scale: 0.6, pointerEvents: "none" }
-      }
-      transition={{ duration: 0.25 }}
-      className="fixed bottom-6 right-6 z-40 flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:-translate-y-0.5 transition-transform"
+      onClick={goTop}
       aria-label="Back to top"
+      aria-hidden={!visible}
+      tabIndex={visible ? 0 : -1}
+      className={`fixed bottom-6 right-6 z-40 flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none ${
+        visible ? "opacity-100" : "pointer-events-none opacity-0"
+      }`}
     >
-      <ArrowUp className="size-5" />
-    </motion.button>
+      <ArrowUp className="size-5" aria-hidden="true" />
+    </button>
   );
 }
 
 export default function PrivacyContent() {
+  const [query, setQuery] = useState("");
+  const [activeId, setActiveId] = useState(sections[0].id);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sections;
+    return sections.filter((s) =>
+      [s.heading, ...s.body].join(" ").toLowerCase().includes(q),
+    );
+  }, [query]);
+
+  // Highlight the section being read in the table of contents
+  const visibleKey = filtered.map((s) => s.id).join("|");
+  useEffect(() => {
+    const elements = visibleKey
+      .split("|")
+      .filter(Boolean)
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
+    if (!elements.length) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.find((e) => e.isIntersecting);
+        if (hit) setActiveId(hit.target.id);
+      },
+      { rootMargin: "-20% 0px -70% 0px" },
+    );
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [visibleKey]);
+
   return (
-    <main className="relative overflow-hidden bg-background">
-      <ScrollProgressBar />
-      <BackToTop />
+    <MotionConfig reducedMotion="user">
+      {/* overflow-x-clip (not hidden) so the sticky table of contents keeps working */}
+      <main className="relative overflow-x-clip bg-background">
+        <ScrollProgressBar />
+        <BackToTop />
 
-      {/* Decorative background */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] overflow-hidden"
-      >
-        <motion.div
-          animate={{ y: [0, 20, 0] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute left-1/2 top-[-280px] h-[560px] w-[560px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
-        />
-        <motion.div
-          animate={{ y: [0, -16, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute right-[-180px] top-[120px] h-[360px] w-[360px] rounded-full bg-accent/10 blur-3xl"
-        />
-        <div className="absolute left-[-180px] top-[220px] h-[320px] w-[320px] rounded-full bg-primary/5 blur-3xl" />
-      </div>
-
-      {/* Hero */}
-      <section className="border-b bg-background/80 backdrop-blur-sm">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
-          <motion.div
-            initial="hidden"
-            animate="show"
-            variants={fadeUp}
-            className="mx-auto max-w-4xl text-center"
-          >
-            <motion.div
-              custom={0}
-              variants={fadeUp}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border bg-background/80 px-4 py-2 text-sm font-medium shadow-sm"
-            >
-              <ShieldCheck className="size-4 text-primary" />
-              Your privacy matters
-            </motion.div>
-
-            <motion.h1
-              custom={1}
-              variants={fadeUp}
-              className="text-balance text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl"
-            >
-              Privacy, explained <span className="text-primary">simply.</span>
-            </motion.h1>
-
-            <motion.p
-              custom={2}
-              variants={fadeUp}
-              className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg"
-            >
-              We believe learning should feel empowering, and your personal
-              information should feel protected. Here is how Apni University
-              collects, uses, and safeguards your information.
-            </motion.p>
-
-            <motion.div
-              custom={3}
-              variants={fadeUp}
-              className="mt-8 flex flex-wrap items-center justify-center gap-3"
-            >
-              <div className="inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm text-muted-foreground shadow-sm">
-                <FileCheck2 className="size-4 text-primary" />
-                Effective: October 7, 2026
-              </div>
-
-              <div className="inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm text-muted-foreground shadow-sm">
-                <Sparkles className="size-4 text-primary" />
-                Clear & transparent
-              </div>
-            </motion.div>
-          </motion.div>
+        {/* Static decorative glow */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] overflow-hidden"
+        >
+          <div className="absolute left-1/2 top-[-280px] h-[560px] w-[560px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
         </div>
-      </section>
 
-      {/* Stats bar */}
-      <motion.section
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, amount: 0.4 }}
-        variants={fadeIn}
-        className="border-b bg-primary/5"
-      >
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-            {stats.map((stat, i) => (
+        {/* Hero with a 3D shield scene */}
+        <section className="border-b">
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+            <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-20">
               <motion.div
-                key={stat.label}
-                custom={i}
-                variants={fadeUp}
-                initial="hidden"
-                whileInView="show"
-                viewport={{ once: true }}
-                className="text-center"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="max-w-3xl"
               >
-                <div className="text-2xl font-bold tracking-tight text-primary sm:text-3xl">
-                  {stat.value}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground sm:text-sm">
-                  {stat.label}
-                </div>
+                <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+                  Privacy, explained{" "}
+                  <span className="text-primary">simply.</span>
+                </h1>
+
+                <p className="mt-6 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
+                  We believe learning should feel empowering, and your personal
+                  information should feel protected. Here is how Apni University
+                  collects, uses, and safeguards your information.
+                </p>
+
+                <ul className="mt-8 flex flex-wrap gap-2">
+                  <li className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm text-foreground">
+                    <FileCheck2
+                      className="size-4 text-primary"
+                      aria-hidden="true"
+                    />
+                    Effective: October 7, 2026
+                  </li>
+                  <li className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm text-foreground">
+                    <Clock className="size-4 text-primary" aria-hidden="true" />
+                    {readMinutes} min read
+                  </li>
+                </ul>
               </motion.div>
-            ))}
-          </div>
-        </div>
-      </motion.section>
 
-      {/* Privacy highlights */}
-      <section className="border-b bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {highlights.map((item, i) => {
-              const Icon = item.icon;
-
-              return (
-                <motion.div
-                  key={item.title}
-                  custom={i}
-                  variants={fadeUp}
-                  initial="hidden"
-                  whileInView="show"
-                  viewport={{ once: true, amount: 0.3 }}
-                  whileHover={{ y: -4 }}
-                  className="group rounded-2xl border bg-background p-5 shadow-sm transition-shadow duration-300 hover:shadow-md"
+              {/* 3D scene: depth layers + orbit ring, pointer-responsive on desktop */}
+              <TiltCard
+                className="mx-auto size-44 sm:size-52 lg:size-60"
+                max={12}
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-full bg-highlight/40 [transform:translateZ(-36px)_translate(12px,12px)]"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute -inset-7 [transform-style:preserve-3d] [transform:translateZ(-8px)_rotateX(68deg)]"
                 >
-                  <div className="mb-4 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-110">
-                    <Icon className="size-5" />
-                  </div>
-
-                  <h2 className="font-semibold">{item.title}</h2>
-
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {item.description}
-                  </p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Main legal content */}
-      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
-        <div className="grid gap-10 lg:grid-cols-[240px_minmax(0,1fr)]">
-          {/* Table of contents */}
-          <aside className="hidden lg:block">
-            <div className="sticky top-24 rounded-2xl border bg-card p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <BookOpen className="size-4 text-primary" />
-                <h2 className="font-semibold">On this page</h2>
-              </div>
-
-              <nav className="max-h-[60vh] space-y-1 overflow-y-auto pr-1">
-                {toc.map((item) => (
-                  <a
-                    key={item.id}
-                    href={`#${item.id}`}
-                    className="group flex items-start gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <ChevronRight className="mt-0.5 size-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
-                    <span>{item.heading}</span>
-                  </a>
-                ))}
-              </nav>
+                  <span className="relative block size-full animate-spin rounded-full border border-dashed border-primary/50 [animation-duration:28s] motion-reduce:animate-none">
+                    <span className="absolute left-1/2 top-0 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-highlight shadow-md" />
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-3 grid place-items-center rounded-full border-4 border-background bg-primary text-primary-foreground shadow-xl [transform:translateZ(36px)]"
+                >
+                  <ShieldCheck
+                    className="size-16 sm:size-20"
+                    aria-hidden="true"
+                  />
+                </span>
+              </TiltCard>
             </div>
-          </aside>
+          </div>
+        </section>
 
-          {/* Content */}
-          <div className="min-w-0">
-            <motion.div
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true, amount: 0.3 }}
-              variants={fadeUp}
-              className="mb-10 rounded-2xl border bg-card p-6 shadow-sm sm:p-8"
+        {/* Key facts: one quiet strip */}
+        <section aria-label="Privacy at a glance" className="border-b">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <dl className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
+              {stats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="flex flex-col-reverse items-center gap-1 px-3 py-6 text-center"
+                >
+                  <dt className="text-xs text-muted-foreground sm:text-sm">
+                    {stat.label}
+                  </dt>
+                  <dd className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                    {stat.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
+
+        {/* Highlights: open columns */}
+        <section
+          aria-labelledby="highlights-title"
+          className="border-b bg-muted/30"
+        >
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-16">
+            <h2
+              id="highlights-title"
+              className="max-w-xl text-balance text-3xl font-bold tracking-tight sm:text-4xl"
             >
-              <div className="flex gap-4">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <ShieldCheck className="size-5" />
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-semibold">
-                    Our approach to privacy
-                  </h2>
-
-                  <p className="mt-2 leading-7 text-muted-foreground">
-                    Apni University is built to help people learn practical
-                    technology skills, build real projects, explore AI, and
-                    prepare for the future of work. We collect information
-                    primarily when it is needed to provide those experiences. We
-                    aim to keep our practices understandable and our security
-                    controls appropriate for the service we provide.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-
-            <div className="space-y-6">
-              {sections.map((section, index) => {
-                const Icon = section.icon;
-
+              The short version
+            </h2>
+            <ul className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+              {highlights.map((item) => {
+                const Icon = item.icon;
                 return (
-                  <motion.article
-                    key={section.id}
-                    id={section.id}
-                    initial="hidden"
-                    whileInView="show"
-                    viewport={{ once: true, amount: 0.15 }}
-                    custom={index % 5}
-                    variants={fadeUp}
-                    whileHover={{ y: -2 }}
-                    className="scroll-mt-24 rounded-2xl border bg-card p-6 shadow-sm transition-shadow duration-300 hover:shadow-md sm:p-8"
+                  <li
+                    key={item.title}
+                    className="border-t-2 border-primary pt-5"
                   >
-                    <div className="flex gap-4">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        <Icon className="size-5" />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
-                          Section {String(index + 1).padStart(2, "0")}
-                        </div>
-
-                        <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-                          {section.heading}
-                        </h2>
-
-                        <div className="mt-4 space-y-4">
-                          {section.body.map((paragraph) => (
-                            <p
-                              key={paragraph}
-                              className="text-sm leading-7 text-muted-foreground sm:text-base"
-                            >
-                              {paragraph}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </motion.article>
+                    <Icon className="size-6 text-primary" aria-hidden="true" />
+                    <h3 className="mt-3 text-base font-semibold">
+                      {item.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground sm:text-base">
+                      {item.description}
+                    </p>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
+          </div>
+        </section>
 
-            {/* FAQ */}
-            <motion.div
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true, amount: 0.2 }}
-              variants={fadeUp}
-              className="mt-10 rounded-2xl border bg-card p-6 shadow-sm sm:p-8"
-            >
-              <div className="mb-6 flex items-center gap-3">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <HelpCircle className="size-5" />
+        {/* Policy */}
+        <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+          <div className="grid gap-10 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-14">
+            {/* Table of contents (desktop) with the section being read highlighted */}
+            <aside className="hidden lg:block">
+              <div className="sticky top-24">
+                <div className="mb-3 flex items-center gap-2">
+                  <BookOpen
+                    className="size-4 text-primary"
+                    aria-hidden="true"
+                  />
+                  <h2 className="font-semibold">On this page</h2>
                 </div>
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-                  Frequently asked questions
-                </h2>
+
+                <nav
+                  aria-label="Privacy policy sections"
+                  className="max-h-[65vh] space-y-0.5 overflow-y-auto pr-1"
+                >
+                  {toc.map((item) => {
+                    const active = activeId === item.id;
+                    return (
+                      <a
+                        key={item.id}
+                        href={`#${item.id}`}
+                        aria-current={active ? "location" : undefined}
+                        className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${
+                          active
+                            ? "bg-primary/10 font-medium text-primary"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                      >
+                        <ChevronRight
+                          className="mt-0.5 size-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span>{item.heading}</span>
+                      </a>
+                    );
+                  })}
+                </nav>
+              </div>
+            </aside>
+
+            <div className="min-w-0">
+              {/* Table of contents (mobile) */}
+              <details className="group mb-6 rounded-xl border bg-card lg:hidden">
+                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                  <span className="inline-flex items-center gap-2">
+                    <BookOpen
+                      className="size-4 text-primary"
+                      aria-hidden="true"
+                    />
+                    On this page
+                  </span>
+                  <ChevronRight
+                    className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <nav
+                  aria-label="Privacy policy sections"
+                  className="max-h-72 space-y-0.5 overflow-y-auto border-t px-2 py-2"
+                >
+                  {toc.map((item) => (
+                    <a
+                      key={item.id}
+                      href={`#${item.id}`}
+                      className="block rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {item.heading}
+                    </a>
+                  ))}
+                </nav>
+              </details>
+
+              {/* Search within the policy */}
+              <div className="mb-10">
+                <label htmlFor="policy-search" className="sr-only">
+                  Search this policy
+                </label>
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <input
+                    id="policy-search"
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search this policy, e.g. Stripe, cookies, deletion"
+                    className="h-12 w-full rounded-xl border bg-card pl-11 pr-11 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      aria-label="Clear search"
+                      className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <X className="size-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+                <p
+                  aria-live="polite"
+                  className="mt-2 text-sm text-muted-foreground"
+                >
+                  {query.trim()
+                    ? `${filtered.length} of ${sections.length} sections match`
+                    : `${sections.length} sections`}
+                </p>
               </div>
 
-              <div className="divide-y">
-                {faqs.map((faq) => (
-                  <details
-                    key={faq.q}
-                    className="group py-4 first:pt-0 last:pb-0"
-                  >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold sm:text-base">
-                      {faq.q}
-                      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-90" />
-                    </summary>
-                    <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                      {faq.a}
+              {/* Approach */}
+              {!query.trim() && (
+                <div className="mb-10 flex gap-4 border-b pb-10">
+                  <ShieldCheck
+                    className="mt-1 size-6 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      Our approach to privacy
+                    </h2>
+                    <p className="mt-2 max-w-3xl leading-7 text-muted-foreground">
+                      Apni University is built to help people learn practical
+                      technology skills, build real projects, explore AI, and
+                      prepare for the future of work. We collect information
+                      primarily when it is needed to provide those experiences.
+                      We aim to keep our practices understandable and our
+                      security controls appropriate for the service we provide.
                     </p>
-                  </details>
-                ))}
-              </div>
-            </motion.div>
+                  </div>
+                </div>
+              )}
 
-            {/* Contact CTA */}
-            <motion.div
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true, amount: 0.3 }}
-              variants={fadeUp}
-              className="mt-10 overflow-hidden rounded-3xl border bg-card shadow-sm"
-            >
-              <div className="p-7 sm:p-10">
-                <div className="flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="max-w-2xl">
-                    <div className="mb-4 inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Mail className="size-5" />
-                    </div>
+              {/* Sections */}
+              {filtered.length > 0 ? (
+                <div>
+                  {filtered.map((section) => {
+                    const Icon = section.icon;
+                    const number = sections.indexOf(section) + 1;
 
+                    return (
+                      <article
+                        key={section.id}
+                        id={section.id}
+                        className="scroll-mt-24 border-t py-8 first:border-t-0 first:pt-0"
+                      >
+                        <div className="flex items-start gap-4">
+                          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                            <Icon className="size-5" aria-hidden="true" />
+                          </span>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold tabular-nums text-primary">
+                              Section {String(number).padStart(2, "0")}
+                            </p>
+
+                            <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
+                              {section.heading}
+                            </h2>
+
+                            <div className="mt-4 max-w-3xl space-y-4">
+                              {section.body.map((paragraph) => (
+                                <p
+                                  key={paragraph}
+                                  className="text-sm leading-7 text-muted-foreground sm:text-base"
+                                >
+                                  {paragraph}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed p-8 text-center">
+                  <p className="font-medium">No sections match your search.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Try a different word, or clear the search to read the whole
+                    policy.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className={buttonVariants({
+                      variant: "outline",
+                      className: "mt-4",
+                    })}
+                  >
+                    Clear search
+                  </button>
+                </div>
+              )}
+
+              {/* FAQ */}
+              <section
+                aria-labelledby="privacy-faq"
+                className="mt-12 border-t pt-10"
+              >
+                <div className="mb-6 flex items-center gap-3">
+                  <HelpCircle
+                    className="size-6 text-primary"
+                    aria-hidden="true"
+                  />
+                  <h2
+                    id="privacy-faq"
+                    className="text-xl font-bold tracking-tight sm:text-2xl"
+                  >
+                    Frequently asked questions
+                  </h2>
+                </div>
+
+                <div className="divide-y divide-border border-y border-border">
+                  {faqs.map((faq) => (
+                    <details key={faq.q} className="group py-1">
+                      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-left text-base font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                        {faq.q}
+                        <ChevronRight
+                          className="size-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+                          aria-hidden="true"
+                        />
+                      </summary>
+                      <p className="max-w-2xl pb-4 leading-7 text-muted-foreground">
+                        {faq.a}
+                      </p>
+                    </details>
+                  ))}
+                </div>
+              </section>
+
+              {/* Contact */}
+              <div className="mt-12 flex flex-col gap-6 border-t pt-10 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-4">
+                  <Mail
+                    className="mt-1 size-6 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <div className="max-w-xl">
                     <h2 className="text-2xl font-bold tracking-tight">
                       Have a privacy question?
                     </h2>
-
-                    <p className="mt-3 leading-7 text-muted-foreground">
+                    <p className="mt-2 leading-7 text-muted-foreground">
                       If you want to access, update, or request deletion of your
                       personal information, our team is here to help.
                     </p>
                   </div>
-
-                  <Link
-                    href="/contact"
-                    className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    Contact us
-                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-                  </Link>
                 </div>
+
+                <Link
+                  href="/contact"
+                  className={buttonVariants({
+                    size: "lg",
+                    className: "shrink-0",
+                  })}
+                >
+                  Contact us
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
               </div>
-            </motion.div>
 
-            {/* Footer note */}
-            <motion.div
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true, amount: 0.4 }}
-              variants={fadeUp}
-              className="mt-8 flex items-start gap-3 rounded-2xl border border-dashed bg-muted/30 p-5"
-            >
-              <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
-
-              <p className="text-sm leading-6 text-muted-foreground">
+              <p className="mt-10 flex items-start gap-3 text-sm leading-6 text-muted-foreground">
+                <CheckCircle2
+                  className="mt-0.5 size-5 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
                 By using Apni University, you acknowledge that you have read
                 this Privacy Policy. This page may be updated from time to time
                 as our platform and privacy practices evolve.
               </p>
-            </motion.div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Bottom brand CTA */}
-      <motion.section
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, amount: 0.3 }}
-        variants={fadeUp}
-        className="border-t bg-muted/30"
-      >
-        <div className="mx-auto max-w-7xl px-4 py-14 text-center sm:px-6 lg:px-8">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <BookOpen className="size-6" />
+        {/* Bottom brand band */}
+        <section className="border-t bg-muted/30">
+          <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-12 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+            <div className="flex items-start gap-4">
+              <BookOpen
+                className="mt-1 size-7 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                  Learn with confidence.
+                </h2>
+                <p className="mt-2 max-w-xl text-muted-foreground">
+                  Practical skills, real projects, and a learning experience
+                  built with your trust in mind.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/courses"
+              className={buttonVariants({
+                variant: "outline",
+                size: "lg",
+                className: "shrink-0",
+              })}
+            >
+              Explore courses
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
           </div>
-
-          <h2 className="mt-5 text-2xl font-bold tracking-tight sm:text-3xl">
-            Learn with confidence.
-          </h2>
-
-          <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Practical skills, real projects, and a learning experience built
-            with your trust in mind.
-          </p>
-
-          <Link
-            href="/courses"
-            className="group mt-6 inline-flex items-center gap-2 font-semibold text-primary"
-          >
-            Explore courses
-            <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-          </Link>
-        </div>
-      </motion.section>
-    </main>
+        </section>
+      </main>
+    </MotionConfig>
   );
 }

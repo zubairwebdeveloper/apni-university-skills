@@ -27,8 +27,10 @@ import {
 } from "@/components/ui/table";
 import { Container } from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { JsonLd } from "@/components/shared/JsonLd";
 import { CTASection } from "@/components/public/CTASection";
-import { PricingGlows, Reveal } from "@/components/public/PricingMotion";
+import { PricingGlows } from "@/components/public/PricingMotion";
+import { TiltCard } from "@/components/public/TiltCard";
 import { BudgetPlanner } from "@/components/public/PricingTools";
 import {
   PricingChips,
@@ -144,6 +146,15 @@ const faqs = [
   },
 ];
 
+// In-page navigation: every target below exists on this page
+const sections = [
+  { id: "plans", label: "Plans" },
+  { id: "flow", label: "How it works" },
+  { id: "planner", label: "Budget planner" },
+  { id: "compare", label: "Compare" },
+  { id: "faq", label: "FAQ" },
+];
+
 function Cell({ value }) {
   if (value === true)
     return (
@@ -165,6 +176,18 @@ function Cell({ value }) {
 export default function PricingPage() {
   return (
     <>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: faqs.map((f) => ({
+            "@type": "Question",
+            name: f.q,
+            acceptedAnswer: { "@type": "Answer", text: f.a },
+          })),
+        }}
+      />
+
       <PageHeader
         title="Simple, per-course pricing"
         description="Start free. Pay only for the courses you choose."
@@ -176,90 +199,113 @@ export default function PricingPage() {
       <div className="relative overflow-x-clip">
         <PricingGlows />
 
-        {/* Tiers */}
-        <Container className="py-10 sm:py-12">
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-            {tiers.map((t, i) => (
-              <Reveal key={t.name} delay={i * 0.1} className="min-w-0">
-                <Card
-                  className={`group relative h-full gap-4 overflow-hidden p-6 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
-                    t.featured
-                      ? "border-primary/50 shadow-lg shadow-primary/10"
-                      : "hover:border-primary/40"
-                  }`}
+        {/* Plans */}
+        <section
+          id="plans"
+          aria-label="Plans"
+          className="scroll-mt-24 py-10 sm:py-14"
+        >
+          <Container>
+            <nav aria-label="On this page" className="mb-8">
+              <ul className="flex flex-wrap gap-2">
+                {sections.map((s) => (
+                  <li key={s.id}>
+                    <a
+                      href={`#${s.id}`}
+                      className="inline-flex min-h-9 items-center rounded-full border bg-card px-4 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                    >
+                      {s.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            {/* Each tier is a 3D scene: icon, badge and price float on their own layers */}
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              {tiers.map((t) => (
+                <TiltCard
+                  key={t.name}
+                  className="h-full min-w-0"
+                  max={t.featured ? 7 : 6}
                 >
-                  {/* Top accent line that grows on hover */}
-                  <span
-                    aria-hidden="true"
-                    className={`absolute inset-x-0 top-0 h-1 origin-left bg-gradient-to-r from-primary to-highlight transition-transform duration-500 motion-reduce:transition-none ${
+                  <Card
+                    className={`h-full gap-4 p-6 [transform-style:preserve-3d] sm:p-7 ${
                       t.featured
-                        ? "scale-x-100"
-                        : "scale-x-0 group-hover:scale-x-100"
+                        ? "border-2 border-primary shadow-lg shadow-primary/10"
+                        : ""
                     }`}
-                  />
-
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                      <t.icon aria-hidden="true" className="size-5" />
-                    </span>
-                    <Badge variant={t.featured ? "default" : "secondary"}>
-                      {t.badge}
-                    </Badge>
-                  </div>
-
-                  <h2 className="text-xl">{t.name}</h2>
-                  <p className="font-serif text-2xl font-semibold">{t.price}</p>
-                  <p className="text-sm text-muted-foreground">{t.text}</p>
-
-                  <ul className="space-y-2 text-sm">
-                    {t.points.map((p) => (
-                      <li key={p} className="flex gap-2">
-                        <FiCheck
-                          className="mt-0.5 size-4 shrink-0 text-primary transition-transform duration-300 group-hover:scale-125 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-                          aria-hidden="true"
-                        />
-                        {p}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Link
-                    href={t.href}
-                    className={buttonVariants({
-                      variant: t.featured ? "default" : "outline",
-                      className: "group/btn mt-auto",
-                    })}
                   >
-                    {t.cta}
-                    <FiArrowRight
-                      aria-hidden="true"
-                      className="transition-transform duration-200 group-hover/btn:translate-x-1 motion-reduce:transition-none"
-                    />
-                  </Link>
-                </Card>
-              </Reveal>
-            ))}
-          </div>
-        </Container>
+                    <div className="flex items-center justify-between gap-3 [transform-style:preserve-3d]">
+                      <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary [transform:translateZ(30px)]">
+                        <t.icon aria-hidden="true" className="size-5" />
+                      </span>
+                      <Badge
+                        variant={t.featured ? "default" : "secondary"}
+                        className="[transform:translateZ(20px)]"
+                      >
+                        {t.badge}
+                      </Badge>
+                    </div>
+
+                    <h2 className="text-xl">{t.name}</h2>
+                    <p className="font-serif text-2xl font-semibold text-foreground [transform:translateZ(18px)]">
+                      {t.price}
+                    </p>
+                    <p className="text-sm text-muted-foreground sm:text-base">
+                      {t.text}
+                    </p>
+
+                    <ul className="space-y-2.5 text-sm sm:text-base">
+                      {t.points.map((p) => (
+                        <li key={p} className="flex gap-2.5">
+                          <FiCheck
+                            className="mt-1 size-4 shrink-0 text-primary"
+                            aria-hidden="true"
+                          />
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Link
+                      href={t.href}
+                      className={buttonVariants({
+                        variant: t.featured ? "default" : "outline",
+                        size: "lg",
+                        className: "group/btn mt-auto",
+                      })}
+                    >
+                      {t.cta}
+                      <FiArrowRight
+                        aria-hidden="true"
+                        className="transition-transform duration-200 group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                      />
+                    </Link>
+                  </Card>
+                </TiltCard>
+              ))}
+            </div>
+          </Container>
+        </section>
 
         {/* How payment works */}
         <section
+          id="flow"
           aria-labelledby="flow-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="scroll-mt-24 border-t bg-muted/30 py-14 sm:py-20"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                How it works
-              </Badge>
-              <h2 id="flow-title" className="text-2xl sm:text-3xl">
-                From first click to certificate
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                Four simple steps. Free courses skip the payment step.
-              </p>
-            </Reveal>
-            <div className="mt-8">
+            <h2
+              id="flow-title"
+              className="max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              From first click to certificate
+            </h2>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              Four simple steps. Free courses skip the payment step.
+            </p>
+            <div className="mt-10">
               <PricingFlow />
             </div>
           </Container>
@@ -267,190 +313,217 @@ export default function PricingPage() {
 
         {/* Budget planner */}
         <section
+          id="planner"
           aria-labelledby="plan-title"
-          className="border-t py-12 sm:py-16"
+          className="scroll-mt-24 border-t py-14 sm:py-20"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                Budget planner
-              </Badge>
-              <h2 id="plan-title" className="text-2xl sm:text-3xl">
-                Plan what you will spend
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                Move the sliders to see a rough one-time total. Nothing is
-                charged here.
-              </p>
-            </Reveal>
-            <Reveal className="mt-8" delay={0.1}>
+            <h2
+              id="plan-title"
+              className="max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              Plan what you will spend
+            </h2>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              Move the sliders to see a rough one-time total. Nothing is charged
+              here.
+            </p>
+            <div className="mt-8">
               <BudgetPlanner />
-            </Reveal>
+            </div>
           </Container>
         </section>
 
         {/* Comparison */}
         <section
+          id="compare"
           aria-labelledby="compare-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="scroll-mt-24 border-t bg-muted/30 py-14 sm:py-20"
         >
           <Container>
-            <Reveal>
-              <h2 id="compare-title" className="mb-6 text-2xl sm:text-3xl">
-                Free vs. paid at a glance
-              </h2>
-              <div className="rounded-2xl border bg-card shadow-sm">
-                {/* ---------- MOBILE: har row ek card (< md) ---------- */}
-                <ul className="divide-y md:hidden">
-                  {/* Column labels, sticky taake scroll karte waqt yaad rahe */}
-                  <li
-                    aria-hidden="true"
-                    className="sticky top-0 z-10 grid grid-cols-[1fr_1fr] gap-3 rounded-t-2xl bg-card/95 px-4 py-3 text-xs font-semibold text-muted-foreground backdrop-blur"
-                  >
-                    <span>Free course</span>
-                    <span className="text-primary">Paid course</span>
-                  </li>
+            <h2
+              id="compare-title"
+              className="mb-6 max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              Free vs. paid at a glance
+            </h2>
+            <div className="rounded-2xl border bg-card shadow-sm">
+              {/* Mobile: one card per row (below md) */}
+              <ul className="divide-y md:hidden">
+                {/* Column labels stay visible while scrolling */}
+                <li
+                  aria-hidden="true"
+                  className="sticky top-0 z-10 grid grid-cols-[1fr_1fr] gap-3 rounded-t-2xl bg-card px-4 py-3 text-xs font-semibold text-muted-foreground"
+                >
+                  <span>Free course</span>
+                  <span className="text-primary">Paid course</span>
+                </li>
 
-                  {compare.map(([label, free, paid]) => (
-                    <li key={label} className="px-4 py-4">
-                      <p className="mb-3 text-sm font-semibold leading-snug">
-                        {label}
-                      </p>
+                {compare.map(([label, free, paid]) => (
+                  <li key={label} className="px-4 py-4">
+                    <p className="mb-3 text-sm font-semibold leading-snug text-foreground">
+                      {label}
+                    </p>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-xl border bg-muted/30 p-3">
-                          <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                            Free
-                          </p>
-                          <div className="text-sm">
-                            <Cell value={free} />
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
-                          <p className="mb-1 text-[11px] font-medium text-primary">
-                            Paid
-                          </p>
-                          <div className="text-sm">
-                            <Cell value={paid} />
-                          </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-xl border bg-muted/30 p-3">
+                        <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+                          Free
+                        </p>
+                        <div className="text-sm">
+                          <Cell value={free} />
                         </div>
                       </div>
+
+                      <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                        <p className="mb-1 text-[11px] font-medium text-primary">
+                          Paid
+                        </p>
+                        <div className="text-sm">
+                          <Cell value={paid} />
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Desktop and tablet: table (md and up) */}
+              <div className="hidden overflow-hidden rounded-2xl md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[40%] py-4 pl-6">
+                        <span className="sr-only">Feature</span>
+                      </TableHead>
+                      <TableHead className="w-[30%] py-4 text-base font-semibold">
+                        Free course
+                      </TableHead>
+                      <TableHead className="w-[30%] border-x border-primary/20 bg-primary/10 py-4 text-base font-semibold text-primary">
+                        Paid course
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {compare.map(([label, free, paid]) => (
+                      <TableRow
+                        key={label}
+                        className="group transition-colors hover:bg-muted/40"
+                      >
+                        <TableCell className="py-4 pl-6 font-medium">
+                          {label}
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <Cell value={free} />
+                        </TableCell>
+                        <TableCell className="border-x border-primary/20 bg-primary/5 py-4 transition-colors group-hover:bg-primary/10">
+                          <Cell value={paid} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Refund conditions are described in our{" "}
+              <Link
+                href="/terms"
+                className="font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Terms
+              </Link>
+              .
+            </p>
+          </Container>
+        </section>
+
+        {/* Trust: a 3D checkout-card scene beside the reasons to pay with confidence */}
+        <section
+          aria-labelledby="trust-title"
+          className="border-t py-14 sm:py-20"
+        >
+          <Container>
+            <div className="grid items-center gap-12 lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-20">
+              <TiltCard className="mx-auto h-40 w-64 sm:h-44 sm:w-72" max={14}>
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-2xl bg-highlight/40 [transform:translateZ(-40px)_translate(16px,16px)]"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-2xl border-2 border-primary/40 bg-card p-5"
+                >
+                  <span className="block h-2.5 w-1/2 rounded-full bg-muted" />
+                  <span className="mt-3 block h-2.5 w-1/3 rounded-full bg-muted" />
+                  <span className="absolute bottom-5 left-5 block h-2.5 w-2/5 rounded-full bg-primary/30" />
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="absolute -bottom-3 -right-3 grid size-16 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-xl [transform:translateZ(50px)]"
+                >
+                  <FiLock aria-hidden="true" className="size-7" />
+                </span>
+              </TiltCard>
+
+              <div className="min-w-0">
+                <h2
+                  id="trust-title"
+                  className="max-w-xl text-balance text-3xl sm:text-4xl"
+                >
+                  Pay with confidence
+                </h2>
+                <ul className="mt-8 grid grid-cols-1 gap-x-10 sm:grid-cols-2">
+                  {trust.map(({ icon: Icon, title, text }) => (
+                    <li key={title} className="min-w-0 border-t py-5">
+                      <h3 className="flex items-center gap-2 font-sans text-base font-semibold text-foreground">
+                        <Icon
+                          aria-hidden="true"
+                          className="size-5 text-primary"
+                        />
+                        {title}
+                      </h3>
+                      <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
+                        {text}
+                      </p>
                     </li>
                   ))}
                 </ul>
-
-                {/* ---------- DESKTOP / TABLET: table (>= md) ---------- */}
-                <div className="hidden overflow-hidden rounded-2xl md:block">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-[40%] py-4 pl-6">
-                          <span className="sr-only">Feature</span>
-                        </TableHead>
-                        <TableHead className="w-[30%] py-4 text-base font-semibold">
-                          Free course
-                        </TableHead>
-                        <TableHead className="w-[30%] border-x border-primary/20 bg-primary/10 py-4 text-base font-semibold text-primary">
-                          Paid course
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {compare.map(([label, free, paid]) => (
-                        <TableRow
-                          key={label}
-                          className="group transition-colors hover:bg-muted/40"
-                        >
-                          <TableCell className="py-4 pl-6 font-medium">
-                            {label}
-                          </TableCell>
-                          <TableCell className="py-4">
-                            <Cell value={free} />
-                          </TableCell>
-                          <TableCell className="border-x border-primary/20 bg-primary/5 py-4 transition-colors group-hover:bg-primary/10">
-                            <Cell value={paid} />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
               </div>
-              <p className="mt-4 text-sm text-muted-foreground">
-                Refund conditions are described in our{" "}
-                <Link
-                  href="/terms"
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Terms
-                </Link>
-                .
-              </p>
-            </Reveal>
+            </div>
           </Container>
         </section>
 
-        {/* Trust */}
+        {/* FAQ: heading left, accordion right */}
         <section
-          aria-labelledby="trust-title"
-          className="border-t py-12 sm:py-16"
+          id="faq"
+          aria-labelledby="faq-title"
+          className="scroll-mt-24 border-t bg-muted/30 py-14 sm:py-20"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <h2 id="trust-title" className="text-2xl sm:text-3xl">
-                Pay with confidence
-              </h2>
-            </Reveal>
-            <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {trust.map(({ icon: Icon, title, text }, i) => (
-                <li key={title} className="min-w-0">
-                  <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group h-full rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold">
-                        {title}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {text}
-                      </p>
-                    </div>
-                  </Reveal>
-                </li>
-              ))}
-            </ul>
-          </Container>
-        </section>
-
-        {/* FAQ */}
-        <section
-          aria-labelledby="faq-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
-        >
-          <Container className="max-w-3xl">
-            <Reveal className="text-center">
-              <h2 id="faq-title" className="text-2xl sm:text-3xl">
+            <div className="grid gap-8 lg:grid-cols-12 lg:gap-16">
+              <h2
+                id="faq-title"
+                className="text-balance text-3xl sm:text-4xl lg:col-span-4"
+              >
                 Pricing questions
               </h2>
-            </Reveal>
-            <div className="mt-8 space-y-3">
-              {faqs.map(({ q, a }, i) => (
-                <Reveal key={q} delay={i * 0.06}>
-                  <details className="group rounded-xl border bg-card px-4 py-3 open:shadow-md">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
+
+              <div className="divide-y divide-border border-y border-border lg:col-span-8">
+                {faqs.map(({ q, a }) => (
+                  <details key={q} className="group py-1">
+                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-left text-base font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                       {q}
                       <FiChevronDown
                         aria-hidden="true"
-                        className="size-4 shrink-0 text-primary transition-transform duration-300 group-open:rotate-180 motion-reduce:transition-none"
+                        className="size-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
                       />
                     </summary>
-                    <p className="mt-3 text-sm text-muted-foreground">{a}</p>
+                    <p className="max-w-2xl pb-4 text-muted-foreground">{a}</p>
                   </details>
-                </Reveal>
-              ))}
+                ))}
+              </div>
             </div>
           </Container>
         </section>

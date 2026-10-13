@@ -1,6 +1,6 @@
 // components/admin/lessons/LessonForm.jsx
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,6 +19,9 @@ import {
 import { lessonSchema } from "@/lib/validations/lesson";
 import { createLesson, updateLesson } from "@/app/actions/admin/lessons";
 
+const MAX_ITEMS = 10;
+const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+
 const defaults = (l, section) => ({
   title: l?.title ?? "",
   slug: l?.slug ?? "",
@@ -31,6 +34,42 @@ const defaults = (l, section) => ({
   resources: l?.resources ?? [],
   attachments: l?.attachments ?? [],
 });
+
+// Tells the editor how a video link will be played, before they save
+function videoNote(url) {
+  const value = url?.trim();
+  if (!value) return null;
+  try {
+    const u = new URL(value);
+    if (u.protocol !== "https:")
+      return { warn: true, text: "Links must use https." };
+    const host = u.hostname.replace(/^www\./, "");
+    if (["youtube.com", "m.youtube.com", "youtu.be"].includes(host))
+      return { text: "YouTube link: it will be embedded." };
+    if (["vimeo.com", "player.vimeo.com"].includes(host))
+      return { text: "Vimeo link: it will be embedded." };
+    return {
+      text: `Other https link (${host}): it plays in the browser's video player.`,
+    };
+  } catch {
+    return { warn: true, text: "This doesn't look like a valid link." };
+  }
+}
+
+function durationText(minutes) {
+  const total = Number(minutes);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const h = Math.floor(total / 60);
+  const m = Math.round(total % 60);
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+function formatSize(bytes) {
+  return bytes >= 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
 
 export function LessonForm({
   course,
@@ -57,6 +96,9 @@ export function LessonForm({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    // Quick check in the browser; the server still validates everything
+    if (file.size > MAX_ATTACHMENT_BYTES)
+      return toast.error("File must be under 4 MB.");
     setUploading(true);
     try {
       const fd = new FormData();
@@ -93,6 +135,43 @@ export function LessonForm({
     router.push(back);
     router.refresh();
   }
+
+  const { isDirty, isSubmitting, isSubmitSuccessful } = form.formState;
+
+  // Warn before closing or reloading the tab with unsaved edits.
+  // (In-app link clicks are not intercepted by the browser event.)
+  useEffect(() => {
+    if (!isDirty || isSubmitting || isSubmitSuccessful) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty, isSubmitting, isSubmitSuccessful]);
+
+  // Ctrl/Cmd+S saves (not while a file is uploading). The ref keeps the listener
+  // pointing at the latest handler and upload state.
+  const submitRef = useRef(null);
+  submitRef.current = uploading ? null : form.handleSubmit(onSubmit);
+  useEffect(() => {
+    const onKey = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        submitRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const video = videoNote(form.watch("videoUrl"));
+  const length = durationText(form.watch("duration"));
+  const transcript = form.watch("transcript");
+  const transcriptWords = (transcript ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
 
   return (
     <form
@@ -148,12 +227,24 @@ export function LessonForm({
           name="videoUrl"
           label="Video link"
           type="url"
+          description={
+            video ? (
+              <span
+                className={
+                  video.warn ? "font-medium text-destructive" : undefined
+                }
+              >
+                {video.text}
+              </span>
+            ) : undefined
+          }
         />
         <NumberField
           control={form.control}
           name="duration"
           label="Duration (minutes)"
           step={1}
+          description={length ? `That is ${length}.` : undefined}
         />
         <SwitchField
           control={form.control}
@@ -165,7 +256,7 @@ export function LessonForm({
 
       <FormSection
         title="Resources"
-        description="External links students can open from the lesson."
+        description={`External links students can open from the lesson. ${resources.fields.length} of ${MAX_ITEMS} used.`}
       >
         {resources.fields.map((f, i) => (
           <div
@@ -187,14 +278,16 @@ export function LessonForm({
               type="button"
               variant="ghost"
               size="sm"
+              className="text-destructive hover:text-destructive"
               onClick={() => resources.remove(i)}
             >
               <FiTrash2 aria-hidden="true" />
-              Remove resource {i + 1}
+              <span className="sr-only">Remove resource {i + 1}</span>
+              <span aria-hidden="true">Remove</span>
             </Button>
           </div>
         ))}
-        {resources.fields.length < 10 && (
+        {resources.fields.length < MAX_ITEMS && (
           <Button
             type="button"
             variant="outline"
@@ -210,7 +303,7 @@ export function LessonForm({
 
       <FormSection
         title="Attachments"
-        description="Files are stored privately. Only enrolled students get a short-lived download link. PDF, ZIP, DOCX, PPTX, XLSX, PNG, JPG or TXT, up to 4 MB."
+        description={`Files are stored privately. Only enrolled students get a short-lived download link. PDF, ZIP, DOCX, PPTX, XLSX, PNG, JPG or TXT, up to 4 MB. ${attachments.fields.length} of ${MAX_ITEMS} used.`}
       >
         {attachments.fields.length > 0 && (
           <ul className="divide-y rounded-lg border">
@@ -222,7 +315,7 @@ export function LessonForm({
                 />
                 <span className="min-w-0 flex-1 truncate">{a.name}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {Math.max(1, Math.round(a.size / 1024))} KB
+                  {formatSize(a.size)}
                 </span>
                 <Button
                   type="button"
@@ -236,7 +329,7 @@ export function LessonForm({
             ))}
           </ul>
         )}
-        {attachments.fields.length < 10 && (
+        {attachments.fields.length < MAX_ITEMS && (
           <>
             <Button
               type="button"
@@ -258,6 +351,11 @@ export function LessonForm({
             />
           </>
         )}
+        {isDirty && attachments.fields.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Uploaded files are attached to this lesson only once you save.
+          </p>
+        )}
       </FormSection>
 
       <FormSection title="Transcript (optional)">
@@ -267,16 +365,25 @@ export function LessonForm({
           label="Transcript"
           component={Textarea}
           rows={8}
-          description="Plain text. Separate paragraphs with a blank line."
+          description={
+            <>
+              Plain text. Separate paragraphs with a blank line.
+              {transcriptWords > 0 && (
+                <span className="ml-1 tabular-nums">
+                  ({transcriptWords.toLocaleString()} words)
+                </span>
+              )}
+            </>
+          }
         />
       </FormSection>
 
       <FormFooter
         submitting={form.formState.isSubmitting || uploading}
+        dirty={isDirty}
         cancelHref={back}
         submitLabel={edit ? "Save changes" : "Create lesson"}
       />
     </form>
   );
 }
-

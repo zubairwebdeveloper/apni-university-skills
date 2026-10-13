@@ -5,20 +5,33 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+} from "framer-motion";
 import { toast } from "sonner";
 import {
   AlertCircle,
+  AlertTriangle,
   Check,
+  Copy,
   GraduationCap,
+  ImageOff,
+  Keyboard,
   Loader2,
   Mail,
+  RotateCcw,
   Save,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   UserCog,
   UserPlus,
+  X,
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -94,8 +107,11 @@ const TYPOS = {
   "gmail.con": "gmail.com",
   "gmail.co": "gmail.com",
   "hotmial.com": "hotmail.com",
+  "hotmai.com": "hotmail.com",
   "yaho.com": "yahoo.com",
+  "yahooo.com": "yahoo.com",
   "outlok.com": "outlook.com",
+  "outlook.con": "outlook.com",
 };
 
 function suggestEmail(value) {
@@ -107,6 +123,7 @@ function suggestEmail(value) {
 }
 
 const NAME_MAX = 60;
+const DRAFT_KEY = "admin-user-form-draft";
 
 const list = {
   hidden: {},
@@ -173,68 +190,132 @@ function RoleCard({ value, selected, onSelect }) {
   );
 }
 
+/**
+ * Preview card with a subtle, pointer-driven 3D tilt. Pure CSS-perspective
+ * transforms (no WebGL) so it stays cheap and works everywhere; disabled
+ * entirely under prefers-reduced-motion.
+ */
 function PreviewCard({ name, email, image, role }) {
   const info = ROLE_INFO[role] ?? ROLE_INFO.admin;
   const Icon = info.icon;
+  const reduce = useReducedMotion();
+  const [imgStatus, setImgStatus] = useState("idle");
+
+  const rotateX = useMotionValue(0);
+  const rotateY = useMotionValue(0);
+  const springX = useSpring(rotateX, { stiffness: 220, damping: 20 });
+  const springY = useSpring(rotateY, { stiffness: 220, damping: 20 });
+  const glowX = useTransform(springY, [-7, 7], [20, 80]);
+  const glowY = useTransform(springX, [7, -7], [0, 60]);
+  const glowBackground = useTransform(
+    [glowX, glowY],
+    ([gx, gy]) =>
+      `radial-gradient(260px circle at ${gx}% ${gy}%, hsl(var(--primary) / 0.12), transparent 70%)`,
+  );
+
+  function handleMouseMove(e) {
+    if (reduce) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+    rotateY.set((px - 0.5) * 14);
+    rotateX.set((0.5 - py) * 14);
+  }
+  function handleMouseLeave() {
+    rotateX.set(0);
+    rotateY.set(0);
+  }
+
   return (
-    <Card className="gap-0 overflow-hidden py-0">
-      <div className="h-16 bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
-      <CardContent className="-mt-8 space-y-4 p-5">
-        <Avatar className="size-16 ring-4 ring-card">
-          {image ? <AvatarImage src={image} alt={name || "Admin"} /> : null}
-          <AvatarFallback className="bg-primary/10 text-xl font-semibold text-primary">
-            {(name || email || "A").trim().slice(0, 1).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+    <motion.div
+      style={
+        reduce
+          ? undefined
+          : { rotateX: springX, rotateY: springY, transformPerspective: 900 }
+      }
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className="[transform-style:preserve-3d]"
+    >
+      <Card className="relative gap-0 overflow-hidden py-0">
+        {!reduce && (
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            style={{ background: glowBackground }}
+          />
+        )}
+        <div className="h-16 bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
+        <CardContent className="-mt-8 space-y-4 p-5">
+          <Avatar className="size-16 ring-4 ring-card">
+            {image ? (
+              <AvatarImage
+                src={image}
+                alt={name || "Admin"}
+                onLoadingStatusChange={(status) => setImgStatus(status)}
+              />
+            ) : null}
+            <AvatarFallback className="bg-primary/10 text-xl font-semibold text-primary">
+              {(name || email || "A").trim().slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
 
-        <div className="min-w-0 space-y-1">
-          <p className="truncate text-lg font-semibold leading-tight tracking-tight">
-            {name || "Full name"}
-          </p>
-          <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
-            <Mail aria-hidden="true" className="size-3.5 shrink-0" />
-            {email || "email@example.com"}
-          </p>
-        </div>
+          {image && imgStatus === "error" && (
+            <p className="flex items-center gap-1.5 text-xs text-destructive">
+              <ImageOff aria-hidden="true" className="size-3.5 shrink-0" />
+              That image link didn&apos;t load — showing their initial instead.
+            </p>
+          )}
 
-        <Badge
-          variant="outline"
-          className={cn("gap-1.5 font-medium", info.tone)}
-        >
-          <Icon aria-hidden="true" className="size-3" />
-          {info.label}
-        </Badge>
+          <div className="min-w-0 space-y-1">
+            <p className="truncate text-lg font-semibold leading-tight tracking-tight">
+              {name || "Full name"}
+            </p>
+            <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
+              <Mail aria-hidden="true" className="size-3.5 shrink-0" />
+              {email || "email@example.com"}
+            </p>
+          </div>
 
-        <div className="space-y-2 border-t pt-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Can access
-          </p>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.ul
-              key={role}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-1.5"
-            >
-              {info.points.map((p) => (
-                <li
-                  key={p}
-                  className="flex items-start gap-2 text-sm text-foreground/80"
-                >
-                  <Check
-                    aria-hidden="true"
-                    className="mt-0.5 size-4 shrink-0 text-emerald-500"
-                  />
-                  {p}
-                </li>
-              ))}
-            </motion.ul>
-          </AnimatePresence>
-        </div>
-      </CardContent>
-    </Card>
+          <Badge
+            variant="outline"
+            className={cn("gap-1.5 font-medium", info.tone)}
+          >
+            <Icon aria-hidden="true" className="size-3" />
+            {info.label}
+          </Badge>
+
+          <div className="space-y-2 border-t pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Can access
+            </p>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.ul
+                key={role}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-1.5"
+              >
+                {info.points.map((p) => (
+                  <li
+                    key={p}
+                    className="flex items-start gap-2 text-sm text-foreground/80"
+                  >
+                    <Check
+                      aria-hidden="true"
+                      className="mt-0.5 size-4 shrink-0 text-emerald-500"
+                    />
+                    {p}
+                  </li>
+                ))}
+              </motion.ul>
+            </AnimatePresence>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -249,6 +330,8 @@ export function AdminUserForm({ mode = "create", initial }) {
 
   const [serverError, setServerError] = useState("");
   const [done, setDone] = useState(false);
+  const [draftAvailable, setDraftAvailable] = useState(false);
+  const [pendingAdminConfirm, setPendingAdminConfirm] = useState(false);
   const addAnotherRef = useRef(false);
 
   const defaults = {
@@ -281,6 +364,90 @@ export function AdminUserForm({ mode = "create", initial }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty, isSubmitting, done]);
 
+  // Offer to restore an abandoned draft (create mode only)
+  useEffect(() => {
+    if (isEdit) return;
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft?.name || draft?.email) setDraftAvailable(true);
+    } catch {
+      // ignore corrupt draft
+    }
+  }, [isEdit]);
+
+  // Autosave the in-progress draft (create mode only)
+  useEffect(() => {
+    if (isEdit || done) return;
+    const sub = form.watch((values) => {
+      try {
+        if (values.name || values.email || values.image) {
+          window.localStorage.setItem(DRAFT_KEY, JSON.stringify(values));
+        } else {
+          window.localStorage.removeItem(DRAFT_KEY);
+        }
+      } catch {
+        // ignore storage errors (private browsing, quota, etc.)
+      }
+    });
+    return () => sub.unsubscribe?.();
+  }, [isEdit, done, form]);
+
+  function restoreDraft() {
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        form.reset(JSON.parse(raw));
+        toast.success("Draft restored");
+      }
+    } catch {
+      toast.error("Couldn't read that draft");
+    }
+    setDraftAvailable(false);
+  }
+
+  function discardDraft() {
+    try {
+      window.localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // ignore
+    }
+    setDraftAvailable(false);
+  }
+
+  function clearDraft() {
+    try {
+      window.localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Require a second tap before switching someone into the Admin role
+  function handleRoleSelect(value) {
+    if (value === "admin" && role !== "admin") {
+      setPendingAdminConfirm(true);
+      return;
+    }
+    setPendingAdminConfirm(false);
+    form.setValue("role", value, { shouldDirty: true, shouldValidate: true });
+  }
+
+  function confirmAdminRole() {
+    form.setValue("role", "admin", { shouldDirty: true, shouldValidate: true });
+    setPendingAdminConfirm(false);
+  }
+
+  async function copyEmail() {
+    try {
+      await navigator.clipboard.writeText(email);
+      toast.success("Email copied");
+    } catch {
+      toast.error("Couldn't copy — select and copy manually");
+    }
+  }
+
   async function onSubmit(values) {
     const another = addAnotherRef.current;
     addAnotherRef.current = false;
@@ -289,6 +456,8 @@ export function AdminUserForm({ mode = "create", initial }) {
     try {
       if (isEdit) await updateAdmin(values.email, values);
       else await createAdmin(values);
+
+      clearDraft();
 
       if (!isEdit && another) {
         toast.success(`${values.name} was added. Add the next one.`);
@@ -314,6 +483,19 @@ export function AdminUserForm({ mode = "create", initial }) {
     form.handleSubmit(onSubmit)();
   }
 
+  // ⌘/Ctrl + Enter submits the form from anywhere in it
+  useEffect(() => {
+    function onKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (!isSubmitting && !done) form.handleSubmit(onSubmit)();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSubmitting, done]);
+
   return (
     <motion.div
       initial={reduce ? false : { opacity: 0, y: 16 }}
@@ -326,26 +508,83 @@ export function AdminUserForm({ mode = "create", initial }) {
         <div className="h-1.5 bg-gradient-to-r from-primary via-primary/60 to-primary/10" />
 
         <CardHeader className="space-y-1.5">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              {isEdit ? (
-                <ShieldCheck aria-hidden="true" className="size-5" />
-              ) : (
-                <UserPlus aria-hidden="true" className="size-5" />
-              )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                {isEdit ? (
+                  <ShieldCheck aria-hidden="true" className="size-5" />
+                ) : (
+                  <UserPlus aria-hidden="true" className="size-5" />
+                )}
+              </div>
+              <div>
+                <CardTitle className="text-xl font-semibold tracking-tight">
+                  {isEdit ? "Edit admin details" : "Admin details"}
+                </CardTitle>
+                <CardDescription className="text-sm leading-6">
+                  {isEdit
+                    ? "The email can't be changed because it identifies this admin."
+                    : "They will sign in with this email address."}
+                </CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-xl font-semibold tracking-tight">
-                {isEdit ? "Edit admin details" : "Admin details"}
-              </CardTitle>
-              <CardDescription className="text-sm leading-6">
-                {isEdit
-                  ? "The email can't be changed because it identifies this admin."
-                  : "They will sign in with this email address."}
-              </CardDescription>
-            </div>
+
+            {isEdit && email && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={copyEmail}
+                className="gap-1.5 text-xs text-muted-foreground"
+              >
+                <Copy aria-hidden="true" className="size-3.5" />
+                Copy email
+              </Button>
+            )}
           </div>
         </CardHeader>
+
+        {/* Abandoned-draft banner */}
+        <AnimatePresence initial={false}>
+          {draftAvailable && (
+            <motion.div
+              initial={reduce ? false : { opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden px-6"
+            >
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 text-sm">
+                <RotateCcw
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-primary"
+                />
+                <span className="flex-1 text-foreground/80">
+                  You left an unsaved admin form open. Pick up where you left
+                  off?
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={restoreDraft}
+                  >
+                    Restore
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={discardDraft}
+                  >
+                    Discard
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
           <CardContent>
@@ -523,14 +762,14 @@ export function AdminUserForm({ mode = "create", initial }) {
                         <div
                           role="radiogroup"
                           aria-label="Role"
-                          className="grid gap-3 sm:grid-cols-3"
+                          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
                         >
                           {ROLE_ORDER.map((r) => (
                             <RoleCard
                               key={r}
                               value={r}
                               selected={field.value === r}
-                              onSelect={field.onChange}
+                              onSelect={handleRoleSelect}
                             />
                           ))}
                         </div>
@@ -541,8 +780,51 @@ export function AdminUserForm({ mode = "create", initial }) {
                     )}
                   />
 
+                  {/* Second tap required to grant Admin */}
                   <AnimatePresence initial={false}>
-                    {role === "admin" && (
+                    {pendingAdminConfirm && (
+                      <motion.div
+                        initial={reduce ? false : { opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-3 flex flex-wrap items-center gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs text-destructive">
+                          <AlertTriangle
+                            aria-hidden="true"
+                            className="size-4 shrink-0"
+                          />
+                          <span className="flex-1 leading-relaxed">
+                            Confirm you want to give full Admin access,
+                            including managing other admins.
+                          </span>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={confirmAdminRole}
+                            >
+                              Make Admin
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setPendingAdminConfirm(false)}
+                            >
+                              <X aria-hidden="true" className="size-3.5" />
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence initial={false}>
+                    {role === "admin" && !pendingAdminConfirm && (
                       <motion.div
                         initial={reduce ? false : { opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
@@ -569,43 +851,57 @@ export function AdminUserForm({ mode = "create", initial }) {
             </motion.div>
           </CardContent>
 
-          <CardFooter className="flex flex-col-reverse gap-2 border-t bg-muted/30 pt-6 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isSubmitting || done}
-              onClick={() => router.push("/admin/admin-users")}
-            >
-              Cancel
-            </Button>
-
-            {!isEdit && (
+          <CardFooter className="flex flex-col gap-3 border-t bg-muted/30 pt-6">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
-                variant="secondary"
+                variant="outline"
                 disabled={isSubmitting || done}
-                onClick={submitAndAddAnother}
+                onClick={() => router.push("/admin/admin-users")}
               >
-                Save and add another
+                Cancel
               </Button>
-            )}
 
-            <Button
-              type="submit"
-              disabled={isSubmitting || done}
-              className="gap-2 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-            >
-              {isSubmitting ? (
-                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-              ) : (
-                <Save aria-hidden="true" className="size-4" />
+              {!isEdit && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={isSubmitting || done}
+                  onClick={submitAndAddAnother}
+                >
+                  Save and add another
+                </Button>
               )}
-              {isSubmitting
-                ? "Saving…"
-                : isEdit
-                  ? "Save changes"
-                  : "Create admin"}
-            </Button>
+
+              <Button
+                type="submit"
+                disabled={isSubmitting || done}
+                className="gap-2 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              >
+                {isSubmitting ? (
+                  <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                ) : (
+                  <Save aria-hidden="true" className="size-4" />
+                )}
+                {isSubmitting
+                  ? "Saving…"
+                  : isEdit
+                    ? "Save changes"
+                    : "Create admin"}
+              </Button>
+            </div>
+
+            <p className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+              <Keyboard aria-hidden="true" className="size-3.5" />
+              <kbd className="rounded border bg-background px-1.5 py-0.5 font-mono text-[10px]">
+                Ctrl/⌘
+              </kbd>
+              +
+              <kbd className="rounded border bg-background px-1.5 py-0.5 font-mono text-[10px]">
+                Enter
+              </kbd>
+              to save
+            </p>
           </CardFooter>
         </form>
 
@@ -657,7 +953,11 @@ export function AdminUserForm({ mode = "create", initial }) {
       </Card>
 
       {/* ---------------- Live preview ---------------- */}
-      <aside className="space-y-3 lg:sticky lg:top-6" aria-label="Live preview">
+      <aside
+        className="space-y-3 lg:sticky lg:top-6"
+        aria-label="Live preview"
+        style={{ perspective: 900 }}
+      >
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Live preview
         </p>

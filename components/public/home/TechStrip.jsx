@@ -1,18 +1,19 @@
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
-  FiArrowLeft,
-  FiArrowRight,
-  FiCheck,
-  FiClock,
-  FiCode,
-  FiCopy,
-  FiLayers,
-  FiSearch,
-  FiX,
-} from "react-icons/fi";
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Clock3,
+  Code2,
+  Copy,
+  Layers3,
+  Search,
+  X,
+} from "lucide-react";
 import {
   SiDocker,
   SiFirebase,
@@ -23,14 +24,23 @@ import {
   SiTailwindcss,
   SiTensorflow,
 } from "react-icons/si";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import Container from "@/components/layout/Container";
 import { techStrip } from "@/config/content";
 
-// Extra info per technology. Names must match the entries in techStrip.
-// color = hover accent (null uses the theme's primary color).
-// level: 1 = beginner friendly, 2 = intermediate, 3 = advanced.
+const EASE = [0.22, 1, 0.36, 1];
+
+// Design tokens shared with HeroSection (kept local, no global CSS change).
+const BORDER = "border-border/80";
+const BORDER_STRONG = "border-border";
+const TEXT_MUTED = "text-muted-foreground";
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const LABEL =
+  "font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-primary";
+const DEFAULT_BRAND = "var(--primary)";
+// Technology brand colour; falls back to the theme primary when none is set.
+
+// Names here should match the entries in techStrip.
 const meta = {
   "Next.js": {
     icon: SiNextdotjs,
@@ -217,7 +227,7 @@ CMD ["npm", "start"]`,
 };
 
 const fallback = {
-  icon: FiCode,
+  icon: Code2,
   category: "Other",
   color: null,
   level: 1,
@@ -231,64 +241,62 @@ const fallback = {
   code: `// Your first project starts here`,
 };
 
-const LEVELS = { 1: "Beginner", 2: "Intermediate", 3: "Advanced" };
+const LEVELS = {
+  1: "Beginner",
+  2: "Intermediate",
+  3: "Advanced",
+};
 
-const getMeta = (name) => ({ ...fallback, ...(meta[name] ?? {}) });
+const getMeta = (name) => ({
+  ...fallback,
+  ...(meta[name] ?? {}),
+});
 
-// Types a string out one small step at a time (instant if motion is reduced).
 function useTyping(text, reduce) {
-  const [out, setOut] = useState(reduce ? text : "");
+  const [output, setOutput] = useState(reduce ? text : "");
+
   useEffect(() => {
     if (reduce) {
-      setOut(text);
+      setOutput(text);
       return;
     }
-    setOut("");
-    let i = 0;
-    const id = setInterval(() => {
-      i += 2;
-      setOut(text.slice(0, i));
-      if (i >= text.length) clearInterval(id);
+
+    setOutput("");
+    let position = 0;
+
+    const intervalId = setInterval(() => {
+      position += 2;
+      setOutput(text.slice(0, position));
+
+      if (position >= text.length) {
+        clearInterval(intervalId);
+      }
     }, 16);
-    return () => clearInterval(id);
+
+    return () => clearInterval(intervalId);
   }, [text, reduce]);
-  return out;
+
+  return output;
 }
 
-// Counts up from 0 to `value` when the value changes.
-function useCountUp(value, reduce) {
-  const [n, setN] = useState(reduce ? value : 0);
-  useEffect(() => {
-    if (reduce) {
-      setN(value);
-      return;
-    }
-    let cur = 0;
-    const id = setInterval(() => {
-      cur += 1;
-      setN(cur);
-      if (cur >= value) clearInterval(id);
-    }, 60);
-    return () => clearInterval(id);
-  }, [value, reduce]);
-  return n;
-}
-
-function LevelBars({ level }) {
+function LevelBars({ level, reduce }) {
   return (
     <span
       className="flex items-center gap-1"
       role="img"
       aria-label={`Level: ${LEVELS[level]}`}
     >
-      {[1, 2, 3].map((i) => (
+      {[1, 2, 3].map((bar) => (
         <motion.span
-          key={i}
-          initial={{ scaleX: 0 }}
+          key={bar}
+          initial={reduce ? false : { scaleX: 0 }}
           animate={{ scaleX: 1 }}
-          transition={{ delay: 0.1 * i, duration: 0.3 }}
+          transition={{
+            delay: reduce ? 0 : 0.08 * bar,
+            duration: reduce ? 0 : 0.28,
+          }}
           className={`h-1.5 w-6 origin-left rounded-full ${
-            i <= level ? "bg-[color:var(--brand)]" : "bg-muted"
+            bar <= level ? "bg-primary" : "bg-foreground/10"
           }`}
         />
       ))}
@@ -297,48 +305,53 @@ function LevelBars({ level }) {
 }
 
 function CodeWindow({ file, code, reduce }) {
-  const typed = useTyping(code, reduce);
+  const typedCode = useTyping(code, reduce);
   const [copied, setCopied] = useState(false);
 
-  const copy = async () => {
+  const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      window.setTimeout(() => setCopied(false), 1500);
     } catch {
-      /* clipboard not available */
+      setCopied(false);
     }
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-muted/60">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-xs text-muted-foreground">{file}</span>
+    <div className="overflow-hidden rounded-xl border border-border/80 bg-slate-950 text-slate-100">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-slate-900 px-3 py-2">
+        <span className="min-w-0 truncate font-mono text-xs text-slate-300">
+          {file}
+        </span>
+
         <button
           type="button"
-          onClick={copy}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={copyCode}
+          aria-label={copied ? "Code copied" : "Copy code"}
+          className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-300 outline-none transition-colors duration-200 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-primary active:bg-white/15 motion-reduce:transition-none"
         >
           {copied ? (
-            <FiCheck aria-hidden="true" />
+            <Check className="size-3.5" aria-hidden="true" />
           ) : (
-            <FiCopy aria-hidden="true" />
+            <Copy className="size-3.5" aria-hidden="true" />
           )}
-          {copied ? "Copied" : "Copy code"}
+          <span aria-live="polite">{copied ? "Copied" : "Copy code"}</span>
         </button>
       </div>
-      {/* Full code is hidden from screen readers while it types out. */}
+
       <pre
-        className="min-h-[7.5rem] overflow-x-auto p-4 font-mono text-xs leading-relaxed"
+        className="min-h-[7.5rem] overflow-x-auto p-4 font-mono text-xs leading-relaxed text-slate-100"
         aria-hidden="true"
       >
         <code>
-          {typed}
-          {typed.length < code.length && (
-            <span className="ml-0.5 inline-block h-3.5 w-1.5 translate-y-0.5 animate-pulse bg-[color:var(--brand)]" />
+          {typedCode}
+          {!reduce && typedCode.length < code.length && (
+            <span className="ml-0.5 inline-block h-3.5 w-1.5 translate-y-0.5 animate-pulse bg-primary motion-reduce:animate-none" />
           )}
         </code>
       </pre>
+
       <span className="sr-only">{code}</span>
     </div>
   );
@@ -351,227 +364,257 @@ export function TechStrip() {
   const [selected, setSelected] = useState(null);
 
   const categories = useMemo(
-    () => ["All", ...new Set(techStrip.map((t) => getMeta(t).category))],
+    () => [
+      "All",
+      ...new Set(techStrip.map((technology) => getMeta(technology).category)),
+    ],
     [],
   );
 
-  const countFor = (c) =>
-    c === "All"
-      ? techStrip.length
-      : techStrip.filter((t) => getMeta(t).category === c).length;
+  const queryText = query.trim().toLowerCase();
 
-  const q = query.trim().toLowerCase();
-  const matches = (t) => {
-    const m = getMeta(t);
-    const inCategory = category === "All" || m.category === category;
-    const inSearch =
-      !q ||
-      t.toLowerCase().includes(q) ||
-      m.topics.some((topic) => topic.toLowerCase().includes(q));
-    return inCategory && inSearch;
-  };
+  const visible = useMemo(
+    () =>
+      techStrip.filter((technology) => {
+        const details = getMeta(technology);
+        const matchesCategory =
+          category === "All" || details.category === category;
+        const searchableText = [
+          technology,
+          details.category,
+          details.project,
+          ...details.topics,
+        ]
+          .join(" ")
+          .toLowerCase();
+        const matchesQuery = !queryText || searchableText.includes(queryText);
 
-  const visible = techStrip.filter(matches);
-  // The detail panel shows the picked tech, or the first match.
-  const current = selected && matches(selected) ? selected : visible[0];
-  const cm = current ? getMeta(current) : null;
-  const index = current ? visible.indexOf(current) : -1;
-
-  const step = (dir) => {
-    if (!visible.length) return;
-    setSelected(visible[(index + dir + visible.length) % visible.length]);
-  };
-
-  const totalWeeks = techStrip.reduce((sum, t) => sum + getMeta(t).weeks, 0);
-  const totalProjects = techStrip.reduce(
-    (sum, t) => sum + getMeta(t).projects,
-    0,
+        return matchesCategory && matchesQuery;
+      }),
+    [category, queryText],
   );
-  const techCount = useCountUp(techStrip.length, reduce);
-  const weekCount = useCountUp(totalWeeks, reduce);
-  const projectCount = useCountUp(totalProjects, reduce);
+
+  const current =
+    selected && visible.includes(selected) ? selected : (visible[0] ?? null);
+  const currentMeta = current ? getMeta(current) : null;
+  const currentIndex = current ? visible.indexOf(current) : -1;
+
+  const countFor = (categoryName) =>
+    categoryName === "All"
+      ? techStrip.length
+      : techStrip.filter(
+          (technology) => getMeta(technology).category === categoryName,
+        ).length;
+
+  const step = (direction) => {
+    if (visible.length < 2) return;
+
+    const nextIndex =
+      (currentIndex + direction + visible.length) % visible.length;
+    setSelected(visible[nextIndex]);
+  };
+
+  const reveal = (delay = 0) =>
+    reduce
+      ? {}
+      : {
+          initial: { opacity: 0, y: 16 },
+          whileInView: { opacity: 1, y: 0 },
+          viewport: { once: true, margin: "-40px" },
+          transition: { duration: 0.55, delay, ease: EASE },
+        };
 
   return (
-    <div className="border-b bg-secondary/40 py-12">
+    <section
+      aria-labelledby="tech-strip-title"
+      className={`border-b ${BORDER} bg-muted/20 py-16 text-foreground sm:py-24`}
+    >
       <Container>
-        {/* Heading + summary numbers */}
-        <div className="mb-8 flex flex-col items-center gap-5 text-center">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Learn the stack companies actually use
-            </h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-              Pick a technology to see what you&apos;ll learn, the project you
-              will build, and a first look at the code.
-            </p>
-          </div>
+        <motion.div
+          {...reveal()}
+          className="mx-auto flex max-w-3xl flex-col items-center text-center"
+        >
+          <p className={`${LABEL} inline-flex items-center gap-2`}>
+            <Code2 className="size-3.5" aria-hidden="true" />
+            Technology stack
+          </p>
 
-          <dl className="flex flex-wrap justify-center gap-x-10 gap-y-3">
-            {[
-              [techCount, "technologies"],
-              [weekCount, "weeks of lessons"],
-              [projectCount, "hands-on projects"],
-            ].map(([value, label]) => (
-              <div key={label} className="flex items-baseline gap-2">
-                <dt className="sr-only">{label}</dt>
-                <dd className="text-2xl font-semibold tabular-nums">{value}</dd>
-                <span
-                  className="text-sm text-muted-foreground"
-                  aria-hidden="true"
-                >
-                  {label}
-                </span>
-              </div>
-            ))}
-          </dl>
+          <h2
+            id="tech-strip-title"
+            style={{ fontSize: "clamp(1.75rem, 1.3rem + 1.8vw, 2.75rem)" }}
+            className="mt-3 text-balance font-semibold leading-[1.1] tracking-[-0.025em]"
+          >
+            The tools behind modern software
+          </h2>
+          <p
+            className={`mt-4 max-w-2xl text-sm leading-6 sm:text-base sm:leading-7 ${TEXT_MUTED}`}
+          >
+            Pick a technology to see what you&apos;ll learn, the project you
+            will build, and a first look at the code.
+          </p>
 
-          {/* Search */}
-          <div className="relative w-full max-w-sm">
-            <FiSearch
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          <div className="relative mt-8 w-full max-w-lg">
+            <Search
+              className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden="true"
             />
             <input
               type="search"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder="Search a technology or topic, e.g. hooks"
               aria-label="Search technologies and topics"
-              className="h-10 w-full rounded-full border bg-card pl-9 pr-9 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className={`h-11 w-full rounded-xl border ${BORDER} bg-card pl-10 pr-10 text-sm text-foreground outline-none transition-colors duration-200 placeholder:text-muted-foreground hover:border-border focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-primary/25 motion-reduce:transition-none`}
             />
+
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery("")}
                 aria-label="Clear search"
-                className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className={`absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition-colors duration-200 hover:bg-foreground/10 hover:text-foreground motion-reduce:transition-none ${FOCUS}`}
               >
-                <FiX aria-hidden="true" />
+                <X className="size-4" aria-hidden="true" />
               </button>
             )}
           </div>
 
-          {/* Category filter with a sliding highlight */}
           <ul
-            className="flex flex-wrap justify-center gap-2"
+            className="mt-5 flex flex-wrap justify-center gap-2"
             aria-label="Filter technologies by category"
           >
-            {categories.map((c) => {
-              const active = category === c;
+            {categories.map((categoryName) => {
+              const active = category === categoryName;
+
               return (
-                <li key={c}>
+                <li key={categoryName}>
                   <button
                     type="button"
                     aria-pressed={active}
-                    onClick={() => setCategory(c)}
-                    className="relative rounded-full border bg-card px-4 py-1.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => setCategory(categoryName)}
+                    className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors duration-200 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 ${FOCUS} ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : `${BORDER} bg-foreground/[0.03] text-foreground/85 hover:border-primary/50 hover:text-foreground`
+                    }`}
                   >
-                    {active && (
-                      <motion.span
-                        layoutId="tech-filter-pill"
-                        className="absolute inset-0 rounded-full bg-primary"
-                        transition={
-                          reduce
-                            ? { duration: 0 }
-                            : { type: "spring", stiffness: 380, damping: 30 }
-                        }
-                      />
-                    )}
+                    {categoryName}
                     <span
-                      className={`relative flex items-center gap-2 ${
-                        active ? "text-primary-foreground" : "text-foreground"
+                      className={`text-xs tabular-nums ${
+                        active
+                          ? "text-primary-foreground/70"
+                          : "text-muted-foreground"
                       }`}
                     >
-                      {c}
-                      <span
-                        className={`text-xs tabular-nums ${
-                          active
-                            ? "text-primary-foreground/80"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {countFor(c)}
-                      </span>
+                      {countFor(categoryName)}
                     </span>
                   </button>
                 </li>
               );
             })}
           </ul>
-        </div>
 
-        {/* Technology grid */}
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-          {techStrip.map((t) => {
-            const m = getMeta(t);
-            const Icon = m.icon;
-            const on = matches(t);
-            return (
-              <li key={t}>
-                <motion.button
-                  type="button"
-                  aria-pressed={current === t}
-                  aria-label={`${t}, ${m.category}, ${LEVELS[m.level]}`}
-                  onClick={() => setSelected(t)}
-                  whileHover={reduce || !on ? undefined : { y: -4 }}
-                  whileTap={reduce ? undefined : { scale: 0.96 }}
-                  animate={{ opacity: on ? 1 : 0.3 }}
-                  transition={{ duration: 0.25 }}
-                  style={{ "--brand": m.color ?? "var(--primary)" }}
-                  className="group relative flex w-full flex-col items-center gap-2 overflow-hidden rounded-xl border bg-card px-3 py-4 text-muted-foreground outline-none transition-colors hover:border-[color:var(--brand)] hover:text-[color:var(--brand)] focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-[color:var(--brand)] aria-pressed:text-[color:var(--brand)]"
+          <p
+            className="mt-4 text-xs text-muted-foreground"
+            role="status"
+            aria-live="polite"
+          >
+            Showing {visible.length} of {techStrip.length} technologies
+          </p>
+        </motion.div>
+
+        {visible.length > 0 ? (
+          <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+            {visible.map((technology, index) => {
+              const details = getMeta(technology);
+              const Icon = details.icon;
+              const isSelected = current === technology;
+
+              return (
+                <motion.li
+                  key={technology}
+                  {...reveal(Math.min(index, 7) * 0.04)}
                 >
-                  <span
-                    className="pointer-events-none absolute inset-x-4 -top-6 h-12 rounded-full bg-[color:var(--brand)] opacity-0 blur-2xl transition-opacity group-hover:opacity-25 group-aria-pressed:opacity-25"
-                    aria-hidden="true"
-                  />
-                  <Icon className="relative size-7" aria-hidden="true" />
-                  <span className="relative text-xs font-medium text-foreground">
-                    {t}
-                  </span>
-                  <span className="relative flex gap-0.5" aria-hidden="true">
-                    {[1, 2, 3].map((i) => (
-                      <span
-                        key={i}
-                        className={`size-1 rounded-full ${
-                          i <= m.level
-                            ? "bg-[color:var(--brand)]"
-                            : "bg-muted-foreground/25"
-                        }`}
-                      />
-                    ))}
-                  </span>
-                </motion.button>
-              </li>
-            );
-          })}
-        </ul>
+                  <motion.button
+                    type="button"
+                    aria-pressed={isSelected}
+                    aria-label={`${technology}, ${details.category}, ${LEVELS[details.level]}`}
+                    onClick={() => setSelected(technology)}
+                    whileHover={reduce ? undefined : { y: -3 }}
+                    whileTap={reduce ? undefined : { scale: 0.97 }}
+                    style={{ "--brand": details.color ?? DEFAULT_BRAND }}
+                    className={`group relative flex min-h-28 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border px-3 py-4 text-foreground transition-colors duration-200 motion-reduce:transition-none ${FOCUS} ${
+                      isSelected
+                        ? "border-primary/60 bg-muted"
+                        : `${BORDER} bg-card hover:border-border`
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-aria-pressed:opacity-100 motion-reduce:transition-none"
+                      style={{
+                        background:
+                          "linear-gradient(180deg, color-mix(in srgb, var(--brand) 10%, transparent), transparent 70%)",
+                      }}
+                    />
 
-        {/* Empty state */}
-        {!current && (
-          <div className="mx-auto mt-6 max-w-3xl rounded-2xl border bg-card p-8 text-center">
-            <p className="font-medium">
+                    <Icon
+                      className="relative size-7 text-primary"
+                      style={{ color: details.color ?? undefined }}
+                      aria-hidden="true"
+                    />
+                    <span className="relative text-center text-xs font-semibold">
+                      {technology}
+                    </span>
+
+                    <span className="relative flex gap-1" aria-hidden="true">
+                      {[1, 2, 3].map((levelDot) => (
+                        <span
+                          key={levelDot}
+                          className={`size-1.5 rounded-full ${
+                            levelDot <= details.level
+                              ? "bg-primary"
+                              : "bg-foreground/10"
+                          }`}
+                        />
+                      ))}
+                    </span>
+                  </motion.button>
+                </motion.li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div
+            className={`mx-auto mt-8 max-w-3xl rounded-2xl border ${BORDER} bg-card p-7 text-center sm:p-10`}
+          >
+            <span className="mx-auto grid size-11 place-items-center rounded-full bg-foreground/[0.06] text-muted-foreground">
+              <Search className="size-5" aria-hidden="true" />
+            </span>
+            <p className="mt-4 font-semibold">
               No technology matches &quot;{query}&quot;
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Try a shorter word, or show all categories.
+            <p className={`mt-1 text-sm ${TEXT_MUTED}`}>
+              Try another search or reset the filters to see every technology.
             </p>
             <button
               type="button"
               onClick={() => {
                 setQuery("");
                 setCategory("All");
+                setSelected(null);
               }}
-              className={`${buttonVariants({ variant: "outline", size: "sm" })} mt-4`}
+              className={`mt-5 inline-flex min-h-10 items-center justify-center rounded-lg border ${BORDER_STRONG} bg-foreground/[0.03] px-5 text-sm font-semibold transition-colors duration-200 hover:border-primary/50 active:bg-foreground/10 motion-reduce:transition-none ${FOCUS}`}
             >
               Reset filters
             </button>
           </div>
         )}
 
-        {/* Detail panel */}
-        {current && (
-          <div
-            className="mx-auto mt-6 max-w-4xl overflow-hidden rounded-2xl border bg-card"
+        {current && currentMeta && (
+          <motion.div
+            {...reveal(0.05)}
+            className={`mx-auto mt-6 max-w-5xl overflow-hidden rounded-3xl border ${BORDER} bg-card shadow-lg shadow-black/[0.06]`}
             aria-live="polite"
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -580,76 +623,98 @@ export function TechStrip() {
                 initial={reduce ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduce ? undefined : { opacity: 0, y: -8 }}
-                transition={{ duration: 0.22 }}
-                style={{ "--brand": cm.color ?? "var(--primary)" }}
-                className="relative p-5 sm:p-6"
+                transition={{ duration: reduce ? 0 : 0.22 }}
+                style={{ "--brand": currentMeta.color ?? DEFAULT_BRAND }}
+                className="relative p-5 sm:p-8"
               >
                 <span
-                  className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full bg-[color:var(--brand)] opacity-10 blur-3xl"
                   aria-hidden="true"
+                  className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full opacity-[0.12] blur-3xl"
+                  style={{ backgroundColor: "var(--brand)" }}
                 />
 
-                <div className="relative grid gap-6 md:grid-cols-2">
-                  {/* Left: what and why */}
-                  <div className="flex flex-col gap-4">
+                <div className="relative grid gap-8 md:grid-cols-2 md:gap-10">
+                  <div className="flex min-w-0 flex-col gap-5">
                     <div className="flex items-center gap-4">
                       <motion.span
-                        className="grid size-14 shrink-0 place-items-center rounded-xl bg-muted text-[color:var(--brand)]"
-                        animate={reduce ? undefined : { y: [0, -4, 0] }}
-                        transition={{
-                          duration: 3.2,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                        }}
+                        initial={reduce ? false : { scale: 0.92, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: reduce ? 0 : 0.25 }}
+                        className={`grid size-14 shrink-0 place-items-center rounded-2xl border ${BORDER} bg-muted/40 text-primary`}
+                        style={{ color: currentMeta.color ?? undefined }}
                       >
-                        <cm.icon className="size-8" aria-hidden="true" />
+                        <currentMeta.icon
+                          className="size-8"
+                          aria-hidden="true"
+                        />
                       </motion.span>
-                      <div>
+
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-semibold">{current}</h3>
-                          <Badge variant="secondary">{cm.category}</Badge>
+                          <h3 className="text-xl font-semibold tracking-tight">
+                            {current}
+                          </h3>
+                          <span
+                            className={`rounded-full border ${BORDER} bg-foreground/[0.04] px-2.5 py-0.5 text-xs text-foreground/80`}
+                          >
+                            {currentMeta.category}
+                          </span>
                         </div>
-                        <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                          <LevelBars level={cm.level} />
-                          <span>{LEVELS[cm.level]}</span>
+
+                        <div
+                          className={`mt-2 flex flex-wrap items-center gap-2.5 text-xs ${TEXT_MUTED}`}
+                        >
+                          <LevelBars
+                            level={currentMeta.level}
+                            reduce={reduce}
+                          />
+                          <span>{LEVELS[currentMeta.level]}</span>
                         </div>
                       </div>
                     </div>
 
-                    <p className="text-sm text-muted-foreground">{cm.blurb}</p>
+                    <p className={`text-sm leading-6 ${TEXT_MUTED}`}>
+                      {currentMeta.blurb}
+                    </p>
 
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      <span className="flex items-center gap-1.5">
-                        <FiClock
-                          className="text-[color:var(--brand)]"
+                    <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock3
+                          className="size-4 text-primary"
+                          style={{ color: currentMeta.color ?? undefined }}
                           aria-hidden="true"
                         />
-                        {cm.weeks} weeks
+                        {currentMeta.weeks} weeks
                       </span>
-                      <span className="flex items-center gap-1.5">
-                        <FiLayers
-                          className="text-[color:var(--brand)]"
+                      <span className="inline-flex items-center gap-1.5">
+                        <Layers3
+                          className="size-4 text-primary"
+                          style={{ color: currentMeta.color ?? undefined }}
                           aria-hidden="true"
                         />
-                        {cm.projects} projects
+                        {currentMeta.projects} projects
                       </span>
                     </div>
 
                     <div>
-                      <p className="mb-2 text-sm font-medium">
+                      <p className={`mb-2.5 ${LABEL}`}>
                         What you&apos;ll learn
                       </p>
-                      <ul className="flex flex-col gap-1.5">
-                        {cm.learn.map((item, i) => (
+                      <ul className="flex flex-col gap-2">
+                        {currentMeta.learn.map((item, index) => (
                           <motion.li
                             key={item}
-                            initial={reduce ? false : { opacity: 0, x: -8 }}
+                            initial={reduce ? false : { opacity: 0, x: -6 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.08 * i + 0.1 }}
-                            className="flex items-start gap-2 text-sm text-muted-foreground"
+                            transition={{
+                              delay: reduce ? 0 : 0.06 * index,
+                              duration: reduce ? 0 : 0.2,
+                            }}
+                            className="flex items-start gap-2 text-sm leading-5 text-foreground/85"
                           >
-                            <FiCheck
-                              className="mt-0.5 shrink-0 text-[color:var(--brand)]"
+                            <Check
+                              className="mt-0.5 size-4 shrink-0 text-primary"
+                              style={{ color: currentMeta.color ?? undefined }}
                               aria-hidden="true"
                             />
                             {item}
@@ -658,84 +723,85 @@ export function TechStrip() {
                       </ul>
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5">
-                      {cm.topics.map((topic, i) => (
-                        <motion.span
+                    <ul className="flex flex-wrap gap-1.5">
+                      {currentMeta.topics.map((topic, index) => (
+                        <motion.li
                           key={topic}
-                          initial={reduce ? false : { opacity: 0, scale: 0.9 }}
+                          initial={reduce ? false : { opacity: 0, scale: 0.96 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: 0.04 * i + 0.15 }}
-                          className="rounded-full border px-2.5 py-0.5 text-xs text-muted-foreground"
+                          transition={{
+                            delay: reduce ? 0 : 0.03 * index,
+                            duration: reduce ? 0 : 0.18,
+                          }}
+                          className={`rounded-md border ${BORDER} bg-foreground/[0.03] px-2 py-1 text-xs text-foreground/80`}
                         >
                           {topic}
-                        </motion.span>
+                        </motion.li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
 
-                  {/* Right: code + project */}
-                  <div className="flex flex-col gap-4">
+                  <div className="flex min-w-0 flex-col gap-4">
                     <CodeWindow
                       key={current}
-                      file={cm.lang}
-                      code={cm.code}
+                      file={currentMeta.lang}
+                      code={currentMeta.code}
                       reduce={reduce}
                     />
-                    <p className="rounded-xl bg-muted/60 p-3 text-sm">
-                      <span className="text-muted-foreground">
-                        You&apos;ll build:{" "}
+
+                    <p
+                      className={`rounded-xl border ${BORDER} bg-foreground/[0.03] p-3.5 text-sm leading-6`}
+                    >
+                      <span className={TEXT_MUTED}>You&apos;ll build: </span>
+                      <span className="font-semibold">
+                        {currentMeta.project}
                       </span>
-                      <span className="font-medium">{cm.project}</span>
                     </p>
                   </div>
                 </div>
 
-                {/* Footer: navigation + CTA */}
-                <div className="relative mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                <div
+                  className={`relative mt-7 flex flex-wrap items-center justify-between gap-3 border-t ${BORDER} pt-5`}
+                >
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => step(-1)}
                       aria-label="Previous technology"
                       disabled={visible.length < 2}
-                      className={buttonVariants({
-                        variant: "outline",
-                        size: "icon",
-                        className: "rounded-full",
-                      })}
+                      className={`grid size-10 place-items-center rounded-full border ${BORDER_STRONG} bg-foreground/[0.03] transition-colors duration-200 hover:border-primary/50 active:bg-foreground/10 disabled:pointer-events-none disabled:opacity-40 motion-reduce:transition-none ${FOCUS}`}
                     >
-                      <FiArrowLeft aria-hidden="true" />
+                      <ArrowLeft className="size-4" aria-hidden="true" />
                     </button>
+
                     <button
                       type="button"
                       onClick={() => step(1)}
                       aria-label="Next technology"
                       disabled={visible.length < 2}
-                      className={buttonVariants({
-                        variant: "outline",
-                        size: "icon",
-                        className: "rounded-full",
-                      })}
+                      className={`grid size-10 place-items-center rounded-full border ${BORDER_STRONG} bg-foreground/[0.03] transition-colors duration-200 hover:border-primary/50 active:bg-foreground/10 disabled:pointer-events-none disabled:opacity-40 motion-reduce:transition-none ${FOCUS}`}
                     >
-                      <FiArrowRight aria-hidden="true" />
+                      <ArrowRight className="size-4" aria-hidden="true" />
                     </button>
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {index + 1} of {visible.length}
+
+                    <span className="ml-1 text-xs tabular-nums text-muted-foreground">
+                      {currentIndex + 1} of {visible.length}
                     </span>
                   </div>
+
                   <Link
                     href={`/courses?q=${encodeURIComponent(current)}`}
-                    className={buttonVariants({ size: "sm" })}
+                    className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 active:translate-y-0 motion-reduce:transform-none motion-reduce:transition-none sm:w-auto ${FOCUS}`}
                   >
                     Browse {current} courses
-                    <FiArrowRight aria-hidden="true" />
+                    <ArrowRight className="size-4" aria-hidden="true" />
                   </Link>
                 </div>
               </motion.div>
             </AnimatePresence>
-          </div>
+          </motion.div>
         )}
       </Container>
-    </div>
+    </section>
   );
 }

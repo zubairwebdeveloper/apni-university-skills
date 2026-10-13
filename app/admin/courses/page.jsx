@@ -3,11 +3,16 @@ import Link from "next/link";
 import { z } from "zod";
 import { buttonVariants } from "@/components/ui/button";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { StatusSummaryCards } from "@/components/admin/StatusSummaryCards";
 import { DataTableToolbar } from "@/components/admin/table/DataTableToolbar";
 import { CoursesTable } from "@/components/admin/courses/CoursesTable";
 import { CursorPagination } from "@/components/shared/CursorPagination";
 import { requirePermission } from "@/lib/auth/authorize";
-import { can, PERMISSIONS as P, permissionsFor } from "@/lib/constants/permissions";
+import {
+  can,
+  PERMISSIONS as P,
+  permissionsFor,
+} from "@/lib/constants/permissions";
 import {
   CONTENT_STATUS_OPTIONS,
   RANGE_OPTIONS,
@@ -24,6 +29,18 @@ import { instructorAdminRepository } from "@/repositories/admin/instructorAdminR
 
 export const metadata = { title: "Courses" };
 const slugParam = z.string().regex(/^[a-z0-9-]{1,80}$/);
+
+// Keeps every other filter / sort / search in the link, swaps only the status.
+function hrefFor(params, status) {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (k === "status" || v == null || v === "") continue;
+    qs.set(k, String(v));
+  }
+  if (status) qs.set("status", status);
+  const s = qs.toString();
+  return `/admin/courses${s ? `?${s}` : ""}`;
+}
 
 export default async function AdminCoursesPage({ searchParams }) {
   const user = await requirePermission(P.COURSES_READ);
@@ -44,7 +61,8 @@ export default async function AdminCoursesPage({ searchParams }) {
   if (p.level) filters.push(["level", "==", p.level]);
   if (p.featured) filters.push(["featured", "==", true]);
 
-  const [{ items, nextCursor, total }, categories, instructors] =
+  // Status counts follow every filter except status and search.
+  const [{ items, nextCursor, total }, categories, instructors, ...counts] =
     await Promise.all([
       courseAdminRepository.list({
         status: p.status,
@@ -55,8 +73,23 @@ export default async function AdminCoursesPage({ searchParams }) {
       }),
       categoryAdminRepository.options(),
       instructorAdminRepository.options(),
+      ...CONTENT_STATUS_OPTIONS.map((o) =>
+        courseAdminRepository.list({
+          status: o.value,
+          sort: p.sort,
+          filters,
+        }),
+      ),
     ]);
   const { after, keyword, ...linkParams } = p;
+
+  const summary = CONTENT_STATUS_OPTIONS.map((o, i) => ({
+    key: o.value,
+    label: o.label,
+    count: counts[i].total,
+    href: hrefFor(linkParams, o.value),
+    active: p.status === o.value,
+  }));
 
   return (
     <>
@@ -71,58 +104,67 @@ export default async function AdminCoursesPage({ searchParams }) {
           )
         }
       />
-      <DataTableToolbar
-        searchPlaceholder="Search by title, category, instructor or tag…"
-        total={total}
-        sorts={sortOptions(COURSE_SORTS)}
-        filters={[
-          {
-            key: "status",
-            label: "Status",
-            allLabel: "All (not in trash)",
-            options: CONTENT_STATUS_OPTIONS,
-          },
-          {
-            key: "category",
-            label: "Category",
-            allLabel: "All categories",
-            options: categories.map((c) => ({ value: c.slug, label: c.name })),
-          },
-          {
-            key: "instructor",
-            label: "Instructor",
-            allLabel: "All instructors",
-            options: instructors.map((i) => ({ value: i.slug, label: i.name })),
-          },
-          {
-            key: "price",
-            label: "Price",
-            allLabel: "Free & paid",
-            options: [
-              { value: "free", label: "Free" },
-              { value: "paid", label: "Paid" },
-            ],
-          },
-          {
-            key: "level",
-            label: "Level",
-            allLabel: "All levels",
-            options: LEVELS,
-          },
-          {
-            key: "featured",
-            label: "Featured",
-            allLabel: "All",
-            options: [{ value: "yes", label: "Featured only" }],
-          },
-          {
-            key: "range",
-            label: "Created",
-            allLabel: "Any time",
-            options: RANGE_OPTIONS,
-          },
-        ]}
-      />
+      <StatusSummaryCards items={summary} ariaLabel="Courses by status" />
+      <div className="mt-6">
+        <DataTableToolbar
+          searchPlaceholder="Search by title, category, instructor or tag…"
+          total={total}
+          sorts={sortOptions(COURSE_SORTS)}
+          filters={[
+            {
+              key: "status",
+              label: "Status",
+              allLabel: "All (not in trash)",
+              options: CONTENT_STATUS_OPTIONS,
+            },
+            {
+              key: "category",
+              label: "Category",
+              allLabel: "All categories",
+              options: categories.map((c) => ({
+                value: c.slug,
+                label: c.name,
+              })),
+            },
+            {
+              key: "instructor",
+              label: "Instructor",
+              allLabel: "All instructors",
+              options: instructors.map((i) => ({
+                value: i.slug,
+                label: i.name,
+              })),
+            },
+            {
+              key: "price",
+              label: "Price",
+              allLabel: "Free & paid",
+              options: [
+                { value: "free", label: "Free" },
+                { value: "paid", label: "Paid" },
+              ],
+            },
+            {
+              key: "level",
+              label: "Level",
+              allLabel: "All levels",
+              options: LEVELS,
+            },
+            {
+              key: "featured",
+              label: "Featured",
+              allLabel: "All",
+              options: [{ value: "yes", label: "Featured only" }],
+            },
+            {
+              key: "range",
+              label: "Created",
+              allLabel: "Any time",
+              options: RANGE_OPTIONS,
+            },
+          ]}
+        />
+      </div>
       <div className="mt-4">
         <CoursesTable rows={items} perms={permissionsFor(user.role)} />
         <CursorPagination
@@ -135,4 +177,3 @@ export default async function AdminCoursesPage({ searchParams }) {
     </>
   );
 }
-

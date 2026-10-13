@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+
+import { Component, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -10,116 +12,144 @@ import {
   useMotionTemplate,
   useMotionValue,
   useReducedMotion,
+  useScroll,
   useSpring,
   useTransform,
 } from "framer-motion";
 import {
-  FiArrowRight,
-  FiArrowUpRight,
-  FiAward,
-  FiBriefcase,
-  FiCheck,
-  FiCloud,
-  FiCode,
-  FiCpu,
-  FiGlobe,
-  FiLayers,
-  FiServer,
-  FiShield,
-  FiStar,
-  FiTarget,
-  FiTrendingUp,
-  FiUsers,
-} from "react-icons/fi";
-import {
-  SiDocker,
-  SiFirebase,
-  SiGit,
-  SiKubernetes,
-  SiLinux,
-  SiNextdotjs,
-  SiPython,
-  SiReact,
-  SiTailwindcss,
-  SiTensorflow,
-} from "react-icons/si";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+  ArrowRight,
+  ArrowUpRight,
+  Award,
+  BriefcaseBusiness,
+  Check,
+  Cloud,
+  Code2,
+  Cpu,
+  Globe2,
+  Layers3,
+  LayoutDashboard,
+  Server,
+  ShieldCheck,
+  Target,
+  TrendingUp,
+  UsersRound,
+} from "lucide-react";
 import Container from "@/components/layout/Container";
 import { mediaConfig } from "@/config/media";
 import { formatCompact } from "@/lib/utils/format";
 
+// Browser-only WebGL scene: never rendered on the server.
+const HeroScene = dynamic(() => import("./HeroScene"), {
+  ssr: false,
+  loading: () => null,
+});
+
 const EASE = [0.22, 1, 0.36, 1];
 
-/* ------------------------------ content ------------------------------ */
+// Design tokens (kept local so the redesign does not touch global CSS).
+const BORDER = "border-border/80";
+const TEXT_MUTED = "text-muted-foreground";
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const LABEL =
+  "font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-primary";
+
+// Apne asal role names ke hisaab se adjust karein
+const DASHBOARD_BY_ROLE = {
+  student: "/student",
+  instructor: "/instructor",
+  admin: "/admin",
+};
+
+const getDashboardHref = (user) => DASHBOARD_BY_ROLE[user?.role] ?? "/student";
+const getFirstName = (user) =>
+  (user?.name ?? "").trim().split(/\s+/)[0] || "learner";
 
 const paths = [
   {
     id: "web",
-    label: "Web Development",
-    icon: FiGlobe,
-    blurb:
-      "Build fast, accessible apps with React, Next.js and modern backends, then deploy them for real users.",
+    label: "Full-Stack Web",
+    icon: Globe2,
+    study:
+      "React, Next.js, APIs and databases, from the interface to deployment.",
+    why: "Most digital products, from SaaS dashboards to marketplaces, start as web applications.",
+    build: "A deployed full-stack app with authentication and real data.",
+    background: "Basic HTML and JavaScript help, but beginners can start here.",
     tools: ["React", "Next.js", "Node.js", "Tailwind"],
-    meta: "40+ lessons · 6 projects · Beginner to Pro",
   },
   {
     id: "ai",
-    label: "AI & ML",
-    icon: FiCpu,
-    blurb:
-      "Train models, build LLM-powered apps and ship AI agents that automate real work.",
+    label: "AI & Automation",
+    icon: Cpu,
+    study:
+      "Generative AI, LLM-powered apps, AI agents, workflow automation and machine learning fundamentals.",
+    why: "AI features and automation are becoming a standard layer of modern software.",
+    build: "An LLM-powered app or an agent that automates a real workflow.",
+    background: "Some Python or JavaScript is useful.",
     tools: ["Python", "TensorFlow", "LangChain", "Prompting"],
-    meta: "35+ lessons · 5 projects · Some coding needed",
   },
   {
     id: "cloud",
     label: "Cloud",
-    icon: FiCloud,
-    blurb:
-      "Deploy and scale with serverless, containers and managed databases without managing servers.",
+    icon: Cloud,
+    study:
+      "Cloud computing and serverless systems: functions, storage, managed databases and APIs.",
+    why: "It lets small teams ship and scale without running their own servers.",
+    build: "A serverless backend with storage and a public API.",
+    background: "Basic programming knowledge is enough to begin.",
     tools: ["Firebase", "Serverless", "Storage", "APIs"],
-    meta: "30+ lessons · 4 projects · Beginner friendly",
   },
   {
     id: "security",
     label: "Cybersecurity",
-    icon: FiShield,
-    blurb:
-      "Find and fix vulnerabilities, secure your apps and learn how attackers think.",
+    icon: ShieldCheck,
+    study:
+      "Cybersecurity and digital privacy: OWASP risks, secure coding, networking and Linux.",
+    why: "Every application that handles user data needs to be defended.",
+    build: "An application where common vulnerabilities are found and fixed.",
+    background: "Comfort with the command line and web basics.",
     tools: ["OWASP", "Linux", "Networking", "Pen testing"],
-    meta: "30+ lessons · 4 labs · Intermediate",
   },
   {
     id: "devops",
     label: "DevOps",
-    icon: FiServer,
-    blurb:
-      "Automate builds, tests and releases with CI/CD pipelines and infrastructure as code.",
+    icon: Server,
+    study:
+      "DevOps and platform engineering: Git, CI/CD, containers, testing and infrastructure as code.",
+    why: "Reliable testing and releases keep teams shipping without breaking things.",
+    build: "A CI/CD pipeline that tests and deploys a containerised app.",
+    background: "Git and basic Linux skills help.",
     tools: ["Docker", "Kubernetes", "CI/CD", "Git"],
-    meta: "30+ lessons · 5 projects · Intermediate",
   },
 ];
 
-const roles = [
-  "Web Developer",
-  "AI Engineer",
-  "Cloud Architect",
-  "Security Expert",
-  "DevOps Pro",
-];
-
-const stack = [
-  { name: "React", icon: SiReact },
-  { name: "Next.js", icon: SiNextdotjs },
-  { name: "Python", icon: SiPython },
-  { name: "TensorFlow", icon: SiTensorflow },
-  { name: "Docker", icon: SiDocker },
-  { name: "Kubernetes", icon: SiKubernetes },
-  { name: "Firebase", icon: SiFirebase },
-  { name: "Tailwind CSS", icon: SiTailwindcss },
-  { name: "Git", icon: SiGit },
-  { name: "Linux", icon: SiLinux },
+// Hero mein har 4 second baad type hone wala content + uska button
+const rotating = [
+  {
+    text: "Build full-stack apps with React, Next.js and real databases.",
+    label: "Full-Stack Web",
+    href: "/courses?category=web",
+  },
+  {
+    text: "Create LLM-powered apps and agents that automate real work.",
+    label: "AI & Automation",
+    href: "/courses?category=ai",
+  },
+  {
+    text: "Ship serverless backends with storage and public APIs.",
+    label: "Cloud",
+    href: "/courses?category=cloud",
+  },
+  {
+    text: "Find and fix real vulnerabilities in live applications.",
+    label: "Cybersecurity",
+    href: "/courses?category=security",
+  },
+  {
+    text: "Automate testing and deploys with CI/CD and containers.",
+    label: "DevOps",
+    href: "/courses?category=devops",
+  },
 ];
 
 const terminalLines = [
@@ -131,806 +161,1023 @@ const terminalLines = [
 
 const perks = ["Project-based", "Beginner friendly", "Learn at your pace"];
 
-const avatars = [
-  { letter: "A", className: "bg-primary text-primary-foreground" },
-  { letter: "H", className: "bg-highlight text-highlight-foreground" },
-  { letter: "S", className: "bg-accent text-accent-foreground" },
-  { letter: "M", className: "bg-secondary text-secondary-foreground" },
-];
-
 const highlights = [
   {
-    icon: FiUsers,
+    icon: UsersRound,
     title: "Live mentors",
     text: "Get unstuck fast with Q&A sessions and code reviews.",
   },
   {
-    icon: FiLayers,
+    icon: Layers3,
     title: "Real projects",
-    text: "Build a portfolio that employers can actually open.",
+    text: "Build a portfolio that others can actually open.",
   },
   {
-    icon: FiAward,
+    icon: Award,
     title: "Certificates",
     text: "Share proof of your skills on LinkedIn and your CV.",
   },
   {
-    icon: FiBriefcase,
+    icon: BriefcaseBusiness,
     title: "Career support",
-    text: "CV reviews, mock interviews and job guidance.",
+    text: "CV reviews, mock interviews and guidance.",
   },
 ];
 
 const steps = [
   {
-    icon: FiTarget,
+    icon: Target,
     title: "Pick your path",
     text: "Choose web, AI, cloud, security or DevOps and get a clear roadmap.",
   },
   {
-    icon: FiCode,
+    icon: Code2,
     title: "Build real projects",
     text: "Learn by shipping. Every module ends with something you can show.",
   },
   {
-    icon: FiTrendingUp,
-    title: "Launch your career",
-    text: "Get certified, polish your portfolio and start applying with confidence.",
+    icon: TrendingUp,
+    title: "Show your skills",
+    text: "Earn certificates, polish your portfolio and start applying with confidence.",
   },
 ];
 
-/* ------------------------------ helpers ------------------------------ */
+function reveal(reduce, delay = 0) {
+  if (reduce) return {};
 
-// Fade-up when scrolled into view.
-const reveal = (reduce, delay = 0) =>
-  reduce
-    ? {}
-    : {
-        initial: { opacity: 0, y: 20 },
-        whileInView: { opacity: 1, y: 0 },
-        viewport: { once: true, margin: "-40px" },
-        transition: { duration: 0.5, delay, ease: EASE },
-      };
+  return {
+    initial: { opacity: 0, y: 18 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, margin: "-40px" },
+    transition: { duration: 0.6, delay, ease: EASE },
+  };
+}
 
-/* ----------------------------- small parts ---------------------------- */
+/* ------------------------------------------------------------------ */
+/* Hooks                                                               */
+/* ------------------------------------------------------------------ */
+
+// Returns { user, loading }.
+// loading = true: abhi check ho raha hai | user = null: logged out | user = object: logged in
+function useCurrentUser() {
+  const [state, setState] = useState({ user: null, loading: true });
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    // 4 second mein jawab na aaye to logged-out maan lo
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    fetch("/api/auth/me", {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const data = await res.json();
+        return (
+          data?.user ?? (data?.uid || data?.id || data?.email ? data : null)
+        );
+      })
+      .catch(() => null)
+      .then((user) => {
+        clearTimeout(timeoutId);
+        if (!cancelled) setState({ user, loading: false });
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, []);
+
+  return state;
+}
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [query]);
+
+  return matches;
+}
+
+// If WebGL is unavailable the CSS fallback behind the canvas stays visible.
+class SceneBoundary extends Component {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Auth CTA: login ke hisaab se button badalta hai                      */
+/* ------------------------------------------------------------------ */
+function AuthCta({ user, loading = false, className = "" }) {
+  const base = `inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none ${FOCUS} ${className}`;
+
+  // Auth resolve hone tak placeholder, taake button flicker na kare
+  if (loading) {
+    return (
+      <div
+        className={`min-h-12 min-w-48 animate-pulse rounded-lg bg-muted ${className}`}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  if (user) {
+    return (
+      <Link href={getDashboardHref(user)} className={base}>
+        <LayoutDashboard className="size-4" aria-hidden="true" />
+        Go to dashboard
+      </Link>
+    );
+  }
+
+  return (
+    <Link href="/courses" className={base}>
+      Explore More Courses
+      <ArrowRight className="size-4" aria-hidden="true" />
+    </Link>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 3D helpers                                                          */
+/* ------------------------------------------------------------------ */
+function Tilt3D({ reduce, className = "", max = 7, children }) {
+  const x = useMotionValue(0.5);
+  const y = useMotionValue(0.5);
+  const sx = useSpring(x, { stiffness: 200, damping: 22 });
+  const sy = useSpring(y, { stiffness: 200, damping: 22 });
+
+  const rotateX = useTransform(sy, [0, 1], [max, -max]);
+  const rotateY = useTransform(sx, [0, 1], [-max, max]);
+  const gx = useTransform(sx, (v) => `${v * 100}%`);
+  const gy = useTransform(sy, (v) => `${v * 100}%`);
+  const glare = useMotionTemplate`radial-gradient(260px circle at ${gx} ${gy}, color-mix(in oklab, var(--primary) 14%, transparent), transparent 70%)`;
+
+  const onMove = (event) => {
+    if (reduce || event.pointerType !== "mouse") return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    x.set((event.clientX - rect.left) / rect.width);
+    y.set((event.clientY - rect.top) / rect.height);
+  };
+
+  const onLeave = () => {
+    x.set(0.5);
+    y.set(0.5);
+  };
+
+  return (
+    <motion.div
+      onPointerMove={onMove}
+      onPointerLeave={onLeave}
+      style={
+        reduce
+          ? undefined
+          : {
+              rotateX,
+              rotateY,
+              transformPerspective: 900,
+              transformStyle: "preserve-3d",
+            }
+      }
+      className={`relative will-change-transform ${className}`}
+    >
+      {children}
+      {!reduce && (
+        <motion.span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[inherit]"
+          style={{ background: glare }}
+        />
+      )}
+    </motion.div>
+  );
+}
+
+function TiltCard({ reduce, delay = 0, className, children }) {
+  return (
+    <motion.li {...reveal(reduce, delay)} className="[perspective:900px]">
+      <Tilt3D reduce={reduce} className={className}>
+        {children}
+      </Tilt3D>
+    </motion.li>
+  );
+}
 
 function Float({ children, className, delay = 0 }) {
   const reduce = useReducedMotion();
+
   return (
     <motion.div
       className={className}
-      animate={reduce ? undefined : { y: [0, -8, 0] }}
-      transition={{ duration: 6, delay, repeat: Infinity, ease: "easeInOut" }}
+      animate={reduce ? undefined : { y: [0, -6, 0] }}
+      transition={{
+        duration: 7,
+        delay,
+        repeat: Infinity,
+        ease: "easeInOut",
+      }}
     >
       {children}
     </motion.div>
   );
 }
 
-// Counts up once when the stat scrolls into view.
 function CountUp({ value, reduce }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true });
-  const [n, setN] = useState(reduce ? value : 0);
+  const [count, setCount] = useState(reduce ? value : 0);
 
   useEffect(() => {
     if (!inView || reduce) return;
+
     const controls = animate(0, value, {
       duration: 1.4,
       ease: "easeOut",
-      onUpdate: (v) => setN(Math.round(v)),
+      onUpdate: (nextValue) => setCount(Math.round(nextValue)),
     });
+
     return () => controls.stop();
   }, [inView, value, reduce]);
 
-  return <span ref={ref}>{formatCompact(reduce ? value : n)}+</span>;
+  return <span ref={ref}>{formatCompact(reduce ? value : count)}+</span>;
 }
 
-// "Become a ___" with a word that slides in and out.
-function RotatingRole({ reduce }) {
-  const [i, setI] = useState(0);
+/* ------------------------------------------------------------------ */
+/* Type rotator: har 4 second baad naya text type hota hai + button     */
+/* ------------------------------------------------------------------ */
+function TypeRotator({ reduce }) {
+  const ref = useRef(null);
+  const inView = useInView(ref);
+  const [index, setIndex] = useState(0);
+  const item = rotating[index];
+  const [length, setLength] = useState(reduce ? item.text.length : 0);
 
+  // Har 4 second baad agla content
   useEffect(() => {
-    if (reduce) return;
-    const id = setInterval(() => setI((c) => (c + 1) % roles.length), 2600);
-    return () => clearInterval(id);
-  }, [reduce]);
+    if (reduce || !inView) return;
+
+    const intervalId = setInterval(() => {
+      setIndex((current) => (current + 1) % rotating.length);
+      setLength(0);
+    }, 4000);
+
+    return () => clearInterval(intervalId);
+  }, [reduce, inView]);
+
+  // Typing: ek ek character
+  useEffect(() => {
+    if (reduce || !inView || length >= item.text.length) return;
+
+    const timeoutId = setTimeout(() => setLength((l) => l + 1), 35);
+    return () => clearTimeout(timeoutId);
+  }, [reduce, inView, length, item.text.length]);
+
+  const visibleLength = reduce ? item.text.length : length;
 
   return (
-    <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xl font-medium sm:text-2xl">
-      <span className="sr-only">Become a {roles.join(", ")}.</span>
-      <span aria-hidden="true" className="text-foreground/70">
-        Become a
-      </span>
-      <span
+    <div ref={ref} className="mt-6 max-w-xl">
+      {/* Screen readers ko poora text milta hai, typing nahi */}
+      <p className="sr-only">{item.text}</p>
+
+      {/* min-h se layout shift nahi hota */}
+      <p
         aria-hidden="true"
-        className="relative inline-flex h-9 overflow-hidden sm:h-10"
+        className={`min-h-[5.5rem] text-base leading-7 sm:min-h-[4rem] sm:text-lg sm:leading-8 ${TEXT_MUTED}`}
       >
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={roles[i]}
-            initial={reduce ? false : { y: "100%", opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={reduce ? undefined : { y: "-100%", opacity: 0 }}
-            transition={{ duration: 0.35, ease: EASE }}
-            className="rounded-lg bg-primary/10 px-2.5 leading-9 text-primary sm:leading-10"
-          >
-            {roles[i]}
-          </motion.span>
-        </AnimatePresence>
-      </span>
-    </p>
-  );
-}
+        {item.text.slice(0, visibleLength)}
+        {!reduce && (
+          <span className="ml-0.5 inline-block h-5 w-0.5 translate-y-1 animate-pulse bg-primary motion-reduce:animate-none" />
+        )}
+      </p>
 
-// Overlapping avatars + stars. Replace the numbers with real ones.
-function SocialProof({ reduce }) {
-  return (
-    <motion.div
-      {...(reduce
-        ? {}
-        : {
-            initial: { opacity: 0, y: 12 },
-            animate: { opacity: 1, y: 0 },
-            transition: { duration: 0.5, delay: 0.32, ease: EASE },
-          })}
-      className="mt-6 flex items-center gap-3"
-    >
-      <ul className="flex -space-x-2" aria-hidden="true">
-        {avatars.map((a) => (
-          <li
-            key={a.letter}
-            className={`grid size-9 place-items-center rounded-full text-xs font-semibold ring-2 ring-background ${a.className}`}
-          >
-            {a.letter}
-          </li>
-        ))}
-        <li className="grid size-9 place-items-center rounded-full bg-card text-[11px] font-semibold ring-2 ring-background">
-          10K+
-        </li>
-      </ul>
-      <div className="text-sm">
-        <div
-          className="flex items-center gap-0.5 text-highlight"
-          role="img"
-          aria-label="Rated 4.9 out of 5"
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={item.href}
+          initial={reduce ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduce ? undefined : { opacity: 0, y: -6 }}
+          transition={{ duration: 0.25 }}
         >
-          {Array.from({ length: 5 }).map((_, i) => (
-            <FiStar
-              key={i}
-              className="size-3.5 fill-current"
-              aria-hidden="true"
-            />
-          ))}
-          <span className="ml-1.5 font-medium text-foreground">4.9/5</span>
-        </div>
-        <p className="text-xs text-muted-foreground">Loved by learners</p>
-      </div>
-    </motion.div>
+          <Link
+            href={item.href}
+            className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border ${BORDER} bg-foreground/[0.03] px-4 text-sm font-medium text-primary transition-colors duration-200 hover:border-primary/50 motion-reduce:transition-none ${FOCUS}`}
+          >
+            Explore {item.label}
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        </motion.div>
+      </AnimatePresence>
+    </div>
   );
 }
 
-// Decorative typing terminal. Loops, and shows full text with reduced motion.
-function Terminal({ reduce, className = "w-64" }) {
-  const full = terminalLines.join("\n");
-  const [len, setLen] = useState(0);
+/* ------------------------------------------------------------------ */
+/* Terminal                                                            */
+/* ------------------------------------------------------------------ */
+function Terminal({ reduce, className = "w-60" }) {
+  const ref = useRef(null);
+  const inView = useInView(ref);
+  const fullText = terminalLines.join("\n");
+  const [length, setLength] = useState(reduce ? fullText.length : 0);
 
+  // Only types while visible, so it never burns frames off-screen.
   useEffect(() => {
-    if (reduce) return;
-    const id = setInterval(
-      () => setLen((l) => (l >= full.length + 30 ? 0 : l + 1)),
-      55,
-    );
-    return () => clearInterval(id);
-  }, [reduce, full.length]);
+    if (reduce || !inView) return;
 
-  const visibleLen = reduce ? full.length : len;
+    const intervalId = setInterval(() => {
+      setLength((current) =>
+        current >= fullText.length + 30 ? 0 : current + 1,
+      );
+    }, 55);
+
+    return () => clearInterval(intervalId);
+  }, [reduce, inView, fullText.length]);
+
+  const visibleLength = reduce ? fullText.length : length;
 
   return (
     <div
+      ref={ref}
       aria-hidden="true"
-      className={`rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur ${className}`}
+      className={`rounded-xl border ${BORDER} bg-card/90 p-3 shadow-lg shadow-black/[0.06] backdrop-blur ${className}`}
     >
       <div className="mb-2 flex gap-1.5">
-        <span className="size-2 rounded-full bg-destructive/60" />
-        <span className="size-2 rounded-full bg-highlight/80" />
-        <span className="size-2 rounded-full bg-primary/60" />
+        <span className="size-2 rounded-full bg-foreground/20" />
+        <span className="size-2 rounded-full bg-foreground/20" />
+        <span className="size-2 rounded-full bg-amber-400/80" />
       </div>
       <pre className="h-24 overflow-hidden whitespace-pre-wrap font-mono text-[11px] leading-5 text-foreground/90">
-        {full.slice(0, visibleLen)}
-        <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 animate-pulse bg-primary" />
+        {fullText.slice(0, visibleLength)}
+        {!reduce && (
+          <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 animate-pulse bg-primary motion-reduce:animate-none" />
+        )}
       </pre>
     </div>
   );
 }
 
-function ProgressCard({ reduce }) {
-  return (
-    <div className="w-48 rounded-xl border bg-card p-3 shadow-lg">
-      <div className="flex items-center justify-between text-xs">
-        <span className="font-medium">Course progress</span>
-        <span className="font-semibold text-primary">72%</span>
-      </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-        <motion.div
-          initial={reduce ? false : { width: 0 }}
-          animate={{ width: "72%" }}
-          transition={{ duration: 1.4, delay: 0.9, ease: EASE }}
-          className="h-full rounded-full bg-primary"
-        />
-      </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        Next: Deploy to production
-      </p>
-    </div>
-  );
-}
-
+/* ------------------------------------------------------------------ */
+/* Path switcher                                                       */
+/* ------------------------------------------------------------------ */
 function PathSwitcher({ reduce }) {
   const [activeId, setActiveId] = useState(paths[0].id);
-  const [auto, setAuto] = useState(true);
-  const active = paths.find((p) => p.id === activeId);
+  const [autoRotate, setAutoRotate] = useState(true);
+  const activePath = paths.find((path) => path.id === activeId);
 
-  // Auto-rotates until the visitor picks a path themselves.
   useEffect(() => {
-    if (!auto || reduce) return;
-    const id = setInterval(() => {
-      setActiveId((cur) => {
-        const i = paths.findIndex((p) => p.id === cur);
-        return paths[(i + 1) % paths.length].id;
+    if (!autoRotate || reduce) return;
+
+    const intervalId = setInterval(() => {
+      setActiveId((currentId) => {
+        const currentIndex = paths.findIndex((path) => path.id === currentId);
+        return paths[(currentIndex + 1) % paths.length].id;
       });
-    }, 5000);
-    return () => clearInterval(id);
-  }, [auto, reduce]);
+    }, 6000);
+
+    return () => clearInterval(intervalId);
+  }, [autoRotate, reduce]);
+
+  const details = [
+    ["Study", activePath.study],
+    ["Why it matters", activePath.why],
+    ["You can build", activePath.build],
+    ["Helpful background", activePath.background],
+  ];
 
   return (
-    <div className="mt-8">
-      {/* Mobile: one swipeable row. Larger screens: wraps normally. */}
+    <div id="learning-paths" className="mt-10 scroll-mt-24">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className={LABEL}>Learning paths</p>
+        <span className={`hidden text-xs sm:block ${TEXT_MUTED}`}>
+          Pick one to see what it covers
+        </span>
+      </div>
+
       <ul
-        className="flex max-w-full snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden"
+        className="flex max-w-full snap-x gap-2 overflow-x-auto pb-2 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden"
         aria-label="Learning paths"
       >
-        {paths.map((p) => {
-          const isActive = p.id === activeId;
+        {paths.map((path) => {
+          const Icon = path.icon;
+          const isActive = path.id === activeId;
+
           return (
-            <li key={p.id} className="shrink-0 snap-start">
+            <li key={path.id} className="shrink-0 snap-start">
               <button
                 type="button"
                 aria-pressed={isActive}
                 onClick={() => {
-                  setAuto(false);
-                  setActiveId(p.id);
+                  setAutoRotate(false);
+                  setActiveId(path.id);
                 }}
-                className={buttonVariants({
-                  size: "sm",
-                  variant: isActive ? "default" : "outline",
-                  className: "rounded-full",
-                })}
+                className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors duration-200 motion-reduce:transition-none ${FOCUS} ${
+                  isActive
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : `${BORDER} bg-foreground/[0.03] text-foreground/85 hover:border-primary/50 hover:text-foreground`
+                }`}
               >
-                <p.icon aria-hidden="true" />
-                {p.label}
+                <Icon className="size-4" aria-hidden="true" />
+                {path.label}
               </button>
             </li>
           );
         })}
       </ul>
 
-      <div className="relative mt-3 min-h-36 overflow-hidden rounded-xl border bg-card/70 p-4 backdrop-blur">
-        {/* Thin bar showing when the next path will show up */}
-        {auto && !reduce && (
-          <motion.div
-            key={activeId}
-            aria-hidden="true"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 5, ease: "linear" }}
-            className="absolute inset-x-0 top-0 h-0.5 origin-left bg-primary"
-          />
-        )}
+      <Tilt3D reduce={reduce} max={3} className="mt-2 rounded-2xl">
+        <div
+          className={`relative min-h-[21rem] overflow-hidden rounded-2xl border ${BORDER} bg-card/70 p-5 sm:min-h-[15rem] sm:p-6`}
+        >
+          {autoRotate && !reduce && (
+            <motion.div
+              key={activeId}
+              aria-hidden="true"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 6, ease: "linear" }}
+              className="absolute inset-x-0 top-0 h-px origin-left bg-primary"
+            />
+          )}
 
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={active.id}
-            initial={reduce ? false : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduce ? undefined : { opacity: 0, y: -6 }}
-            transition={{ duration: 0.2 }}
-          >
-            <p className="text-sm text-muted-foreground">{active.blurb}</p>
-            <ul className="mt-3 flex flex-wrap gap-1.5">
-              {active.tools.map((t) => (
-                <li key={t}>
-                  <Badge variant="secondary">{t}</Badge>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-xs text-muted-foreground">{active.meta}</p>
-            <Link
-              href={`/courses?category=${active.id}`}
-              className="mt-2 inline-flex items-center gap-1 rounded-sm text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={activePath.id}
+              initial={reduce ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduce ? undefined : { opacity: 0, y: -6 }}
+              transition={{ duration: 0.22 }}
             >
-              Browse {active.label} courses
-              <FiArrowRight aria-hidden="true" />
-            </Link>
-          </motion.div>
-        </AnimatePresence>
-      </div>
+              <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                {details.map(([term, description]) => (
+                  <div key={term}>
+                    <dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-primary/80">
+                      {term}
+                    </dt>
+                    <dd className="mt-1 text-sm leading-6 text-foreground/90">
+                      {description}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <ul className="flex flex-wrap gap-1.5">
+                  {activePath.tools.map((tool) => (
+                    <li
+                      key={tool}
+                      className={`rounded-md border ${BORDER} bg-foreground/[0.03] px-2 py-1 text-xs text-foreground/80`}
+                    >
+                      {tool}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href={`/courses?category=${activePath.id}`}
+                  className={`inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline ${FOCUS}`}
+                >
+                  Browse courses
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </Tilt3D>
     </div>
   );
 }
 
-/* ------------------------------ visual side --------------------------- */
-
-function Visual({ reduce, src, featuredCourse }) {
+/* ------------------------------------------------------------------ */
+/* Hero stage                                                          */
+/* ------------------------------------------------------------------ */
+function Stage({ reduce, src, featuredCourse, scrollProgress }) {
+  const stageRef = useRef(null);
+  const inView = useInView(stageRef, { margin: "120px" });
+  const compact = useMediaQuery("(max-width: 767px)");
+  const finePointer = useMediaQuery("(hover: hover) and (pointer: fine)");
   const [gifFailed, setGifFailed] = useState(false);
 
-  // Gentle 3D tilt that follows the mouse (desktop only)
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [5, -5]), {
-    stiffness: 120,
-    damping: 16,
-  });
-  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-5, 5]), {
-    stiffness: 120,
-    damping: 16,
-  });
-
-  const onMove = (e) => {
-    if (reduce || e.pointerType !== "mouse") return;
-    const r = e.currentTarget.getBoundingClientRect();
-    x.set((e.clientX - r.left) / r.width - 0.5);
-    y.set((e.clientY - r.top) / r.height - 0.5);
-  };
-  const onLeave = () => {
-    x.set(0);
-    y.set(0);
-  };
-
   return (
-    <div className="mx-auto w-full max-w-xl">
-      <motion.div
-        {...(reduce
-          ? {}
-          : {
-              initial: { opacity: 0, scale: 0.97 },
-              animate: { opacity: 1, scale: 1 },
-              transition: { duration: 0.7, delay: 0.15 },
-            })}
-        onPointerMove={onMove}
-        onPointerLeave={onLeave}
-        style={
-          reduce ? undefined : { rotateX, rotateY, transformPerspective: 1200 }
-        }
-        className="relative"
+    <div
+      ref={stageRef}
+      className="relative mx-auto aspect-square w-full max-w-[34rem] lg:max-w-none"
+    >
+      {/* CSS fallback / ambient light behind the canvas keeps layout stable. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-[8%] rounded-full bg-primary/10 blur-3xl"
+      />
+
+      <div aria-hidden="true" className="absolute inset-0">
+        <SceneBoundary>
+          <HeroScene
+            scrollProgress={scrollProgress}
+            reduce={!!reduce}
+            compact={compact}
+            active={inView}
+            pointerEnabled={finePointer && !compact && !reduce}
+          />
+        </SceneBoundary>
+      </div>
+
+      <Float
+        delay={0.4}
+        className="absolute bottom-[4%] left-[2%] w-[56%] sm:w-[50%]"
       >
         <div
-          aria-hidden="true"
-          className="absolute -right-4 -top-4 -z-10 size-28 rounded-full bg-highlight/70"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute -bottom-6 -left-6 -z-10 size-32 rounded-full bg-primary/20 blur-2xl"
-        />
-
-        {/* Editor-style frame around the GIF */}
-        <div className="relative overflow-hidden rounded-3xl border bg-muted shadow-xl">
+          className={`overflow-hidden rounded-xl border ${BORDER} bg-card/95 shadow-lg shadow-black/[0.06]`}
+        >
           <div
             aria-hidden="true"
-            className="flex h-9 items-center gap-1.5 border-b bg-card px-4"
+            className={`flex h-7 items-center gap-1.5 border-b ${BORDER} bg-foreground/[0.03] px-3`}
           >
-            <span className="size-2.5 rounded-full bg-destructive/60" />
-            <span className="size-2.5 rounded-full bg-highlight/80" />
-            <span className="size-2.5 rounded-full bg-primary/60" />
-            <span className="ml-3 truncate rounded-md bg-muted px-3 py-0.5 text-xs text-muted-foreground">
+            <span className="size-1.5 rounded-full bg-foreground/20" />
+            <span className="size-1.5 rounded-full bg-foreground/20" />
+            <span className="size-1.5 rounded-full bg-foreground/20" />
+            <span className="ml-2 truncate text-[10px] text-muted-foreground">
               my-first-project / main
             </span>
           </div>
-
-          <div className="relative aspect-[4/3]">
+          <div className="relative aspect-[4/3] bg-muted/20">
             {gifFailed ? (
               <div
                 aria-hidden="true"
-                className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/15 via-accent to-highlight/20"
+                className="absolute inset-0 grid place-items-center"
               >
-                <FiCode className="size-16 text-primary/70" />
+                <Code2 className="size-10 text-primary/70" />
               </div>
             ) : (
-              // unoptimized: Next.js doesn't optimize animated GIFs, and this keeps them animating
               <Image
                 src={src}
                 alt="Learners building software projects"
                 fill
                 priority
                 unoptimized
-                sizes="(min-width:1024px) 560px, 100vw"
+                sizes="(min-width: 1024px) 300px, 55vw"
                 className="object-cover"
                 onError={() => setGifFailed(true)}
               />
             )}
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background/50 to-transparent"
-            />
           </div>
         </div>
+      </Float>
 
-        <Float className="absolute bottom-6 left-2 sm:-left-8 sm:bottom-8">
-          {" "}
-          <div className="flex items-center gap-3 rounded-xl border bg-card p-2.5 shadow-lg sm:p-3">
-            <span className="grid size-9 place-items-center rounded-lg bg-accent text-primary sm:size-10">
-              <FiCode aria-hidden="true" />
+      <Float delay={1.2} className="absolute right-[2%] top-[10%]">
+        <div
+          className={`flex items-center gap-2.5 rounded-xl border ${BORDER} bg-card/90 p-2.5 backdrop-blur sm:p-3`}
+        >
+          <span className="grid size-8 place-items-center rounded-lg bg-amber-400/15 text-amber-700 dark:text-amber-400 sm:size-9">
+            <Cpu className="size-4 sm:size-5" aria-hidden="true" />
+          </span>
+          <p className="text-sm">
+            <span className="block font-medium">AI learning paths</span>
+            <span className={`hidden text-xs sm:block ${TEXT_MUTED}`}>
+              Agents &amp; automation
             </span>
-            <p className="text-sm">
-              <span className="block font-medium">Build real projects</span>
-              <span className="hidden text-xs text-muted-foreground sm:block">
-                Ship a portfolio
-              </span>
-            </p>
-          </div>
-        </Float>
+          </p>
+        </div>
+      </Float>
 
+      <Float delay={0.8} className="absolute left-0 top-[12%] hidden lg:block">
+        <Terminal reduce={reduce} />
+      </Float>
+
+      {featuredCourse && (
         <Float
-          delay={1.2}
-          className="absolute right-2 top-12 sm:-right-6 sm:top-14"
+          delay={2}
+          className="absolute bottom-[8%] right-[2%] hidden sm:block"
         >
-          {" "}
-          <div className="flex items-center gap-3 rounded-xl border bg-card p-2.5 shadow-lg sm:p-3">
-            <span className="grid size-9 place-items-center rounded-lg bg-highlight/30 text-highlight-foreground sm:size-10">
-              <FiCpu aria-hidden="true" />
-            </span>
-            <p className="text-sm">
-              <span className="block font-medium">AI learning paths</span>
-              <span className="hidden text-xs text-muted-foreground sm:block">
-                Agents & automation
-              </span>
-            </p>
-          </div>
-        </Float>
-
-        <Float
-          delay={1.8}
-          className="absolute -right-4 top-44 hidden sm:block lg:-right-8"
-        >
-          <ProgressCard reduce={reduce} />
-        </Float>
-
-        <Float
-          delay={0.6}
-          className="absolute -left-6 top-24 hidden lg:block xl:-left-12"
-        >
-          <Terminal reduce={reduce} />
-        </Float>
-
-        {featuredCourse && (
-          <Float
-            delay={2.4}
-            className="absolute -bottom-5 right-4 hidden sm:block"
+          <Link
+            href={`/courses/${featuredCourse.slug}`}
+            className={`flex max-w-[14rem] cursor-pointer items-center gap-3 rounded-xl border ${BORDER} bg-card/95 p-3 backdrop-blur hover:border-primary/40 ${FOCUS}`}
           >
-            <Link
-              href={`/courses/${featuredCourse.slug}`}
-              className="flex max-w-[15rem] items-center gap-3 rounded-xl border bg-card p-3 shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <p className="text-sm">
-                <span className="block text-xs text-muted-foreground">
-                  Featured course
-                </span>
-                <span className="line-clamp-2 font-medium">
-                  {featuredCourse.title}
-                </span>
-              </p>
-              <FiArrowUpRight className="shrink-0" aria-hidden="true" />
-            </Link>
-          </Float>
-        )}
-      </motion.div>
-
-      {/* Mobile / tablet: the terminal sits under the image instead of floating */}
-      <div className="mt-8 lg:hidden">
-        <Terminal reduce={reduce} className="w-full" />
-      </div>
+            <p className="text-sm">
+              <span className={`block text-xs ${TEXT_MUTED}`}>
+                Featured course
+              </span>
+              <span className="line-clamp-2 font-medium">
+                {featuredCourse.title}
+              </span>
+            </p>
+            <ArrowUpRight
+              className="size-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+          </Link>
+        </Float>
+      )}
     </div>
   );
 }
 
-/* --------------------------- extra content ---------------------------- */
+/* ------------------------------------------------------------------ */
+/* Sections                                                            */
+/* ------------------------------------------------------------------ */
+function SectionHeading({ reduce, eyebrow, title, text }) {
+  return (
+    <motion.div {...reveal(reduce)} className="max-w-2xl">
+      <p className={LABEL}>{eyebrow}</p>
+      <h2
+        style={{ fontSize: "clamp(1.75rem, 1.3rem + 1.8vw, 2.75rem)" }}
+        className="mt-3 text-balance font-semibold leading-[1.1] tracking-[-0.025em]"
+      >
+        {title}
+      </h2>
+      <p className={`mt-4 max-w-xl leading-7 ${TEXT_MUTED}`}>{text}</p>
+    </motion.div>
+  );
+}
 
 function Highlights({ reduce }) {
   return (
-    <div className="border-t bg-muted/20 py-12 sm:py-16">
+    <div className={`border-t ${BORDER} bg-muted/20 py-16 sm:py-24`}>
       <Container>
-        <motion.div
-          {...reveal(reduce)}
-          className="mx-auto max-w-2xl text-center"
-        >
-          <Badge variant="secondary" className="mb-3">
-            Why ZT Skills Pro
-          </Badge>
-          <h2 className="text-2xl sm:text-3xl">
-            Everything you need to go from beginner to job-ready
-          </h2>
-          <p className="mt-3 text-muted-foreground">
-            Practical lessons, real feedback and a clear path, all in one place.
-          </p>
-        </motion.div>
+        <SectionHeading
+          reduce={reduce}
+          eyebrow="Why Apni University"
+          title="A practical path from curiosity to capability"
+          text="Hands-on lessons, real feedback and a clear sequence, all in one place."
+        />
 
-        <ul className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {highlights.map(({ icon: Icon, title, text }, i) => (
-            <motion.li
+        <ul className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+          {highlights.map(({ icon: Icon, title, text }, index) => (
+            <TiltCard
               key={title}
-              {...reveal(reduce, i * 0.08)}
-              className="group rounded-2xl border bg-card p-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-5"
-            >
-              <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                <Icon aria-hidden="true" className="size-5" />
-              </span>
-              <h3 className="mt-3 font-sans text-sm font-semibold sm:text-base">
-                {title}
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-                {text}
-              </p>
-            </motion.li>
-          ))}
-        </ul>
-
-        {/* How it works */}
-        <ol className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {" "}
-          {steps.map(({ icon: Icon, title, text }, i) => (
-            <motion.li
-              key={title}
-              {...reveal(reduce, i * 0.1)}
-              className="relative overflow-hidden rounded-2xl border bg-card/70 p-5 backdrop-blur"
+              reduce={reduce}
+              delay={index * 0.07}
+              className={`group rounded-2xl border ${BORDER} bg-card p-5 transition-colors duration-300 hover:border-primary/40 motion-reduce:transition-none`}
             >
               <span
-                aria-hidden="true"
-                className="absolute -right-2 -top-4 font-serif text-7xl font-bold text-primary/10"
+                style={reduce ? undefined : { transform: "translateZ(34px)" }}
+                className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none"
               >
-                {i + 1}
+                <Icon className="size-5" aria-hidden="true" />
               </span>
-              <span className="relative grid size-10 place-items-center rounded-xl bg-highlight/30 text-highlight-foreground">
-                <Icon aria-hidden="true" className="size-5" />
-              </span>
-              <h3 className="relative mt-3 font-sans text-base font-semibold">
-                <span className="sr-only">Step {i + 1}: </span>
+              <h3 className="mt-4 text-base font-semibold tracking-tight">
                 {title}
               </h3>
-              <p className="relative mt-1 text-sm text-muted-foreground">
-                {text}
-              </p>
-            </motion.li>
+              <p className={`mt-1.5 text-sm leading-6 ${TEXT_MUTED}`}>{text}</p>
+            </TiltCard>
+          ))}
+        </ul>
+      </Container>
+    </div>
+  );
+}
+
+function JourneyStep({ step, index, progress, reduce }) {
+  const Icon = step.icon;
+  const start = index / steps.length;
+  const emphasis = useTransform(
+    progress,
+    [start, start + 0.5 / steps.length],
+    [0.45, 1],
+  );
+
+  return (
+    <li className="relative pl-14 md:pl-0 md:pt-14">
+      <motion.span
+        whileHover={reduce ? undefined : { rotateY: 180, scale: 1.1 }}
+        transition={{ duration: 0.5 }}
+        style={
+          reduce ? undefined : { opacity: emphasis, transformPerspective: 400 }
+        }
+        className="absolute left-0 top-0 grid size-10 cursor-pointer place-items-center rounded-full border border-primary/50 bg-muted/20 text-primary"
+      >
+        <Icon className="size-5" aria-hidden="true" />
+      </motion.span>
+      <motion.div style={reduce ? undefined : { opacity: emphasis }}>
+        <h3 className="font-semibold tracking-tight">
+          <span className="sr-only">Step {index + 1}: </span>
+          <span
+            aria-hidden="true"
+            className="mr-2 font-mono text-amber-700 dark:text-amber-400"
+          >
+            0{index + 1}
+          </span>
+          {step.title}
+        </h3>
+        <p className={`mt-1.5 max-w-sm text-sm leading-6 ${TEXT_MUTED}`}>
+          {step.text}
+        </p>
+      </motion.div>
+    </li>
+  );
+}
+
+function Journey({ reduce, user, loading }) {
+  const ref = useRef(null);
+  const ctaRef = useRef(null);
+
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start 80%", "end 60%"],
+  });
+  const progress = useSpring(scrollYProgress, {
+    stiffness: 120,
+    damping: 24,
+    mass: 0.4,
+  });
+
+  // CTA card scroll karne par neeche se seedha hota hai (3D)
+  const { scrollYProgress: ctaProgress } = useScroll({
+    target: ctaRef,
+    offset: ["start 95%", "start 60%"],
+  });
+  const ctaRotate = useTransform(ctaProgress, [0, 1], [18, 0]);
+  const ctaScale = useTransform(ctaProgress, [0, 1], [0.94, 1]);
+
+  return (
+    <div className={`border-t ${BORDER} bg-muted/20 py-16 sm:py-24`}>
+      <Container>
+        <SectionHeading
+          reduce={reduce}
+          eyebrow="How it works"
+          title="Three steps, one clear direction"
+          text="Start with a path, build something real, then show what you can do."
+        />
+
+        <ol
+          ref={ref}
+          className="relative mt-12 grid gap-10 md:grid-cols-3 md:gap-8"
+        >
+          <span
+            aria-hidden="true"
+            className="absolute bottom-5 left-5 top-5 w-px bg-foreground/10 md:hidden"
+          >
+            <motion.span
+              style={reduce ? undefined : { scaleY: progress }}
+              className="block h-full w-full origin-top bg-primary"
+            />
+          </span>
+          <span
+            aria-hidden="true"
+            className="absolute left-5 right-5 top-5 hidden h-px bg-foreground/10 md:block"
+          >
+            <motion.span
+              style={reduce ? undefined : { scaleX: progress }}
+              className="block h-full w-full origin-left bg-primary"
+            />
+          </span>
+
+          {steps.map((step, index) => (
+            <JourneyStep
+              key={step.title}
+              step={step}
+              index={index}
+              progress={progress}
+              reduce={reduce}
+            />
           ))}
         </ol>
 
-        <motion.div
-          {...reveal(reduce, 0.1)}
-          className="mt-10 flex flex-col items-center justify-between gap-4 rounded-2xl border bg-gradient-to-r from-primary/10 via-card to-highlight/20 p-6 text-center sm:flex-row sm:text-left"
-        >
-          <div>
-            <p className="font-serif text-xl">Ready to start building?</p>
-            <p className="text-sm text-muted-foreground">
-              Create a free account and pick your first course today.
-            </p>
-          </div>
-          <Link
-            href="/register"
-            className={buttonVariants({
-              size: "lg",
-              className: "w-full sm:w-auto",
-            })}
-          >
-            Create free account
-            <FiArrowRight aria-hidden="true" />
-          </Link>
-        </motion.div>
-      </Container>
-    </div>
-  );
-}
-
-function TechMarquee({ reduce }) {
-  const items = reduce ? stack : [...stack, ...stack];
-  return (
-    <div className="border-t bg-muted/30 py-5">
-      <Container>
-        <p className="mb-3 text-center text-sm text-muted-foreground">
-          Tools you&apos;ll use in our courses
-        </p>
-        <div className="overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
-          <motion.ul
-            className={
+        <div className="mt-14 [perspective:1000px]">
+          <motion.div
+            ref={ctaRef}
+            style={
               reduce
-                ? "flex flex-wrap justify-center gap-x-8 gap-y-3"
-                : "flex w-max"
+                ? undefined
+                : {
+                    rotateX: ctaRotate,
+                    scale: ctaScale,
+                    transformOrigin: "50% 100%",
+                  }
             }
-            animate={reduce ? undefined : { x: ["0%", "-50%"] }}
-            transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
+            className={`flex flex-col items-center justify-between gap-5 rounded-2xl border ${BORDER} bg-card p-6 text-center sm:flex-row sm:text-left sm:p-8`}
           >
-            {items.map(({ name, icon: Icon }, idx) => (
-              <li
-                key={`${name}-${idx}`}
-                aria-hidden={idx >= stack.length ? true : undefined}
-                className={`flex items-center gap-2 text-muted-foreground ${
-                  reduce ? "" : "pr-10"
-                }`}
-              >
-                <Icon className="size-5" aria-hidden="true" />
-                <span className="text-sm font-medium">{name}</span>
-              </li>
-            ))}
-          </motion.ul>
+            <div>
+              <p className="text-xl font-semibold tracking-tight">
+                {user
+                  ? `Welcome back, ${getFirstName(user)}!`
+                  : "Ready to start building?"}
+              </p>
+              <p className={`mt-1 text-sm ${TEXT_MUTED}`}>
+                Head to your dashboard and continue where you left off.
+              </p>
+            </div>
+            <AuthCta
+              user={user}
+              loading={loading}
+              className="w-full sm:w-auto"
+            />
+          </motion.div>
         </div>
       </Container>
     </div>
   );
 }
 
-/* ------------------------------- section ------------------------------ */
-
+/* ------------------------------------------------------------------ */
+/* Hero                                                                */
+/* ------------------------------------------------------------------ */
 export function HeroSection({ stats = [], featuredCourse = null, gifSrc }) {
   const reduce = useReducedMotion();
+  const heroRef = useRef(null);
 
-  // Online GIF: prop > env var > local config fallback.
+  const { user, loading } = useCurrentUser();
+
+  const safeStats = Array.isArray(stats) ? stats : [];
+
+  // Source priority: prop > environment variable > local media config.
   const src =
     gifSrc || process.env.NEXT_PUBLIC_HERO_GIF_URL || mediaConfig.heroGif;
 
-  // Soft light that follows the mouse (desktop only)
-  const mx = useMotionValue(-600);
-  const my = useMotionValue(-600);
-  const spotlight = useMotionTemplate`radial-gradient(480px circle at ${mx}px ${my}px, color-mix(in oklab, var(--primary) 14%, transparent), transparent 70%)`;
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const stageY = useTransform(scrollYProgress, [0, 1], [0, 70]);
+  const glowY = useTransform(scrollYProgress, [0, 1], [0, -60]);
 
-  const onMove = (e) => {
-    if (reduce || e.pointerType !== "mouse") return;
-    const r = e.currentTarget.getBoundingClientRect();
-    mx.set(e.clientX - r.left);
-    my.set(e.clientY - r.top);
+  const mouseX = useMotionValue(-600);
+  const mouseY = useMotionValue(-600);
+  const spotlight = useMotionTemplate`radial-gradient(480px circle at ${mouseX}px ${mouseY}px, color-mix(in oklab, var(--primary) 8%, transparent), transparent 70%)`;
+
+  const handlePointerMove = (event) => {
+    if (reduce || event.pointerType !== "mouse") return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    mouseX.set(event.clientX - rect.left);
+    mouseY.set(event.clientY - rect.top);
   };
 
-  const enter = (delay = 0) =>
-    reduce
-      ? {}
-      : {
-          initial: { opacity: 0, y: 16 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.55, delay, ease: EASE },
-        };
+  const enter = (delay = 0) => {
+    if (reduce) return {};
+
+    return {
+      initial: { opacity: 0, y: 14 },
+      animate: { opacity: 1, y: 0 },
+      transition: { duration: 0.6, delay, ease: EASE },
+    };
+  };
+
+  const line = (delay = 0) => {
+    if (reduce) return {};
+
+    return {
+      initial: { y: "110%" },
+      animate: { y: 0 },
+      transition: { duration: 0.85, delay, ease: EASE },
+    };
+  };
 
   return (
     <section
-      className="relative max-w-full overflow-x-clip border-b"
+      className="relative isolate max-w-full overflow-x-clip bg-background text-foreground"
       aria-labelledby="hero-title"
-      onPointerMove={onMove}
     >
-      {/* Background: dots, spotlight and drifting glows */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 -z-10 opacity-60 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:linear-gradient(to_bottom,black_60%,transparent)]"
-      />
-      <motion.div
-        aria-hidden="true"
-        style={{ background: spotlight }}
-        className="pointer-events-none absolute inset-0 -z-10"
-      />
-      <motion.div
-        aria-hidden="true"
-        animate={reduce ? undefined : { x: [0, 40, 0], y: [0, 30, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -left-24 top-0 -z-10 size-96 rounded-full bg-primary/10 blur-3xl"
-      />
-      <motion.div
-        aria-hidden="true"
-        animate={reduce ? undefined : { x: [0, -40, 0], y: [0, -30, 0] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -right-24 bottom-0 -z-10 size-96 rounded-full bg-highlight/20 blur-3xl"
-      />
+      <div ref={heroRef} className="relative" onPointerMove={handlePointerMove}>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 opacity-40 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:28px_28px] [mask-image:linear-gradient(to_bottom,black_50%,transparent)]"
+        />
+        <motion.div
+          aria-hidden="true"
+          style={{ background: spotlight }}
+          className="pointer-events-none absolute inset-0 -z-10"
+        />
+        <motion.div
+          aria-hidden="true"
+          style={reduce ? undefined : { y: glowY }}
+          className="pointer-events-none absolute -left-48 -top-40 -z-10 size-[30rem] rounded-full bg-primary/10 blur-3xl"
+        />
+        <motion.div
+          aria-hidden="true"
+          style={reduce ? undefined : { y: glowY }}
+          className="pointer-events-none absolute -bottom-32 -right-40 -z-10 size-[26rem] rounded-full bg-amber-400/10 blur-3xl"
+        />
 
-      <Container className="grid grid-cols-1 items-center gap-12 py-10 sm:py-16 lg:grid-cols-2 lg:py-24">
-        <div className="min-w-0">
-          <motion.div {...enter(0)}>
-            <Badge variant="secondary" className="mb-5 gap-2">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/60 motion-reduce:animate-none" />
-                <span className="relative inline-flex size-2 rounded-full bg-primary" />
-              </span>
-              Technology-first learning
-            </Badge>
-          </motion.div>
+        <Container className="grid grid-cols-1 items-center gap-12 py-14 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-24">
+          <div className="min-w-0">
+            <motion.p {...enter(0)} className={`mb-6 ${LABEL}`}>
+              Apni University · Technology-first learning
+            </motion.p>
 
-          <motion.h1
-            id="hero-title"
-            {...enter(0.08)}
-            className="text-4xl leading-[1.05] sm:text-5xl lg:text-6xl"
-          >
-            Learn Skills.
-            <br />
-            <motion.span
-              animate={
-                reduce
-                  ? undefined
-                  : { backgroundPosition: ["0% 50%", "200% 50%"] }
-              }
-              transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-              className="inline-block bg-gradient-to-r from-primary via-highlight to-primary bg-[length:200%_100%] bg-clip-text text-transparent"
+            <h1
+              id="hero-title"
+              style={{ fontSize: "clamp(2.5rem, 1.5rem + 4.4vw, 4.75rem)" }}
+              className="max-w-3xl font-semibold leading-[1.02] tracking-[-0.035em]"
             >
-              Build Your Future.
-            </motion.span>
-          </motion.h1>
+              <span className="block overflow-hidden pb-[0.1em]">
+                <motion.span className="block" {...line(0.05)}>
+                  Build the Skills
+                </motion.span>
+              </span>
+              <span className="block overflow-hidden pb-[0.1em]">
+                <motion.span className="block" {...line(0.16)}>
+                  That Shape <span className="text-primary">Tomorrow</span>
+                  <span className="text-amber-500">.</span>
+                </motion.span>
+              </span>
+            </h1>
 
-          <motion.div {...enter(0.14)}>
-            <RotatingRole reduce={reduce} />
-          </motion.div>
+            {/* Har 4 second baad type hone wala content + uska button */}
+            <motion.div {...enter(0.3)}>
+              <TypeRotator reduce={reduce} />
+            </motion.div>
 
-          <motion.p
-            {...enter(0.2)}
-            className="mt-5 max-w-xl text-base text-muted-foreground sm:text-lg"
-          >
-            Master practical technology skills, build real projects, explore AI,
-            and prepare for the future of work.
-          </motion.p>
+            <motion.div
+              {...enter(0.38)}
+              className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap"
+            >
+              <AuthCta
+                user={user}
+                loading={loading}
+                className="shadow-md shadow-primary/25"
+              />
+              <Link
+                href="#learning-paths"
+                className={`inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border ${BORDER} bg-foreground/[0.03] px-6 text-sm font-semibold text-foreground transition-colors duration-200 hover:border-primary/50 motion-reduce:transition-none ${FOCUS}`}
+              >
+                Explore Learning Paths
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
+              <Link
+                href="/courses"
+                className={`inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border ${BORDER} bg-foreground/[0.03] px-6 text-sm font-semibold text-foreground transition-colors duration-200 hover:border-primary/50 motion-reduce:transition-none ${FOCUS}`}
+              >
+                Explore Courses
+              </Link>
+            </motion.div>
+
+            <motion.ul
+              {...enter(0.44)}
+              className={`mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm ${TEXT_MUTED}`}
+            >
+              {perks.map((perk) => (
+                <li key={perk} className="flex items-center gap-1.5">
+                  <Check className="size-4 text-primary" aria-hidden="true" />
+                  {perk}
+                </li>
+              ))}
+            </motion.ul>
+
+            <motion.div {...enter(0.5)}>
+              <PathSwitcher reduce={reduce} />
+            </motion.div>
+
+            {safeStats.length > 0 && (
+              <motion.dl
+                {...enter(0.56)}
+                className="mt-8 grid grid-cols-3 gap-2.5 sm:gap-3"
+              >
+                {safeStats.map((stat) => (
+                  <Tilt3D
+                    key={stat.label}
+                    reduce={reduce}
+                    max={8}
+                    className={`rounded-xl border ${BORDER} bg-foreground/[0.03] p-3 sm:p-4`}
+                  >
+                    <dt className={`text-xs sm:text-sm ${TEXT_MUTED}`}>
+                      {stat.label}
+                    </dt>
+                    <dd className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+                      <CountUp value={stat.value} reduce={reduce} />
+                    </dd>
+                  </Tilt3D>
+                ))}
+              </motion.dl>
+            )}
+          </div>
 
           <motion.div
-            {...enter(0.26)}
-            className="mt-8 flex flex-col gap-3 sm:flex-row"
+            style={reduce ? undefined : { y: stageY }}
+            className="min-w-0"
           >
-            <Link href="/courses" className={buttonVariants({ size: "lg" })}>
-              Explore Courses
-              <FiArrowRight aria-hidden="true" />
-            </Link>
-            <Link
-              href="/register"
-              className={buttonVariants({ size: "lg", variant: "outline" })}
-            >
-              Start Learning
-            </Link>
+            <Stage
+              reduce={reduce}
+              src={src}
+              featuredCourse={featuredCourse}
+              scrollProgress={scrollYProgress}
+            />
           </motion.div>
-
-          <motion.ul
-            {...enter(0.3)}
-            className="mt-5 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground"
-          >
-            {perks.map((p) => (
-              <li key={p} className="flex items-center gap-1.5">
-                <FiCheck className="text-primary" aria-hidden="true" />
-                {p}
-              </li>
-            ))}
-          </motion.ul>
-
-          <SocialProof reduce={reduce} />
-
-          <motion.div {...enter(0.4)}>
-            <PathSwitcher reduce={reduce} />
-          </motion.div>
-
-          {stats.length > 0 && (
-            <motion.dl
-              {...enter(0.48)}
-              className="mt-10 grid grid-cols-3 gap-3 sm:gap-4"
-            >
-              {stats.map((s) => (
-                <div
-                  key={s.label}
-                  className="rounded-xl border bg-card/60 p-3 text-center backdrop-blur sm:p-4 sm:text-left"
-                >
-                  <dt className="text-xs text-muted-foreground sm:text-sm">
-                    {s.label}
-                  </dt>
-                  <dd className="font-serif text-xl font-semibold sm:text-2xl">
-                    <CountUp value={s.value} reduce={reduce} />
-                  </dd>
-                </div>
-              ))}
-            </motion.dl>
-          )}
-        </div>
-        <div className="mx-auto w-full min-w-0 max-w-xl">
-          <Visual reduce={reduce} src={src} featuredCourse={featuredCourse} />
-        </div>
-      </Container>
+        </Container>
+      </div>
 
       <Highlights reduce={reduce} />
-      <TechMarquee reduce={reduce} />
+      <Journey reduce={reduce} user={user} loading={loading} />
     </section>
   );
 }

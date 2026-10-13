@@ -11,39 +11,93 @@ import {
   useSpring,
   useTransform,
 } from "framer-motion";
-import {
-  Braces,
-  Cloud,
-  Code, 
-  Cpu,
-  Database,
-  Lightbulb,
-  Rocket,
-  Sparkles,
-  Terminal,
-} from "lucide-react";
+import { Cloud, Code, Cpu, Database, Terminal } from "lucide-react";
 
-// Fixed positions (no Math.random) so server and client HTML always match.
-const FLOATERS = [
-  { Icon: Code, left: "5%", size: 26, dur: 34, delay: 0 },
-  { Icon: Braces, left: "14%", size: 20, dur: 40, delay: 9 },
-  { Icon: Terminal, left: "24%", size: 24, dur: 36, delay: 4 },
-  { Icon: Cpu, left: "35%", size: 28, dur: 44, delay: 14 },
-  { Icon: Database, left: "46%", size: 20, dur: 38, delay: 2 },
-  { Icon: Cloud, left: "57%", size: 30, dur: 42, delay: 11 },
-  { Icon: Rocket, left: "68%", size: 24, dur: 35, delay: 6 },
-  { Icon: Lightbulb, left: "78%", size: 22, dur: 41, delay: 17 },
-  { Icon: Sparkles, left: "88%", size: 20, dur: 33, delay: 8 },
-  { Icon: Code, left: "95%", size: 18, dur: 39, delay: 21 },
+// Fixed data (no Math.random) so server and client HTML always match.
+// Coordinates are for a 1440 x 900 viewBox.
+const NODES = [
+  [120, 140],
+  [330, 260],
+  [210, 470],
+  [420, 640],
+  [640, 120],
+  [900, 230],
+  [1120, 110],
+  [1300, 300],
+  [1180, 520],
+  [980, 680],
+  [760, 560],
+  [560, 420],
+  [150, 800],
+  [1350, 780],
+  [820, 840],
 ];
+
+// [from, to, animated flow?]
+const EDGES = [
+  [0, 1, true],
+  [1, 2, false],
+  [2, 3, true],
+  [1, 4, false],
+  [4, 5, true],
+  [5, 6, false],
+  [6, 7, true],
+  [7, 8, false],
+  [8, 9, true],
+  [9, 10, false],
+  [10, 11, true],
+  [11, 1, false],
+  [11, 3, false],
+  [5, 10, false],
+  [3, 12, true],
+  [9, 13, false],
+  [10, 14, false],
+];
+
+// Nodes that softly pulse (kept few on purpose).
+const PULSING = new Set([1, 5, 8, 10, 3]);
+
+// Small signals that travel along real edges of the network.
+const SIGNALS = [
+  { d: "M120 140 L330 260 L640 120 L900 230 L1120 110", dur: 16, begin: 0 },
+  { d: "M1300 300 L1180 520 L980 680 L760 560 L560 420", dur: 19, begin: 4 },
+  { d: "M150 800 L420 640 L560 420 L330 260", dur: 17, begin: 9 },
+];
+
+// A few faint tech icons (md and up only).
+const ICONS = [
+  { Icon: Code, className: "left-[6%] top-[22%]", size: 26, delay: 0 },
+  { Icon: Cpu, className: "right-[8%] top-[14%]", size: 30, delay: 2 },
+  { Icon: Cloud, className: "left-[12%] bottom-[18%]", size: 30, delay: 4 },
+  { Icon: Terminal, className: "right-[12%] bottom-[24%]", size: 26, delay: 1 },
+  { Icon: Database, className: "left-[48%] top-[8%]", size: 22, delay: 3 },
+];
+
+// CSS animations only run when the user has not asked for reduced motion.
+const KEYFRAMES = `
+@keyframes sb-drift-a { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(8vw,6vh,0) scale(1.12); } }
+@keyframes sb-drift-b { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-7vw,-5vh,0) scale(1.08); } }
+@keyframes sb-drift-c { 0%,100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(6vw,-4vh,0); } }
+@keyframes sb-pulse { 0%,100% { opacity: .3; } 50% { opacity: 1; } }
+@keyframes sb-flow { to { stroke-dashoffset: -48; } }
+@keyframes sb-float { 0%,100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-12px,0); } }
+@media (prefers-reduced-motion: no-preference) {
+  .sb-a { animation: sb-drift-a 30s ease-in-out infinite; will-change: transform; }
+  .sb-b { animation: sb-drift-b 36s ease-in-out infinite; will-change: transform; }
+  .sb-c { animation: sb-drift-c 42s ease-in-out infinite; will-change: transform; }
+  .sb-pulse { animation: sb-pulse 4.5s ease-in-out infinite; }
+  .sb-flow { animation: sb-flow 7s linear infinite; }
+  .sb-float { animation: sb-float 12s ease-in-out infinite; will-change: transform; }
+}
+`;
 
 export function SiteBackground() {
   const reduce = useReducedMotion();
 
-  // Parallax: the glows drift slowly as the page scrolls
+  // Parallax: layers drift at different speeds as the page scrolls
   const { scrollYProgress } = useScroll();
-  const parallaxA = useTransform(scrollYProgress, [0, 1], ["0vh", "-35vh"]);
-  const parallaxB = useTransform(scrollYProgress, [0, 1], ["0vh", "25vh"]);
+  const auroraY = useTransform(scrollYProgress, [0, 1], ["0vh", "-25vh"]);
+  const networkY = useTransform(scrollYProgress, [0, 1], ["0vh", "-8vh"]);
 
   // Soft spotlight that follows the mouse (desktop only)
   const mx = useMotionValue(-1000);
@@ -67,86 +121,154 @@ export function SiteBackground() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      // Blue / sky / gold accents per theme. Intensities are lower in light mode.
+      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden [--bg-a:0.13] [--bg-blue:37_99_235] [--bg-gold:245_184_46] [--bg-icon:0.2] [--bg-line:0.16] [--bg-sky:14_165_233] dark:[--bg-a:0.2] dark:[--bg-blue:79_140_255] dark:[--bg-gold:255_200_87] dark:[--bg-icon:0.28] dark:[--bg-line:0.26] dark:[--bg-sky:141_203_255]"
     >
-      {/* Dotted grid, fades out towards the edges */}
-      <div className="absolute inset-0 text-foreground/[0.06] [background-image:radial-gradient(currentColor_1px,transparent_1px)] [background-size:26px_26px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
+      <style>{KEYFRAMES}</style>
 
       {/* Top light */}
-      <div className="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-primary/10 to-transparent" />
+      <div
+        className="absolute inset-x-0 top-0 h-80"
+        style={{
+          background:
+            "linear-gradient(to bottom, rgb(var(--bg-blue) / calc(var(--bg-a) * 0.7)), transparent)",
+        }}
+      />
 
-      {/* Aurora blobs: outer = scroll parallax, inner = slow drifting */}
-      <motion.div style={{ y: parallaxA }} className="absolute -left-40 -top-24">
-        <motion.div
-          animate={
-            reduce
-              ? undefined
-              : { x: [0, 120, 0], y: [0, 60, 0], scale: [1, 1.2, 1] }
-          }
-          transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-          className="size-[32rem] rounded-full bg-primary/15 blur-3xl will-change-transform"
+      {/* Aurora glows (gradients, not blur filters: cheap to animate) */}
+      <motion.div
+        style={reduce ? undefined : { y: auroraY }}
+        className="absolute inset-0"
+      >
+        <div
+          className="sb-a absolute -left-[25vmax] -top-[30vmax] size-[75vmax]"
+          style={{
+            background:
+              "radial-gradient(closest-side, rgb(var(--bg-blue) / calc(var(--bg-a) * 1.3)), transparent)",
+          }}
+        />
+        <div
+          className="sb-b absolute -right-[28vmax] top-[22%] size-[70vmax]"
+          style={{
+            background:
+              "radial-gradient(closest-side, rgb(var(--bg-sky) / calc(var(--bg-a) * 1.1)), transparent)",
+          }}
+        />
+        <div
+          className="sb-c absolute -bottom-[30vmax] left-[18%] size-[50vmax]"
+          style={{
+            background:
+              "radial-gradient(closest-side, rgb(var(--bg-gold) / calc(var(--bg-a) * 0.55)), transparent)",
+          }}
         />
       </motion.div>
 
-      <motion.div style={{ y: parallaxB }} className="absolute -right-40 top-1/3">
-        <motion.div
-          animate={
-            reduce
-              ? undefined
-              : { x: [0, -110, 0], y: [0, -70, 0], scale: [1.1, 0.9, 1.1] }
-          }
-          transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
-          className="size-[30rem] rounded-full bg-primary/10 blur-3xl will-change-transform"
-        />
+      {/* Fine dot grid, fades out in the middle so text stays readable */}
+      <div
+        className="absolute inset-0 text-foreground opacity-[0.07]"
+        style={{
+          backgroundImage: "radial-gradient(currentColor 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+          maskImage:
+            "radial-gradient(ellipse at center, transparent 20%, black 85%)",
+          WebkitMaskImage:
+            "radial-gradient(ellipse at center, transparent 20%, black 85%)",
+        }}
+      />
+
+      {/* Knowledge-node network with scroll parallax */}
+      <motion.div
+        style={reduce ? undefined : { y: networkY }}
+        className="absolute inset-x-0 -bottom-[10vh] -top-[10vh]"
+      >
+        <svg
+          viewBox="0 0 1440 900"
+          preserveAspectRatio="xMidYMid slice"
+          className="size-full [mask-image:radial-gradient(ellipse_at_center,rgba(0,0,0,0.3),black_85%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,rgba(0,0,0,0.3),black_85%)]"
+          style={{ color: "rgb(var(--bg-blue))" }}
+          fill="none"
+        >
+          {EDGES.map(([a, b, flow]) => (
+            <line
+              key={`${a}-${b}`}
+              x1={NODES[a][0]}
+              y1={NODES[a][1]}
+              x2={NODES[b][0]}
+              y2={NODES[b][1]}
+              stroke="currentColor"
+              strokeWidth="1.25"
+              strokeDasharray={flow ? "4 8" : undefined}
+              className={flow ? "sb-flow" : undefined}
+              style={{ strokeOpacity: "var(--bg-line)" }}
+            />
+          ))}
+
+          {NODES.map(([cx, cy], i) => (
+            <circle
+              key={i}
+              cx={cx}
+              cy={cy}
+              r={4}
+              fill="currentColor"
+              className={PULSING.has(i) ? "sb-pulse" : undefined}
+              style={{
+                opacity: 0.5,
+                animationDelay: PULSING.has(i) ? `${i * 0.5}s` : undefined,
+              }}
+            />
+          ))}
+
+          {/* Signals travelling along the lines (skipped for reduced motion) */}
+          {!reduce &&
+            SIGNALS.map((s) => (
+              <g key={s.d} style={{ color: "rgb(var(--bg-gold))" }}>
+                <circle r="9" fill="currentColor" opacity="0.18">
+                  <animateMotion
+                    dur={`${s.dur}s`}
+                    begin={`${s.begin}s`}
+                    repeatCount="indefinite"
+                    path={s.d}
+                  />
+                </circle>
+                <circle r="3.5" fill="currentColor" opacity="0.9">
+                  <animateMotion
+                    dur={`${s.dur}s`}
+                    begin={`${s.begin}s`}
+                    repeatCount="indefinite"
+                    path={s.d}
+                  />
+                </circle>
+              </g>
+            ))}
+        </svg>
       </motion.div>
 
-      <motion.div style={{ y: parallaxA }} className="absolute bottom-0 left-1/3">
-        <motion.div
-          animate={
-            reduce
-              ? undefined
-              : { x: [0, 90, -60, 0], y: [0, -50, 40, 0] }
-          }
-          transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
-          className="size-[26rem] rounded-full bg-primary/10 blur-3xl will-change-transform"
-        />
-      </motion.div>
+      {/* A few faint tech icons (md and up) */}
+      {ICONS.map(({ Icon, className, size, delay }) => (
+        <span
+          key={className}
+          className={`sb-float absolute hidden md:block ${className}`}
+          style={{
+            color: "rgb(var(--bg-blue) / var(--bg-icon))",
+            animationDelay: `${delay}s`,
+          }}
+        >
+          <Icon style={{ width: size, height: size }} />
+        </span>
+      ))}
 
       {/* Spotlight that follows the cursor */}
       {!reduce && (
         <motion.div
-          style={{ x: sx, y: sy }}
-          className="absolute left-0 top-0 -ml-48 -mt-48 size-96 rounded-full bg-primary/15 blur-3xl"
+          style={{
+            x: sx,
+            y: sy,
+            background:
+              "radial-gradient(closest-side, rgb(var(--bg-blue) / calc(var(--bg-a) * 1.1)), transparent)",
+          }}
+          className="absolute left-0 top-0 -ml-64 -mt-64 size-[32rem] rounded-full"
         />
       )}
-
-      {/* Tech icons rising slowly through the whole screen */}
-      {!reduce &&
-        FLOATERS.map(({ Icon, left, size, dur, delay }, i) => (
-          <motion.span
-            key={`${left}-${i}`}
-            className={`absolute -bottom-12 text-primary/25 ${
-              i % 2 ? "hidden md:block" : ""
-            }`}
-            style={{ left }}
-            initial={{ y: 0, opacity: 0 }}
-            animate={{
-              y: ["0vh", "-120vh"],
-              x: [0, 18, -12, 10, 0],
-              rotate: [0, 14, -10, 12, 0],
-              opacity: [0, 0.9, 0.9, 0],
-            }}
-            transition={{
-              duration: dur,
-              delay,
-              repeat: Infinity,
-              ease: "linear",
-              times: [0, 0.15, 0.85, 1],
-            }}
-          >
-            <Icon style={{ width: size, height: size }} />
-          </motion.span>
-        ))}
     </div>
   );
 }

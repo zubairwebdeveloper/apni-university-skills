@@ -1,3 +1,4 @@
+// app/(public)/page.jsx
 import { courseService } from "@/services/courseService";
 import { categoryService } from "@/services/categoryService";
 import { instructorService } from "@/services/instructorService";
@@ -11,6 +12,7 @@ import { TechStrip } from "@/components/public/home/TechStrip";
 import {
   PopularCategories,
   FeaturedCourses,
+  HowItWorks,
   JobsSection,
   FeaturedInstructors,
   Testimonials,
@@ -27,11 +29,8 @@ import {
 } from "@/components/public/home/EditorialSections";
 import { Newsletter } from "@/components/public/Newsletter";
 import { CTASection } from "@/components/public/CTASection";
-import {
-  TechMarquee,
-  LearningPaths as TechLearningPaths,
-} from "@/components/public/home/TechSections";
-import { HowItWorks } from "@/components/public/home/DataSections";
+import { TechMarquee } from "@/components/public/home/TechSections";
+
 export const revalidate = 300; // ISR: fresh every 5 minutes, served statically in between
 
 export const metadata = {
@@ -41,6 +40,8 @@ export const metadata = {
 };
 
 export default async function HomePage() {
+  // Every request has a fallback, so one failing service never breaks the
+  // page (for example `courses[0]` below needs an array).
   const [
     stats,
     categories,
@@ -51,19 +52,22 @@ export default async function HomePage() {
     posts,
     techPosts,
   ] = await Promise.all([
-    safe(statsService.getPublicStats()),
-    safe(categoryService.getFeaturedCategories(8)),
-    safe(courseService.getFeaturedCourses(8)),
-    safe(instructorService.getFeaturedInstructors(4)),
-    safe(jobService.getLatestJobs(4)),
-    safe(reviewService.getLatestApproved(3)),
-    safe(blogService.getLatestPosts(3)),
-    safe(blogService.getLatestPosts(3, { tag: "technology" })),
+    safe(statsService.getPublicStats(), null),
+    safe(categoryService.getFeaturedCategories(8), []),
+    safe(courseService.getFeaturedCourses(8), []),
+    safe(instructorService.getFeaturedInstructors(4), []),
+    safe(jobService.getLatestJobs(4), []),
+    safe(reviewService.getLatestApproved(3), []),
+    safe(blogService.getLatestPosts(3), []),
+    safe(blogService.getLatestPosts(3, { tag: "technology" }), []),
   ]);
 
   return (
     <>
-      <HeroSection stats={stats} featuredCourse={courses[0] ?? null} />
+      <HeroSection
+        stats={Array.isArray(stats) ? stats : []}
+        featuredCourse={courses[0] ?? null}
+      />{" "}
       <TechStrip />
       <TechMarquee />
       <PopularCategories categories={categories} />
@@ -99,4 +103,3 @@ export default async function HomePage() {
     </>
   );
 }
-

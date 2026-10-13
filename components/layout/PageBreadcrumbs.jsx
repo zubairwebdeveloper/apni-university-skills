@@ -1,5 +1,5 @@
 // components/layout/PageBreadcrumbs.jsx
-// shadcn's BreadcrumbLink would need asChild to use next/link. Instead the Link goes straight inside BreadcrumbItem.
+// shadcn's BreadcrumbLink would need  to use next/link. Instead the Link goes straight inside BreadcrumbItem.
 import { Fragment } from "react";
 import Link from "next/link";
 import {

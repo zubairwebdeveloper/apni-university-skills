@@ -1,27 +1,33 @@
-// components/auth/PasswordInput.jsx: the toggle is a sibling of the input, never nested
 "use client";
+
 import { useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export function PasswordInput(props) {
+export function PasswordInput({ className, type, ...props }) {
   const [show, setShow] = useState(false);
+
   return (
-    <div className="relative">
-      <Input {...props} type={show ? "text" : "password"} className="pr-11" />
-      <Button
+    <div className="relative w-full min-w-0">
+      <Input
+        {...props}
+        type={show ? "text" : "password"}
+        className={`w-full pr-12 ${className ?? ""}`}
+      />
+
+      <button
         type="button"
-        variant="ghost"
-        size="icon"
-        className="absolute right-1 top-1/2 size-8 -translate-y-1/2"
-        onClick={() => setShow((s) => !s)}
+        onClick={() => setShow((current) => !current)}
         aria-label={show ? "Hide password" : "Show password"}
         aria-pressed={show}
+        className="absolute right-0 top-1/2 z-10 flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {show ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
-      </Button>
+        {show ? (
+          <FiEyeOff aria-hidden="true" className="size-[18px]" />
+        ) : (
+          <FiEye aria-hidden="true" className="size-[18px]" />
+        )}
+      </button>
     </div>
   );
 }
-

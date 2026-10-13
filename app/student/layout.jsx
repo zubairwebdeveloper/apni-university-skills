@@ -29,7 +29,9 @@ export default async function StudentLayout({ children }) {
         sidebar={<StudentSidebar person={person} />}
         header={<StudentHeader person={person} />}
       >
+        <div>
         {children}
+        </div>
       </StudentShell>
     </SidebarProvider>
   );

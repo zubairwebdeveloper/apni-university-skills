@@ -1,5 +1,7 @@
 // app/admin/lessons/[slug]/edit/page.jsx
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { FiArrowLeft } from "react-icons/fi";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LessonForm } from "@/components/admin/lessons/LessonForm";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -33,6 +35,14 @@ export default async function EditLessonPage({ params, searchParams }) {
   ];
   return (
     <>
+      {/* Back to this course's lessons, not the generic list */}
+      <Link
+        href={`/admin/lessons?course=${encodeURIComponent(course.slug)}`}
+        className="mb-4 inline-flex min-h-9 items-center gap-1.5 rounded-md text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+      >
+        <FiArrowLeft aria-hidden="true" className="size-4" />
+        Back to lessons
+      </Link>
       <AdminPageHeader
         title={`Edit ${record.title}`}
         description={course.title}

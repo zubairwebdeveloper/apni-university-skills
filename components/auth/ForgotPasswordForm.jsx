@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { sendPasswordResetEmail } from "firebase/auth";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
   CircleAlert,
@@ -60,30 +61,42 @@ function BackToLogin() {
       href="/login"
       className={buttonVariants({
         variant: "ghost",
-        className: "w-full text-muted-foreground",
+        className:
+          "group w-full text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
       })}
     >
-      <ArrowLeft />
+      <ArrowLeft className="transition-transform duration-200 group-hover:-translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" />
       Back to log in
     </Link>
   );
 }
 
 function AuthCard({ icon: Icon, title, description, children, footer }) {
+  const reduce = useReducedMotion();
+
   return (
-    <Card className="w-full max-w-md shadow-sm">
-      <CardHeader className="items-center text-center">
-        <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Icon className="size-6" aria-hidden="true" />
-        </div>
-        <CardTitle className="text-xl">{title}</CardTitle>
-        <CardDescription className="text-balance">
-          {description}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-      {footer && <CardFooter className="flex-col gap-2">{footer}</CardFooter>}
-    </Card>
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="w-full max-w-md"
+    >
+      <Card className="w-full border-border bg-card text-card-foreground shadow-lg shadow-foreground/5">
+        <CardHeader className="items-center text-center">
+          <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
+            <Icon className="size-6" aria-hidden="true" />
+          </div>
+          <CardTitle className="text-xl font-semibold tracking-tight">
+            {title}
+          </CardTitle>
+          <CardDescription className="text-balance">
+            {description}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>{children}</CardContent>
+        {footer && <CardFooter className="flex-col gap-2">{footer}</CardFooter>}
+      </Card>
+    </motion.div>
   );
 }
 
@@ -135,7 +148,7 @@ export function ForgotPasswordForm() {
     }
   }
 
-  function useAnotherEmail() {
+  function changeEmail() {
     setSentTo("");
     setError("");
     setCooldown(0);
@@ -144,13 +157,16 @@ export function ForgotPasswordForm() {
   if (sentTo)
     return (
       <AuthCard
+        key="sent"
         icon={MailCheck}
         title="Check your email"
         description={
           <>
             If an account exists for{" "}
-            <span className="font-medium text-foreground">{sentTo}</span>, a
-            reset link is on its way.
+            <span className="break-all font-medium text-foreground">
+              {sentTo}
+            </span>
+            , a reset link is on its way.
           </>
         }
         footer={<BackToLogin />}
@@ -158,7 +174,7 @@ export function ForgotPasswordForm() {
         <div className="space-y-4" role="status" aria-live="polite">
           <ErrorAlert message={error} />
 
-          <ul className="space-y-1.5 rounded-lg bg-muted/60 p-4 text-sm text-muted-foreground">
+          <ul className="list-disc space-y-1.5 rounded-lg border border-border bg-muted/50 py-4 pl-9 pr-4 text-sm text-muted-foreground marker:text-primary">
             <li>Check your spam or promotions folder.</li>
             <li>The link expires in 1 hour.</li>
             <li>Only the most recent link will work.</li>
@@ -171,6 +187,7 @@ export function ForgotPasswordForm() {
               size="lg"
               onClick={onResend}
               disabled={cooldown > 0 || resending}
+              className="tabular-nums"
             >
               {resending && <Loader2 className="animate-spin" />}
               {resending
@@ -179,7 +196,7 @@ export function ForgotPasswordForm() {
                   ? `Resend email in ${cooldown}s`
                   : "Resend email"}
             </Button>
-            <Button type="button" variant="link" onClick={useAnotherEmail}>
+            <Button type="button" variant="link" onClick={changeEmail}>
               Use a different email
             </Button>
           </div>
@@ -189,6 +206,7 @@ export function ForgotPasswordForm() {
 
   return (
     <AuthCard
+      key="form"
       icon={KeyRound}
       title="Forgot your password?"
       description="Enter the email you signed up with and we'll send you a link to reset it."

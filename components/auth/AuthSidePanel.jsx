@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   AnimatePresence,
   animate,
@@ -17,10 +18,12 @@ import {
 import {
   ArrowLeft,
   Award,
-  BadgeCheck,
+  Check,
   Code,
   LifeBuoy,
   Lock,
+  Pause,
+  Play,
   Rocket,
   ShieldCheck,
   Sparkles,
@@ -31,16 +34,44 @@ import { AnimatedLogo } from "../layout/AnimatedLogo";
 
 const EASE = [0.22, 1, 0.36, 1];
 
+// Brand yellow: a small accent only (icons, dots). Light / dark variants.
+const YELLOW = "text-[#E5A817] dark:text-[#FFC857]";
+
 /* ------------------------------------------------------------------ */
-/* Canvas: connected network nodes + falling binary / code characters  */
+/* Which auth page are we on? Drives copy, terminal script, steps.     */
+/* ------------------------------------------------------------------ */
+
+const ROUTES = ["/login", "/register", "/forgot-password", "/reset-password"];
+
+function useAuthRoute() {
+  const pathname = usePathname() || "";
+  return (
+    ROUTES.find((p) => pathname === p || pathname.startsWith(`${p}/`)) ?? null
+  );
+}
+
+const DEFAULT_COPY =
+  "Practical technology courses, real projects, and career guidance in one place.";
+
+const PAGE_COPY = {
+  "/login": "Welcome back. Pick up your learning right where you left off.",
+  "/register":
+    "Create your account and start building practical technology skills.",
+  "/forgot-password": "Locked out? We'll help you get back in securely.",
+  "/reset-password": "Choose a new password and you're back in business.",
+};
+
+/* ------------------------------------------------------------------ */
+/* Canvas: connected network nodes + faint falling code characters     */
+/* Draws in the theme's primary colour, so it works in light and dark. */
+/* `still` = reduced motion OR the person pressed "Pause animation".   */
 /* ------------------------------------------------------------------ */
 
 const CHARS = "01{}<>/;=()[]";
 
-function TechNetwork({ className }) {
+function TechNetwork({ still, className }) {
   const canvasRef = useRef(null);
   const probeRef = useRef(null);
-  const reduce = useReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -67,41 +98,29 @@ function TechNetwork({ className }) {
     };
 
     const init = () => {
-      const count = Math.max(18, Math.round((w * h) / 15000));
+      const count = Math.max(16, Math.round((w * h) / 16000));
       nodes = Array.from({ length: count }, () => ({
         x: Math.random() * w,
         y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.35,
-        vy: (Math.random() - 0.5) * 0.35,
-        r: 1 + Math.random() * 1.6,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        r: 1 + Math.random() * 1.5,
       }));
       drops = Array.from({ length: Math.floor(w / COL) }, () => ({
         y: Math.random() * h,
-        speed: 0.5 + Math.random() * 1.1,
+        speed: 0.4 + Math.random() * 0.9,
         ch: CHARS[Math.floor(Math.random() * CHARS.length)],
       }));
     };
 
-    const resize = () => {
-      const r = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = r.width;
-      h = r.height;
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      readColor();
-      init();
-    };
-
-    const draw = (animateFrame) => {
+    function draw(animateFrame) {
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = color;
       ctx.strokeStyle = color;
 
       // Falling code characters (very faint)
       ctx.font = "12px monospace";
-      ctx.globalAlpha = 0.14;
+      ctx.globalAlpha = 0.1;
       for (let i = 0; i < drops.length; i++) {
         const d = drops[i];
         ctx.fillText(d.ch, i * COL + 2, d.y);
@@ -126,7 +145,7 @@ function TechNetwork({ className }) {
         }
       }
 
-      // Connection lines (the mouse acts as an extra node)
+      // Connection lines (the pointer acts as an extra node)
       const pts = pointer.x > -9000 ? [...nodes, pointer] : nodes;
       ctx.lineWidth = 1;
       for (let i = 0; i < pts.length; i++) {
@@ -135,7 +154,7 @@ function TechNetwork({ className }) {
           const dy = pts[i].y - pts[j].y;
           const dist = Math.hypot(dx, dy);
           if (dist < LINK) {
-            ctx.globalAlpha = (1 - dist / LINK) * 0.35;
+            ctx.globalAlpha = (1 - dist / LINK) * 0.3;
             ctx.beginPath();
             ctx.moveTo(pts[i].x, pts[i].y);
             ctx.lineTo(pts[j].x, pts[j].y);
@@ -145,20 +164,31 @@ function TechNetwork({ className }) {
       }
 
       // Nodes
-      ctx.globalAlpha = 0.75;
+      ctx.globalAlpha = 0.6;
       for (const n of nodes) {
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
+    }
+
+    const resize = () => {
+      const r = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = r.width;
+      h = r.height;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      readColor();
+      init();
+      if (still) draw(false);
     };
 
     const loop = () => {
       // Skip work when the tab is hidden or the canvas is not on screen
-      // (e.g. the desktop panel on mobile, or the mobile hero on desktop)
       if (!document.hidden && visible) {
-        // Re-read the colour now and then so dark / light switches are picked up
         if (++frame % 90 === 0) readColor();
         draw(true);
       }
@@ -184,7 +214,17 @@ function TechNetwork({ className }) {
     });
     io.observe(canvas);
 
-    if (reduce) {
+    // Repaint right away when the theme class changes (also covers still mode)
+    const mo = new MutationObserver(() => {
+      readColor();
+      if (still) draw(false);
+    });
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme", "style"],
+    });
+
+    if (still) {
       draw(false); // one still frame
     } else {
       window.addEventListener("pointermove", onMove, { passive: true });
@@ -195,9 +235,10 @@ function TechNetwork({ className }) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
+      mo.disconnect();
       window.removeEventListener("pointermove", onMove);
     };
-  }, [reduce]);
+  }, [still]);
 
   return (
     <>
@@ -206,93 +247,97 @@ function TechNetwork({ className }) {
         aria-hidden="true"
         className={cn("absolute inset-0 size-full", className)}
       />
-      {/* Invisible element used to read the theme's colour */}
+      {/* Invisible element used to read the theme's primary colour */}
       <span
         ref={probeRef}
         aria-hidden="true"
-        className="absolute size-0 text-background opacity-0"
+        className="absolute size-0 text-primary opacity-0"
       />
     </>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Background extras: grid, scan line                                  */
-/* ------------------------------------------------------------------ */
-
 function GridBackdrop() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 text-background opacity-[0.06] [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_80%)]"
-    />
-  );
-}
-
-function ScanLine({ reduce }) {
-  if (reduce) return null;
-  return (
-    <motion.div
-      aria-hidden="true"
-      initial={{ top: "-2%" }}
-      animate={{ top: "102%" }}
-      transition={{
-        duration: 7,
-        repeat: Infinity,
-        ease: "linear",
-        repeatDelay: 2,
-      }}
-      className="pointer-events-none absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-background/50 to-transparent shadow-[0_0_24px_4px] shadow-background/20"
+      className="pointer-events-none absolute inset-0 text-foreground opacity-[0.05] [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_80%)]"
     />
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Terminal card that types itself out in a loop                       */
+/* Terminal card: a decorative code window (dark in both themes).      */
+/* The script changes with the page being shown.                       */
 /* ------------------------------------------------------------------ */
 
-const OK = "text-emerald-400 dark:text-emerald-600";
+const cmd = (text) => ({ text, tone: "text-slate-100" });
+const info = (text) => ({ text, tone: "text-slate-400" });
+const ok = (text) => ({ text, tone: "text-emerald-400" });
 
-const LINES = [
-  { text: "$ apni login --secure", tone: "text-background" },
-  { text: "Verifying your account…", tone: "text-background/60" },
-  { text: "✔ Session started", tone: OK },
-  { text: "$ apni open courses", tone: "text-background" },
-  { text: "✔ Your skills path is ready", tone: OK },
-];
+const SCRIPTS = {
+  "/login": [
+    cmd("$ apni login --secure"),
+    info("Verifying your account…"),
+    ok("✔ Session started"),
+    cmd("$ apni open courses"),
+    ok("✔ Your skills path is ready"),
+  ],
+  "/register": [
+    cmd("$ apni signup"),
+    info("Creating your learner profile…"),
+    ok("✔ Account created"),
+    cmd("$ apni start --path"),
+    ok("✔ Ready to build real skills"),
+  ],
+  "/forgot-password": [
+    cmd("$ apni reset-password"),
+    info("Sending a secure link…"),
+    ok("✔ Check your inbox"),
+    cmd("$ apni login"),
+    ok("✔ Back in, ready to learn"),
+  ],
+  "/reset-password": [
+    cmd("$ apni reset-password --confirm"),
+    info("Verifying your link…"),
+    ok("✔ Link verified"),
+    cmd("$ apni password --update"),
+    ok("✔ You're all set"),
+  ],
+};
 
-function Terminal() {
-  const reduce = useReducedMotion();
-  const [count, setCount] = useState(reduce ? LINES.length : 0);
+function Terminal({ script, still }) {
+  const [count, setCount] = useState(0);
+  const shown = still ? script.length : count;
 
   useEffect(() => {
-    if (reduce) return;
+    if (still) return;
     const timer = setTimeout(
-      () => setCount((c) => (c >= LINES.length ? 0 : c + 1)),
-      count >= LINES.length ? 3200 : 900,
+      () => setCount((c) => (c >= script.length ? 0 : c + 1)),
+      count >= script.length ? 3200 : 900,
     );
     return () => clearTimeout(timer);
-  }, [count, reduce]);
+  }, [count, still, script.length]);
 
   return (
-    <div className="w-full max-w-md overflow-hidden rounded-xl border border-background/15 bg-background/10 shadow-2xl shadow-black/20 backdrop-blur-md">
-      <div className="flex items-center gap-1.5 border-b border-background/15 px-4 py-2.5">
+    <div
+      aria-hidden="true"
+      className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-[#0D121C] shadow-xl shadow-foreground/10"
+    >
+      <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-2.5">
         <span className="size-2.5 rounded-full bg-red-400/80" />
         <span className="size-2.5 rounded-full bg-amber-400/80" />
         <span className="size-2.5 rounded-full bg-emerald-400/80" />
-        <span className="ml-2 font-mono text-[11px] text-background/50">
+        <span className="ml-2 font-mono text-[11px] text-slate-400">
           apni-university.sh
         </span>
       </div>
 
-      <div
-        className="min-h-[9.5rem] space-y-1.5 p-4 font-mono text-xs leading-relaxed"
-        aria-hidden="true"
-      >
-        {LINES.slice(0, count).map((l) => (
+      <div className="min-h-[9.5rem] space-y-1.5 p-4 font-mono text-xs leading-relaxed">
+        {script.slice(0, shown).map((l) => (
           <motion.p
             key={l.text}
-            initial={reduce ? false : { opacity: 0, x: -6 }}
+            initial={still ? false : { opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25 }}
             className={l.tone}
@@ -300,13 +345,13 @@ function Terminal() {
             {l.text}
           </motion.p>
         ))}
-        <span className="inline-block h-3.5 w-1.5 translate-y-0.5 bg-background motion-safe:animate-pulse" />
+        <span className="inline-block h-3.5 w-1.5 translate-y-0.5 bg-slate-100 motion-safe:animate-pulse" />
       </div>
 
       {/* Progress bar that follows the lines */}
-      <div className="h-0.5 w-full bg-background/10" aria-hidden="true">
+      <div className="h-0.5 w-full bg-white/10">
         <motion.div
-          animate={{ width: `${(count / LINES.length) * 100}%` }}
+          animate={{ width: `${(shown / script.length) * 100}%` }}
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="h-full bg-gradient-to-r from-primary to-emerald-400"
         />
@@ -315,46 +360,70 @@ function Terminal() {
   );
 }
 
-/* Small notification that pops up above the terminal now and then */
-function FloatingBadge({ reduce }) {
-  if (reduce) return null;
+/* ------------------------------------------------------------------ */
+/* Recovery steps: shown on the forgot / reset password pages          */
+/* ------------------------------------------------------------------ */
+
+const RECOVERY_STEPS = [
+  "Request a reset link",
+  "Check your email",
+  "Set a new password",
+];
+
+// /forgot-password covers steps 1-2, /reset-password is step 3
+const RECOVERY_CURRENT = { "/forgot-password": 0, "/reset-password": 2 };
+
+function RecoverySteps({ route }) {
+  const current = RECOVERY_CURRENT[route];
+  if (current === undefined) return null;
+
   return (
-    <motion.div
-      aria-hidden="true"
-      initial={{ opacity: 0, y: 10, scale: 0.9 }}
-      animate={{
-        opacity: [0, 1, 1, 0],
-        y: [10, 0, 0, -8],
-        scale: [0.9, 1, 1, 0.95],
-      }}
-      transition={{
-        duration: 4.5,
-        times: [0, 0.12, 0.85, 1],
-        repeat: Infinity,
-        repeatDelay: 4,
-        delay: 2.5,
-      }}
-      className="absolute -right-2 -top-4 flex items-center gap-2 rounded-xl border border-background/20 bg-background/15 px-3 py-2 text-xs font-medium text-background shadow-xl shadow-black/20 backdrop-blur-md sm:-right-6"
+    <ol
+      aria-label="Password recovery steps"
+      className="mt-6 max-w-md space-y-2.5"
     >
-      <span className="grid size-6 place-items-center rounded-full bg-emerald-400/90 text-black">
-        <BadgeCheck className="size-3.5" />
-      </span>
-      New badge unlocked
-    </motion.div>
+      {RECOVERY_STEPS.map((label, i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <li
+            key={label}
+            aria-current={active ? "step" : undefined}
+            className="flex items-center gap-3 text-sm"
+          >
+            <span
+              className={cn(
+                "grid size-7 shrink-0 place-items-center rounded-full border text-xs font-semibold",
+                done && "border-primary bg-primary text-primary-foreground",
+                active && "border-primary bg-primary/10 text-primary",
+                !done &&
+                  !active &&
+                  "border-border bg-card text-muted-foreground",
+              )}
+            >
+              {done ? <Check aria-hidden="true" className="size-3.5" /> : i + 1}
+            </span>
+            <span
+              className={cn(
+                active
+                  ? "font-medium text-foreground"
+                  : "text-muted-foreground",
+              )}
+            >
+              {label}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Count-up stats                                                      */
+/* Optional real content: stats + testimonials (passed in as props)    */
 /* ------------------------------------------------------------------ */
 
-const STATS = [
-  { value: 10, suffix: "K+", label: "Learners" },
-  { value: 50, suffix: "+", label: "Courses" },
-  { value: 95, suffix: "%", label: "Satisfaction" },
-];
-
-function CountUp({ to, suffix, reduce }) {
+function CountUp({ to, suffix = "", reduce }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true });
   const [n, setN] = useState(reduce ? to : 0);
@@ -362,8 +431,8 @@ function CountUp({ to, suffix, reduce }) {
   useEffect(() => {
     if (reduce || !inView) return;
     const controls = animate(0, to, {
-      duration: 1.8,
-      delay: 0.5,
+      duration: 1.6,
+      delay: 0.4,
       ease: EASE,
       onUpdate: (v) => setN(Math.round(v)),
     });
@@ -378,93 +447,113 @@ function CountUp({ to, suffix, reduce }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Rotating testimonials (replace with real ones)                      */
-/* ------------------------------------------------------------------ */
+function Stats({ stats, reduce, className }) {
+  return (
+    <motion.dl
+      initial={reduce ? false : { opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.5, ease: EASE }}
+      className={cn(
+        "grid divide-x divide-border rounded-xl border border-border bg-card",
+        className,
+      )}
+      style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}
+    >
+      {stats.map((s) => (
+        <div key={s.label} className="px-4 py-3 text-center">
+          <dt className="sr-only">{s.label}</dt>
+          <dd className="font-serif text-2xl leading-none text-card-foreground">
+            <CountUp to={s.value} suffix={s.suffix} reduce={reduce} />
+          </dd>
+          <p aria-hidden="true" className="mt-1 text-xs text-muted-foreground">
+            {s.label}
+          </p>
+        </div>
+      ))}
+    </motion.dl>
+  );
+}
 
-const TESTIMONIALS = [
-  {
-    quote:
-      "The projects felt like real work, and that helped me land my first tech job.",
-    name: "Ayesha K.",
-    role: "Frontend Developer",
-  },
-  {
-    quote: "Clear lessons, great mentors, and a path I could actually follow.",
-    name: "Hamza R.",
-    role: "Data Analyst",
-  },
-  {
-    quote: "I went from beginner to building full apps in a few months.",
-    name: "Sana M.",
-    role: "Full-Stack Developer",
-  },
-];
-
-function Testimonials({ reduce }) {
+function Testimonials({ items, still }) {
   const [i, setI] = useState(0);
 
   useEffect(() => {
-    if (reduce) return;
-    const id = setInterval(
-      () => setI((c) => (c + 1) % TESTIMONIALS.length),
-      5000,
-    );
+    if (still || items.length < 2) return;
+    const id = setInterval(() => setI((c) => (c + 1) % items.length), 6000);
     return () => clearInterval(id);
-  }, [reduce]);
+  }, [still, items.length]);
 
-  const t = TESTIMONIALS[i];
+  const t = items[i];
 
   return (
-    <figure className="relative max-w-md rounded-xl border border-background/15 bg-background/10 p-4 backdrop-blur-md">
+    <figure className="max-w-md rounded-xl border border-border bg-card p-4 text-card-foreground">
       <div className="min-h-[5.5rem]">
         <AnimatePresence mode="wait">
           <motion.div
             key={i}
-            initial={reduce ? false : { opacity: 0, y: 10 }}
+            initial={still ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={reduce ? undefined : { opacity: 0, y: -10 }}
-            transition={{ duration: 0.35 }}
+            exit={still ? undefined : { opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
           >
-            <blockquote className="text-sm leading-relaxed text-background/85">
+            <blockquote className="text-sm leading-relaxed">
               “{t.quote}”
             </blockquote>
             <figcaption className="mt-3 flex items-center gap-2.5">
               <span className="grid size-7 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                {t.name[0]}
+                {t.name?.[0]}
               </span>
-              <span className="text-xs text-background/70">
-                <span className="font-medium text-background">{t.name}</span> ·{" "}
-                {t.role}
+              <span className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{t.name}</span>
+                {t.role ? ` · ${t.role}` : ""}
               </span>
             </figcaption>
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* Dots */}
-      <div className="mt-3 flex gap-1.5" aria-hidden="true">
-        {TESTIMONIALS.map((_, idx) => (
-          <span
-            key={idx}
-            className={cn(
-              "h-1 rounded-full bg-background transition-all duration-300 motion-reduce:transition-none",
-              idx === i ? "w-5 opacity-90" : "w-1.5 opacity-30",
-            )}
-          />
-        ))}
-      </div>
+      {items.length > 1 && (
+        <div
+          className="mt-3 flex gap-1.5"
+          role="tablist"
+          aria-label="Choose testimonial"
+        >
+          {items.map((item, idx) => (
+            <button
+              key={`${item.name}-${idx}`}
+              type="button"
+              role="tab"
+              aria-selected={idx === i}
+              aria-label={`Show testimonial from ${item.name}`}
+              onClick={() => setI(idx)}
+              className="grid h-4 place-items-center rounded-full px-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span
+                className={cn(
+                  "h-1 rounded-full bg-primary transition-all duration-300 motion-reduce:transition-none",
+                  idx === i ? "w-5 opacity-100" : "w-1.5 opacity-30",
+                )}
+              />
+            </button>
+          ))}
+        </div>
+      )}
     </figure>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Shared: animated heading (words reveal, last word shimmers)         */
+/* Shared: animated heading (words rise in, last word in brand blue)   */
 /* ------------------------------------------------------------------ */
 
-function AnimatedHeading({ tagline, reduce, className, offset = {} }) {
+function AnimatedHeading({
+  tagline,
+  reduce,
+  className,
+  step = 0.08,
+  start = 0.1,
+}) {
   const lines = tagline.split(/(?<=\.)\s+/);
-  const { y = 22, blur = 8, step = 0.09, start = 0.1, duration = 0.6 } = offset;
   let wordIndex = 0;
 
   return (
@@ -475,43 +564,23 @@ function AnimatedHeading({ tagline, reduce, className, offset = {} }) {
           <span key={line} className="block">
             {words.map((word, wi) => {
               const idx = wordIndex++;
-              const shimmer =
-                li === lines.length - 1 && wi === words.length - 1;
+              const accent = li === lines.length - 1 && wi === words.length - 1;
               return (
                 <motion.span
                   key={`${word}-${wi}`}
-                  initial={
-                    reduce
-                      ? false
-                      : { opacity: 0, y, filter: `blur(${blur}px)` }
-                  }
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  initial={reduce ? false : { opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{
-                    duration,
+                    duration: 0.5,
                     delay: start + idx * step,
                     ease: EASE,
                   }}
-                  className="mr-[0.25em] inline-block"
-                >
-                  {shimmer ? (
-                    <motion.span
-                      animate={
-                        reduce
-                          ? undefined
-                          : { backgroundPosition: ["0% 50%", "200% 50%"] }
-                      }
-                      transition={{
-                        duration: 4,
-                        repeat: Infinity,
-                        ease: "linear",
-                      }}
-                      className="bg-gradient-to-r from-background via-primary to-background bg-[length:200%_100%] bg-clip-text text-transparent"
-                    >
-                      {word}
-                    </motion.span>
-                  ) : (
-                    word
+                  className={cn(
+                    "mr-[0.25em] inline-block",
+                    accent && "text-primary",
                   )}
+                >
+                  {word}
                 </motion.span>
               );
             })}
@@ -526,7 +595,13 @@ function AnimatedHeading({ tagline, reduce, className, offset = {} }) {
 /* Side panel (desktop, lg and up)                                     */
 /* ------------------------------------------------------------------ */
 
-const SKILLS = ["AI", "Web", "Cloud", "Data", "Security", "Mobile"];
+const DEFAULT_TOPICS = [
+  "AI",
+  "Software Engineering",
+  "Automation",
+  "Cloud",
+  "Emerging Tech",
+];
 
 const POINTS = [
   { icon: Rocket, text: "Pick up exactly where you left off" },
@@ -534,18 +609,36 @@ const POINTS = [
   { icon: ShieldCheck, text: "Your account is protected and private" },
 ];
 
-export function AuthSidePanel({ siteName, tagline, year }) {
+export function AuthSidePanel({
+  siteName,
+  tagline,
+  year,
+  topics = DEFAULT_TOPICS,
+  stats, // optional: [{ value: 120, suffix: "+", label: "Courses" }] real numbers only
+  testimonials, // optional: [{ quote, name, role }] real testimonials only
+}) {
   const reduce = useReducedMotion();
+  const route = useAuthRoute();
+  const copy = (route && PAGE_COPY[route]) || DEFAULT_COPY;
+  const script = SCRIPTS[route] ?? SCRIPTS["/login"];
 
-  // Spotlight that follows the mouse (shown through a mask, so it works with any theme colour)
+  // "Pause animation": WCAG 2.2.2, moving content that lasts > 5s can be stopped
+  const [paused, setPaused] = useState(false);
+  const still = Boolean(reduce) || paused;
+
+  const hasStats = Array.isArray(stats) && stats.length > 0;
+  const hasTestimonials =
+    Array.isArray(testimonials) && testimonials.length > 0;
+
+  // Spotlight that follows the pointer (rendered through a mask)
   const mx = useMotionValue(-400);
   const my = useMotionValue(-400);
   const sx = useSpring(mx, { stiffness: 140, damping: 20 });
   const sy = useSpring(my, { stiffness: 140, damping: 20 });
-  const mask = useMotionTemplate`radial-gradient(340px circle at ${sx}px ${sy}px, black, transparent 70%)`;
+  const mask = useMotionTemplate`radial-gradient(320px circle at ${sx}px ${sy}px, black, transparent 70%)`;
 
   const onMove = (e) => {
-    if (reduce) return;
+    if (still) return;
     const r = e.currentTarget.getBoundingClientRect();
     mx.set(e.clientX - r.left);
     my.set(e.clientY - r.top);
@@ -557,38 +650,34 @@ export function AuthSidePanel({ siteName, tagline, year }) {
 
   return (
     <aside
+      aria-label={`About ${siteName}`}
       onPointerMove={onMove}
       onPointerLeave={onLeave}
-      className="relative hidden flex-col justify-between gap-8 overflow-hidden bg-foreground p-10 text-background lg:flex xl:p-14"
+      className="relative hidden flex-col justify-between gap-8 overflow-hidden border-r border-border bg-muted/50 p-10 text-foreground lg:flex xl:p-14"
     >
       <GridBackdrop />
-      <TechNetwork />
-      <ScanLine reduce={reduce} />
+      <TechNetwork still={still} />
 
-      {/* Mouse spotlight */}
+      {/* Pointer spotlight */}
       <motion.div
         aria-hidden="true"
         style={{ maskImage: mask, WebkitMaskImage: mask }}
-        className="pointer-events-none absolute inset-0 bg-background/10"
+        className="pointer-events-none absolute inset-0 bg-primary/10"
       />
 
-      {/* Slow glows */}
-      <motion.div
+      {/* Soft static glows */}
+      <div
         aria-hidden="true"
-        animate={reduce ? undefined : { x: [0, 40, 0], y: [0, -30, 0] }}
-        transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -left-20 -top-20 size-80 rounded-full bg-primary/30 blur-3xl"
+        className="pointer-events-none absolute -left-24 -top-24 size-80 rounded-full bg-primary/15 blur-3xl"
       />
-      <motion.div
+      <div
         aria-hidden="true"
-        animate={reduce ? undefined : { x: [0, -40, 0], y: [0, 30, 0] }}
-        transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -bottom-24 -right-16 size-96 rounded-full bg-primary/20 blur-3xl"
+        className="pointer-events-none absolute -bottom-28 -right-20 size-96 rounded-full bg-primary/10 blur-3xl"
       />
 
       {/* Top: logo */}
       <motion.div
-        initial={reduce ? false : { opacity: 0, y: -12 }}
+        initial={reduce ? false : { opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: EASE }}
         className="relative"
@@ -596,107 +685,60 @@ export function AuthSidePanel({ siteName, tagline, year }) {
         <AnimatedLogo size="lg" tagline="Learn Skills. Build Your Future." />
       </motion.div>
 
-      {/* Middle: message, stats, terminal, chips */}
+      {/* Middle: message, steps / stats, terminal, topics */}
       <div className="relative">
-        <div>
-          <motion.span
-            initial={reduce ? false : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: EASE }}
-            className="inline-flex items-center gap-1.5 rounded-full border border-background/20 bg-background/10 px-3 py-1 text-xs font-medium text-background/90 backdrop-blur"
-          >
-            <Code aria-hidden="true" className="size-3.5" />
-            Technology education
-            <Sparkles
-              aria-hidden="true"
-              className="size-3 text-primary motion-safe:animate-pulse"
-            />
-          </motion.span>
+        <motion.span
+          initial={reduce ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-card-foreground"
+        >
+          <Code aria-hidden="true" className="size-3.5 text-primary" />
+          Technology education
+          <Sparkles aria-hidden="true" className={cn("size-3", YELLOW)} />
+        </motion.span>
 
-          <AnimatedHeading
-            tagline={tagline}
-            reduce={reduce}
-            className="mt-5 font-serif text-4xl leading-tight xl:text-5xl"
-          />
+        <AnimatedHeading
+          tagline={tagline}
+          reduce={reduce}
+          className="mt-5 font-serif text-[clamp(2rem,3.2vw,3rem)] leading-[1.1] tracking-tight"
+        />
 
-          <motion.p
-            initial={reduce ? false : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5, ease: EASE }}
-            className="mt-4 max-w-sm text-background/70"
-          >
-            Practical technology courses, real projects, and career guidance in
-            one place.
-          </motion.p>
-        </div>
+        <motion.p
+          key={copy}
+          initial={reduce ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4, ease: EASE }}
+          className="mt-4 max-w-sm text-muted-foreground"
+        >
+          {copy}
+        </motion.p>
 
-        {/* Stats */}
-        <motion.dl
-          initial={reduce ? false : { opacity: 0, y: 16 }}
+        <RecoverySteps route={route} />
+
+        {hasStats && (
+          <Stats stats={stats} reduce={reduce} className="mt-6 max-w-md" />
+        )}
+
+        {/* Terminal (hidden on short screens) */}
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.6, ease: EASE }}
-          className="mt-6 grid max-w-md grid-cols-3 divide-x divide-background/15 rounded-xl border border-background/15 bg-background/10 backdrop-blur-md"
+          className="mt-6 [@media(max-height:820px)]:hidden"
         >
-          {STATS.map((s) => (
-            <div key={s.label} className="px-4 py-3 text-center">
-              <dt className="sr-only">{s.label}</dt>
-              <dd className="font-serif text-2xl leading-none">
-                <CountUp to={s.value} suffix={s.suffix} reduce={reduce} />
-              </dd>
-              <p
-                aria-hidden="true"
-                className="mt-1 text-[11px] text-background/60"
-              >
-                {s.label}
-              </p>
-            </div>
-          ))}
-        </motion.dl>
-
-        {/* Terminal + floating badge (hidden on short screens) */}
-        <motion.div
-          initial={reduce ? false : { opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.75, ease: EASE }}
-          className="relative mt-6 [@media(max-height:820px)]:hidden"
-        >
-          <motion.div
-            animate={reduce ? undefined : { y: [0, -8, 0] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-            className="relative max-w-md"
-          >
-            <Terminal />
-            <FloatingBadge reduce={reduce} />
-          </motion.div>
+          <Terminal key={route ?? "default"} script={script} still={still} />
         </motion.div>
 
-        {/* Skill chips that float gently */}
+        {/* Topic chips */}
         <ul className="mt-6 flex max-w-md flex-wrap gap-2" aria-label="Topics">
-          {SKILLS.map((s, i) => (
+          {topics.map((s, i) => (
             <motion.li
               key={s}
-              initial={reduce ? false : { opacity: 0, scale: 0.8 }}
-              animate={
-                reduce
-                  ? { opacity: 1, scale: 1 }
-                  : { opacity: 1, scale: 1, y: [0, -5, 0] }
-              }
-              whileHover={reduce ? undefined : { scale: 1.12, rotate: -3 }}
-              transition={{
-                opacity: { delay: 0.9 + i * 0.08 },
-                scale: {
-                  delay: 0.9 + i * 0.08,
-                  type: "spring",
-                  stiffness: 300,
-                },
-                y: {
-                  duration: 3 + i * 0.4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: i * 0.3,
-                },
-              }}
-              className="cursor-default rounded-full border border-background/20 bg-background/10 px-3 py-1 text-xs font-medium text-background/80 backdrop-blur transition-colors duration-200 hover:bg-background hover:text-foreground motion-reduce:transition-none"
+              initial={reduce ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.8 + i * 0.06 }}
+              className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-card-foreground transition-colors duration-200 hover:border-primary/50 hover:text-primary motion-reduce:transition-none"
             >
               {s}
             </motion.li>
@@ -704,22 +746,24 @@ export function AuthSidePanel({ siteName, tagline, year }) {
         </ul>
       </div>
 
-      {/* Bottom: testimonial, points, copyright */}
+      {/* Bottom: testimonials (if provided), points, copyright + pause */}
       <div className="relative">
-        <div className="mb-6 [@media(max-height:940px)]:hidden">
-          <Testimonials reduce={reduce} />
-        </div>
+        {hasTestimonials && (
+          <div className="mb-6 [@media(max-height:940px)]:hidden">
+            <Testimonials items={testimonials} still={still} />
+          </div>
+        )}
 
         <ul className="space-y-3">
           {POINTS.map(({ icon: Icon, text }, i) => (
             <motion.li
               key={text}
-              initial={reduce ? false : { opacity: 0, x: -14 }}
+              initial={reduce ? false : { opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 + i * 0.1 }}
-              className="group flex items-center gap-3 text-sm text-background/80"
+              transition={{ duration: 0.45, delay: 0.3 + i * 0.1 }}
+              className="group flex items-center gap-3 text-sm text-foreground"
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-background/20 bg-background/10 transition-all duration-200 group-hover:scale-110 group-hover:bg-background group-hover:text-foreground motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-card text-primary transition-colors duration-200 group-hover:border-primary/40 group-hover:bg-primary/10 motion-reduce:transition-none">
                 <Icon aria-hidden="true" className="size-4" />
               </span>
               {text}
@@ -727,9 +771,28 @@ export function AuthSidePanel({ siteName, tagline, year }) {
           ))}
         </ul>
 
-        <p className="mt-8 text-xs text-background/60">
-          © {year} {siteName}
-        </p>
+        <div className="mt-8 flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            © {year} {siteName}
+          </p>
+
+          {/* Not needed when the system already asks for reduced motion */}
+          {!reduce && (
+            <button
+              type="button"
+              onClick={() => setPaused((p) => !p)}
+              aria-pressed={paused}
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-medium text-card-foreground outline-none transition-colors duration-200 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+            >
+              {paused ? (
+                <Play aria-hidden="true" className="size-3.5" />
+              ) : (
+                <Pause aria-hidden="true" className="size-3.5" />
+              )}
+              {paused ? "Play animation" : "Pause animation"}
+            </button>
+          )}
+        </div>
       </div>
     </aside>
   );
@@ -737,111 +800,49 @@ export function AuthSidePanel({ siteName, tagline, year }) {
 
 /* ------------------------------------------------------------------ */
 /* Mobile hero (only below lg, the side panel is hidden there)         */
+/* Compact on purpose, so the form stays near the top of the screen.   */
 /* ------------------------------------------------------------------ */
 
-function MobileHero({ tagline, reduce }) {
-  const loop = [...SKILLS, ...SKILLS];
+function MobileHero({ tagline, topics, reduce }) {
+  const route = useAuthRoute();
+  const copy = (route && PAGE_COPY[route]) || DEFAULT_COPY;
 
   return (
     <motion.section
-      initial={reduce ? false : { opacity: 0, y: 20, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.6, ease: EASE }}
-      className="relative mb-8 overflow-hidden rounded-3xl bg-foreground p-5 text-background shadow-xl shadow-primary/10 sm:p-6 lg:hidden"
+      initial={reduce ? false : { opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE }}
+      className="relative mb-6 overflow-hidden rounded-2xl border border-border bg-muted/50 p-5 sm:p-6 lg:hidden"
     >
       <GridBackdrop />
-      <TechNetwork />
-
-      {/* Glows */}
-      <motion.div
+      <div
         aria-hidden="true"
-        animate={reduce ? undefined : { x: [0, 30, 0], y: [0, -20, 0] }}
-        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -left-16 -top-16 size-52 rounded-full bg-primary/30 blur-3xl"
+        className="pointer-events-none absolute -right-12 -top-12 size-44 rounded-full bg-primary/15 blur-3xl"
       />
-      <motion.div
-        aria-hidden="true"
-        animate={reduce ? undefined : { x: [0, -30, 0], y: [0, 20, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -bottom-20 -right-12 size-60 rounded-full bg-primary/20 blur-3xl"
-      />
-      <ScanLine reduce={reduce} />
 
       <div className="relative">
-        <AnimatedLogo tagline={tagline} />
-
-        <span className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-background/20 bg-background/10 px-3 py-1 text-xs font-medium text-background/90 backdrop-blur">
-          <Code aria-hidden="true" className="size-3.5" />
-          Technology education
-          <Sparkles
-            aria-hidden="true"
-            className="size-3 text-primary motion-safe:animate-pulse"
-          />
-        </span>
+        <AnimatedLogo size="sm" />
 
         <AnimatedHeading
           tagline={tagline}
           reduce={reduce}
-          className="mt-4 font-serif text-3xl leading-tight"
-          offset={{ y: 18, blur: 6, step: 0.08, start: 0.15, duration: 0.55 }}
+          className="mt-4 font-serif text-3xl leading-tight tracking-tight"
+          step={0.07}
+          start={0.1}
         />
 
-        <p className="mt-3 text-sm text-background/70">
-          Practical technology courses, real projects, and career guidance in
-          one place.
-        </p>
+        <p className="mt-3 text-sm text-muted-foreground">{copy}</p>
 
-        {/* Stats */}
-        <motion.dl
-          initial={reduce ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5, ease: EASE }}
-          className="mt-5 grid grid-cols-3 divide-x divide-background/15 rounded-xl border border-background/15 bg-background/10 backdrop-blur-md"
-        >
-          {STATS.map((s) => (
-            <div key={s.label} className="px-2 py-3 text-center">
-              <dt className="sr-only">{s.label}</dt>
-              <dd className="font-serif text-xl leading-none">
-                <CountUp to={s.value} suffix={s.suffix} reduce={reduce} />
-              </dd>
-              <p
-                aria-hidden="true"
-                className="mt-1 text-[11px] text-background/60"
-              >
-                {s.label}
-              </p>
-            </div>
+        <ul className="mt-4 flex flex-wrap gap-2" aria-label="Topics">
+          {topics.map((s) => (
+            <li
+              key={s}
+              className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-card-foreground"
+            >
+              {s}
+            </li>
           ))}
-        </motion.dl>
-
-        {/* Skill chips: slow infinite marquee (wraps normally with reduced motion) */}
-        <div
-          className={cn(
-            "mt-5",
-            !reduce &&
-              "overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]",
-          )}
-        >
-          <motion.ul
-            aria-label="Topics"
-            animate={reduce ? undefined : { x: ["0%", "-50%"] }}
-            transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-            className={cn("flex", reduce ? "flex-wrap gap-2" : "w-max")}
-          >
-            {(reduce ? SKILLS : loop).map((s, i) => (
-              <li
-                key={`${s}-${i}`}
-                aria-hidden={!reduce && i >= SKILLS.length}
-                className={cn(
-                  "rounded-full border border-background/20 bg-background/10 px-3 py-1 text-xs font-medium text-background/80 backdrop-blur",
-                  !reduce && "mr-2",
-                )}
-              >
-                {s}
-              </li>
-            ))}
-          </motion.ul>
-        </div>
+        </ul>
       </div>
     </motion.section>
   );
@@ -852,30 +853,30 @@ function MobileHero({ tagline, reduce }) {
 /* ------------------------------------------------------------------ */
 
 const TRUST = [
-  { icon: Lock, text: "Encrypted" },
+  { icon: Lock, text: "Encrypted connection" },
   { icon: ShieldCheck, text: "Secure login" },
-  { icon: BadgeCheck, text: "Trusted by learners" },
 ];
+
+const topLink =
+  "group inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground outline-none transition-colors duration-200 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
 
 export function AuthContentShell({
   children,
   tagline = "Learn Skills. Build Your Future.",
+  topics = DEFAULT_TOPICS,
 }) {
   const reduce = useReducedMotion();
 
   return (
     <div className="relative flex flex-1 flex-col">
-      {/* Top bar */}
+      {/* Top bar: back link, help, and the theme toggle */}
       <motion.div
-        initial={reduce ? false : { opacity: 0, y: -10 }}
+        initial={reduce ? false : { opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="flex items-center justify-between"
+        transition={{ duration: 0.35 }}
+        className="flex items-center justify-between gap-2"
       >
-        <Link
-          href="/"
-          className="group inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-foreground/70 outline-none transition-colors duration-200 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-        >
+        <Link href="/" className={topLink}>
           <ArrowLeft
             aria-hidden="true"
             className="size-4 transition-transform duration-200 group-hover:-translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
@@ -883,37 +884,27 @@ export function AuthContentShell({
           Back to home
         </Link>
 
-        <Link
-          href="/contact"
-          className="group inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-foreground/70 outline-none transition-colors duration-200 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-        >
-          <LifeBuoy
-            aria-hidden="true"
-            className="size-4 transition-transform duration-300 group-hover:rotate-45 motion-reduce:transition-none motion-reduce:group-hover:rotate-0"
-          />
-          Need help?
-        </Link>
+        <div className="flex items-center gap-1">
+          <Link href="/contact" className={topLink}>
+            <LifeBuoy aria-hidden="true" className="size-4" />
+            Need help?
+          </Link>
+        </div>
       </motion.div>
 
       <div className="m-auto w-full max-w-md py-6 lg:py-8">
         {/* Mobile / tablet only: replaces the side panel */}
-        <MobileHero tagline={tagline} reduce={reduce} />
+        <MobileHero tagline={tagline} topics={topics} reduce={reduce} />
 
         <motion.div
-          initial={reduce ? false : { opacity: 0, y: 24, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.55, delay: reduce ? 0 : 0.2, ease: EASE }}
+          initial={reduce ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: reduce ? 0 : 0.15, ease: EASE }}
           className="relative"
         >
-          {/* Glow behind the form (slowly breathes) */}
-          <motion.div
+          {/* Soft glow behind the form */}
+          <div
             aria-hidden="true"
-            animate={
-              reduce
-                ? undefined
-                : { opacity: [0.6, 1, 0.6], scale: [1, 1.04, 1] }
-            }
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
             className="pointer-events-none absolute -inset-6 -z-10 rounded-3xl bg-primary/10 blur-3xl"
           />
           {children}
@@ -921,18 +912,15 @@ export function AuthContentShell({
 
         {/* Trust row */}
         <motion.ul
-          initial={reduce ? false : { opacity: 0, y: 12 }}
+          initial={reduce ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-          className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-foreground/60"
+          transition={{ duration: 0.45, delay: 0.4 }}
+          className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground"
           aria-label="Security"
         >
           {TRUST.map(({ icon: Icon, text }) => (
-            <li key={text} className="group inline-flex items-center gap-1.5">
-              <Icon
-                aria-hidden="true"
-                className="size-3.5 text-primary transition-transform duration-200 group-hover:scale-125 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-              />
+            <li key={text} className="inline-flex items-center gap-1.5">
+              <Icon aria-hidden="true" className="size-3.5 text-primary" />
               {text}
             </li>
           ))}

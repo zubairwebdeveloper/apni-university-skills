@@ -7,7 +7,6 @@ import {
   FiGrid,
   FiLayers,
   FiTarget,
-  FiTrendingUp,
   FiUsers,
 } from "react-icons/fi";
 
@@ -109,184 +108,211 @@ export default async function CategoriesPage() {
       <div className="relative overflow-x-clip">
         <PageGlows />
 
-        <Container className="py-10 sm:py-12">
-          {/* Stats */}
+        <Container className="py-10 sm:py-14">
+          {/* Stats: one quiet strip, separated by hairlines */}
           {categories.length > 0 && (
             <Reveal>
               <dl
-                className={`mb-10 grid gap-3 sm:gap-4 ${
+                className={`mb-12 grid divide-x divide-border border-y border-border ${
                   stats.length === 3 ? "grid-cols-3" : "grid-cols-2"
                 }`}
               >
                 {stats.map((s) => (
                   <div
                     key={s.label}
-                    className="rounded-2xl border bg-card/70 p-3 text-center backdrop-blur sm:p-5"
+                    className="flex flex-col-reverse items-center gap-1 px-2 py-5 text-center sm:flex-row sm:justify-center sm:gap-3 sm:py-6"
                   >
-                    <dd className="font-serif text-xl font-semibold text-primary sm:text-3xl">
-                      {s.value}
-                    </dd>
-                    <dt className="mt-1 text-xs text-muted-foreground sm:text-sm">
+                    <dt className="text-xs text-muted-foreground sm:text-sm">
                       {s.label}
                     </dt>
+                    <dd className="font-serif text-2xl font-semibold tabular-nums text-foreground sm:text-4xl">
+                      {s.value}
+                    </dd>
                   </div>
                 ))}
               </dl>
             </Reveal>
           )}
 
-          {/* Categories */}
+          {/* Categories (the main content; unchanged behavior) */}
           {categories.length ? (
             <CategoriesExplorer categories={categories} />
           ) : (
             <EmptyState
               icon={FiGrid}
-              title="Categories are on the way"
-              description="We're organizing our catalog. Check back soon."
+              title="No categories yet"
+              description="We're organizing our catalog. Check back soon, or browse all courses in the meantime."
             />
           )}
         </Container>
 
-        {/* Why categories */}
+        {/* Why categories: heading left, ruled list right */}
         <section
           aria-labelledby="why-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t bg-muted/30 py-14 sm:py-20"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <h2 id="why-title" className="text-2xl sm:text-3xl">
-                Learn in the right order
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                Categories keep your learning focused, so you spend time
-                building skills instead of searching.
-              </p>
-            </Reveal>
+            <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
+              <div className="lg:col-span-4">
+                <h2
+                  id="why-title"
+                  className="text-balance text-3xl sm:text-4xl"
+                >
+                  Learn in the right order
+                </h2>
+                <p className="mt-4 max-w-md text-muted-foreground">
+                  Categories keep your learning focused, so you spend time
+                  building skills instead of searching.
+                </p>
+              </div>
 
-            <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {benefits.map(({ icon: Icon, title, text }, i) => (
-                <li key={title} className="min-w-0">
-                  <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group h-full rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold">
+              <ul className="divide-y divide-border border-y border-border lg:col-span-8">
+                {benefits.map(({ icon: Icon, title, text }) => (
+                  <li
+                    key={title}
+                    className="group flex items-start gap-4 py-5 sm:gap-5 sm:py-6"
+                  >
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none">
+                      <Icon aria-hidden="true" className="size-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="font-sans text-base font-semibold text-foreground">
                         {title}
                       </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">
                         {text}
                       </p>
                     </div>
-                  </Reveal>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </Container>
         </section>
 
-        {/* How to choose */}
+        {/* How to choose: a real sequence, so numbers are meaningful */}
         <section
           aria-labelledby="choose-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t py-14 sm:py-20"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <h2 id="choose-title" className="text-2xl sm:text-3xl">
-                How to choose your category
-              </h2>
-            </Reveal>
+            <h2
+              id="choose-title"
+              className="max-w-xl text-balance text-3xl sm:text-4xl"
+            >
+              How to choose your category
+            </h2>
 
-            <ol className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {steps.map(({ title, text }, i) => (
-                <li key={title} className="min-w-0">
-                  <Reveal delay={i * 0.1} className="h-full">
-                    <div className="relative h-full overflow-hidden rounded-2xl border bg-card/70 p-5 backdrop-blur">
-                      <span
-                        aria-hidden="true"
-                        className="absolute -right-2 -top-4 font-serif text-7xl font-bold text-primary/10"
-                      >
-                        {i + 1}
-                      </span>
-                      <h3 className="relative font-sans text-base font-semibold">
+            <Reveal>
+              <ol className="relative mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
+                {/* Connecting line (desktop only) */}
+                <span
+                  aria-hidden="true"
+                  className="absolute left-5 right-5 top-5 hidden h-px bg-border sm:block"
+                />
+                {steps.map(({ title, text }, i) => (
+                  <li
+                    key={title}
+                    className="relative flex gap-4 sm:block sm:pr-4"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`relative z-10 grid size-10 shrink-0 place-items-center rounded-full border font-serif text-base font-semibold ${
+                        i === steps.length - 1
+                          ? "border-highlight bg-highlight text-foreground"
+                          : "border-primary bg-background text-primary"
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                    <div className="sm:mt-5">
+                      <h3 className="font-sans text-base font-semibold text-foreground">
                         <span className="sr-only">Step {i + 1}: </span>
                         {title}
                       </h3>
-                      <p className="relative mt-1 text-sm text-muted-foreground">
+                      <p className="mt-1 max-w-xs text-sm text-muted-foreground sm:text-base">
                         {text}
                       </p>
                     </div>
-                  </Reveal>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                ))}
+              </ol>
+            </Reveal>
           </Container>
         </section>
 
-        {/* FAQ */}
+        {/* FAQ: heading left, accordion right */}
         <section
           aria-labelledby="faq-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t bg-muted/30 py-14 sm:py-20"
         >
-          <Container className="max-w-3xl">
-            <Reveal className="text-center">
-              <h2 id="faq-title" className="text-2xl sm:text-3xl">
+          <Container>
+            <div className="grid gap-8 lg:grid-cols-12 lg:gap-16">
+              <h2
+                id="faq-title"
+                className="text-balance text-3xl sm:text-4xl lg:col-span-4"
+              >
                 Common questions
               </h2>
-            </Reveal>
 
-            <div className="mt-8 space-y-3">
-              {faqs.map(({ q, a }, i) => (
-                <Reveal key={q} delay={i * 0.06}>
-                  <details className="group rounded-xl border bg-card px-4 py-3 open:shadow-md">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
+              <div className="divide-y divide-border border-y border-border lg:col-span-8">
+                {faqs.map(({ q, a }) => (
+                  <details key={q} className="group py-1">
+                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-left text-base font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                       {q}
                       <FiChevronDown
                         aria-hidden="true"
-                        className="size-4 shrink-0 text-primary transition-transform duration-300 group-open:rotate-180 motion-reduce:transition-none"
+                        className="size-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
                       />
                     </summary>
-                    <p className="mt-3 text-sm text-muted-foreground">{a}</p>
+                    <p className="max-w-2xl pb-4 text-muted-foreground">{a}</p>
                   </details>
-                </Reveal>
-              ))}
+                ))}
+              </div>
             </div>
           </Container>
         </section>
 
         {/* CTA */}
-        <section className="border-t py-12 sm:py-16">
+        <section className="border-t py-14 sm:py-20">
           <Container>
             <Reveal>
-              <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-r from-primary/10 via-card to-highlight/20 p-6 text-center sm:p-10">
-                <FiTrendingUp
+              <div className="relative overflow-hidden rounded-3xl bg-primary px-6 py-10 text-primary-foreground sm:px-12 sm:py-14">
+                <span
                   aria-hidden="true"
-                  className="mx-auto size-8 text-primary"
+                  className="absolute inset-x-0 top-0 h-1 bg-highlight"
                 />
-                <h2 className="mt-3 text-2xl sm:text-3xl">
-                  Not sure where to begin?
-                </h2>
-                <p className="mx-auto mt-2 max-w-xl text-muted-foreground">
-                  See all courses together, or talk to us and we will help you
-                  pick the right path.
-                </p>
-                <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-                  <Link
-                    href="/courses"
-                    className={buttonVariants({ size: "lg" })}
-                  >
-                    View all courses
-                    <FiArrowRight aria-hidden="true" />
-                  </Link>
-                  <Link
-                    href="/contact"
-                    className={buttonVariants({
-                      size: "lg",
-                      variant: "outline",
-                    })}
-                  >
-                    Talk to us
-                  </Link>
+                <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="max-w-xl">
+                    <h2 className="text-balance text-3xl text-primary-foreground sm:text-4xl">
+                      Not sure where to begin?
+                    </h2>
+                    <p className="mt-3 text-primary-foreground/90 sm:text-lg">
+                      See all courses together, or talk to us and we will help
+                      you pick the right path.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row lg:shrink-0">
+                    <Link
+                      href="/courses"
+                      className={buttonVariants({
+                        size: "lg",
+                        variant: "secondary",
+                      })}
+                    >
+                      View all courses
+                      <FiArrowRight aria-hidden="true" />
+                    </Link>
+                    <Link
+                      href="/contact"
+                      className={`${buttonVariants({
+                        size: "lg",
+                        variant: "ghost",
+                      })} border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground`}
+                    >
+                      Talk to us
+                    </Link>
+                  </div>
                 </div>
               </div>
             </Reveal>

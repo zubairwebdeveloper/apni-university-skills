@@ -11,6 +11,7 @@ import {
 
 import { AdminHeaderBackdrop } from "@/components/admin/admin-users/AdminHeaderBackdrop";
 import { AdminUserForm } from "@/components/admin/admin-users/AdminUserForm";
+
 import { buttonVariants } from "@/components/ui/button";
 import { requirePermission } from "@/lib/auth/authorize";
 import { PERMISSIONS as P } from "@/lib/constants/permissions";
@@ -93,7 +94,7 @@ export default async function CreateAdminPage() {
         </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-6 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Form (existing component, unchanged) */}
         <section
           aria-label="Add admin form"

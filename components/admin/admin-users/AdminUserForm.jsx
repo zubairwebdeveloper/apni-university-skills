@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
+import { AdminImageField } from "@/components/admin/admin-users/AdminImageField";
 import { adminUserSchema } from "@/lib/validations/adminUser";
 import { createAdmin, updateAdmin } from "@/services/admin/adminUsersClient";
 import { cn } from "@/lib/utils";
@@ -201,6 +202,9 @@ function PreviewCard({ name, email, image, role }) {
   const reduce = useReducedMotion();
   const [imgStatus, setImgStatus] = useState("idle");
 
+  // A new image source starts a fresh load, so clear any old error
+  useEffect(() => setImgStatus("idle"), [image]);
+
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
   const springX = useSpring(rotateX, { stiffness: 220, damping: 20 });
@@ -235,7 +239,8 @@ function PreviewCard({ name, email, image, role }) {
       }
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="[transform-style:preserve-3d]"
+      // "group" was missing before, so the glow below never appeared on hover
+      className="group [transform-style:preserve-3d]"
     >
       <Card className="relative gap-0 overflow-hidden py-0">
         {!reduce && (
@@ -263,7 +268,8 @@ function PreviewCard({ name, email, image, role }) {
           {image && imgStatus === "error" && (
             <p className="flex items-center gap-1.5 text-xs text-destructive">
               <ImageOff aria-hidden="true" className="size-3.5 shrink-0" />
-              That image link didn&apos;t load — showing their initial instead.
+              That image link didn&apos;t load, so we&apos;re showing their
+              initial instead.
             </p>
           )}
 
@@ -332,6 +338,12 @@ export function AdminUserForm({ mode = "create", initial }) {
   const [done, setDone] = useState(false);
   const [draftAvailable, setDraftAvailable] = useState(false);
   const [pendingAdminConfirm, setPendingAdminConfirm] = useState(false);
+
+  // Image upload state, reported by <AdminImageField />
+  const [imagePreview, setImagePreview] = useState(""); // local blob while/after upload
+  const [imageBusy, setImageBusy] = useState(false); // optimising or uploading
+  const [imageKey, setImageKey] = useState(0); // bump to fully reset the field
+
   const addAnotherRef = useRef(false);
 
   const defaults = {
@@ -352,6 +364,8 @@ export function AdminUserForm({ mode = "create", initial }) {
   const image = form.watch("image");
   const role = form.watch("role");
   const emailFix = isEdit ? null : suggestEmail(email);
+
+  const locked = isSubmitting || done || imageBusy;
 
   // Warn before closing the tab with unsaved changes
   useEffect(() => {
@@ -377,7 +391,8 @@ export function AdminUserForm({ mode = "create", initial }) {
     }
   }, [isEdit]);
 
-  // Autosave the in-progress draft (create mode only)
+  // Autosave the in-progress draft (create mode only).
+  // Only the final image URL is stored, never a local blob.
   useEffect(() => {
     if (isEdit || done) return;
     const sub = form.watch((values) => {
@@ -399,6 +414,7 @@ export function AdminUserForm({ mode = "create", initial }) {
       const raw = window.localStorage.getItem(DRAFT_KEY);
       if (raw) {
         form.reset(JSON.parse(raw));
+        setImageKey((k) => k + 1);
         toast.success("Draft restored");
       }
     } catch {
@@ -444,7 +460,7 @@ export function AdminUserForm({ mode = "create", initial }) {
       await navigator.clipboard.writeText(email);
       toast.success("Email copied");
     } catch {
-      toast.error("Couldn't copy — select and copy manually");
+      toast.error("Couldn't copy, select and copy manually");
     }
   }
 
@@ -453,20 +469,30 @@ export function AdminUserForm({ mode = "create", initial }) {
     addAnotherRef.current = false;
     setServerError("");
 
+    if (imageBusy) {
+      toast.info("Wait for the photo to finish uploading");
+      return;
+    }
+
     try {
-      if (isEdit) await updateAdmin(values.email, values);
-      else await createAdmin(values);
+      // Empty string means "no photo"
+      const payload = { ...values, image: (values.image ?? "").trim() };
+
+      if (isEdit) await updateAdmin(payload.email, payload);
+      else await createAdmin(payload);
 
       clearDraft();
 
       if (!isEdit && another) {
-        toast.success(`${values.name} was added. Add the next one.`);
-        form.reset({ name: "", email: "", image: "", role: values.role });
+        toast.success(`${payload.name} was added. Add the next one.`);
+        form.reset({ name: "", email: "", image: "", role: payload.role });
+        setImageKey((k) => k + 1);
+        setImagePreview("");
         setTimeout(() => form.setFocus("name"), 50);
         return;
       }
 
-      form.reset(values); // clears "unsaved" state
+      form.reset(payload); // clears "unsaved" state
       setDone(true);
       toast.success(isEdit ? "Admin updated" : "Admin created");
       await new Promise((r) => setTimeout(r, reduce ? 0 : 900));
@@ -488,13 +514,13 @@ export function AdminUserForm({ mode = "create", initial }) {
     function onKeyDown(e) {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        if (!isSubmitting && !done) form.handleSubmit(onSubmit)();
+        if (!isSubmitting && !done && !imageBusy) form.handleSubmit(onSubmit)();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSubmitting, done]);
+  }, [isSubmitting, done, imageBusy]);
 
   return (
     <motion.div
@@ -716,7 +742,7 @@ export function AdminUserForm({ mode = "create", initial }) {
                   </AnimatePresence>
                 </motion.div>
 
-                {/* Image */}
+                {/* Profile photo: upload or link, both optional */}
                 <motion.div variants={item}>
                   <Controller
                     name="image"
@@ -727,21 +753,26 @@ export function AdminUserForm({ mode = "create", initial }) {
                           htmlFor="admin-image"
                           className="font-medium"
                         >
-                          Profile photo URL
+                          Profile photo
                           <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                             Optional
                           </span>
                         </FieldLabel>
-                        <Input
-                          {...field}
+
+                        <AdminImageField
+                          key={imageKey}
                           id="admin-image"
-                          placeholder="https://example.com/photo.jpg"
-                          autoComplete="off"
-                          aria-invalid={fieldState.invalid}
+                          value={field.value ?? ""}
+                          invalid={fieldState.invalid}
+                          onChange={(url) => field.onChange(url)}
+                          onBlur={field.onBlur}
+                          onPreviewChange={setImagePreview}
+                          onBusyChange={setImageBusy}
                         />
+
                         <FieldDescription>
-                          Paste a direct image link (ending in .jpg, .png or
-                          .webp). Leave empty to show their initial.
+                          Upload a photo or paste an image link. Leave it empty
+                          to show their initial.
                         </FieldDescription>
                         {fieldState.invalid && (
                           <FieldError errors={[fieldState.error]} />
@@ -866,7 +897,7 @@ export function AdminUserForm({ mode = "create", initial }) {
                 <Button
                   type="button"
                   variant="secondary"
-                  disabled={isSubmitting || done}
+                  disabled={locked}
                   onClick={submitAndAddAnother}
                 >
                   Save and add another
@@ -875,19 +906,21 @@ export function AdminUserForm({ mode = "create", initial }) {
 
               <Button
                 type="submit"
-                disabled={isSubmitting || done}
+                disabled={locked}
                 className="gap-2 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               >
-                {isSubmitting ? (
+                {isSubmitting || imageBusy ? (
                   <Loader2 aria-hidden="true" className="size-4 animate-spin" />
                 ) : (
                   <Save aria-hidden="true" className="size-4" />
                 )}
                 {isSubmitting
                   ? "Saving…"
-                  : isEdit
-                    ? "Save changes"
-                    : "Create admin"}
+                  : imageBusy
+                    ? "Uploading photo…"
+                    : isEdit
+                      ? "Save changes"
+                      : "Create admin"}
               </Button>
             </div>
 
@@ -961,7 +994,12 @@ export function AdminUserForm({ mode = "create", initial }) {
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Live preview
         </p>
-        <PreviewCard name={name} email={email} image={image} role={role} />
+        <PreviewCard
+          name={name}
+          email={email}
+          image={imagePreview || image}
+          role={role}
+        />
         <p className="text-xs leading-5 text-muted-foreground">
           They get access the next time they sign in with this email. Their
           email must be verified.

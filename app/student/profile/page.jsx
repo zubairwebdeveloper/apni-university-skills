@@ -8,6 +8,7 @@ import { ProfileTips } from "@/components/student/ProfileTips";
 import { AccountDetails } from "@/components/student/AccountDetails";
 import { PrivacyCard } from "@/components/student/PrivacyCard";
 import { Reveal } from "@/components/student/Reveal";
+import { VerifyEmailBanner } from "@/components/auth/VerifyEmailBanner";
 import { StudentPageHeader } from "@/components/student/StudentPageHeader";
 import {
   MotionRoot,
@@ -22,7 +23,11 @@ export const metadata = { title: "Profile" };
 
 export default async function ProfilePage() {
   const user = await requireUser();
-  const profile = await userService.getProfile(user.uid);
+  const profile = await userService.ensureProfile(
+    user.uid,
+    user.email,
+    user.name,
+  );
   if (!profile) notFound();
 
   return (
@@ -35,7 +40,7 @@ export default async function ProfilePage() {
             title="Profile"
             description="Your public name appears on reviews you write. Keep your details fresh so instructors and peers know who you are."
           />
-
+          <VerifyEmailBanner />
           <ProfileQuickNav />
 
           <Reveal>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Activity,
   ArrowRight,
@@ -20,7 +20,6 @@ import {
   Settings,
   Sparkles,
   User,
-  X,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,21 +27,22 @@ import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { useAuth } from "./AuthProvider";
 import { LogoutButton } from "./LogoutButton";
+import { useStaffAccess } from "./useStaffAccess";
+import { ROLE_LABELS } from "@/lib/constants/roles";
 import { cn } from "@/lib/utils";
 
-const ACCENT = "#ef07a2";
-
+// Staff (admin, editor, instructor) can use every student page too,
+// so this menu is the same for everyone who is signed in.
 const MENU = [
   {
     href: "/student",
@@ -145,8 +145,9 @@ function useGreeting() {
 }
 
 /**
- * Admin visibility is determined from available profile data
- * and Firebase Auth custom claims.
+ * Admin visibility from profile data and Firebase Auth custom claims.
+ * Kept as a fallback; the server check (useStaffAccess) is the main source
+ * because admins are stored in the `admins` collection.
  *
  * This controls navigation visibility only. It does not grant
  * access to protected admin routes.
@@ -245,7 +246,7 @@ function CountPill({ count, className }) {
       animate={{ scale: 1, opacity: 1 }}
       transition={popSpring}
       className={cn(
-        "relative inline-flex min-w-5 items-center justify-center  rounded-full bg-destructive px-1.5 py-1 text-[10px] font-bold leading-none text-white",
+        "relative inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-1 text-[10px] font-bold leading-none text-white",
         className,
       )}
     >
@@ -289,7 +290,7 @@ function GlowAvatar({ user, initials, size = "size-9", className }) {
   );
 }
 
-function Identity({ displayName, email, greeting, isAdmin }) {
+function Identity({ displayName, email, greeting, roleLabel }) {
   return (
     <div className="min-w-0 flex-1">
       <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
@@ -302,13 +303,13 @@ function Identity({ displayName, email, greeting, isAdmin }) {
           {displayName}
         </p>
 
-        {isAdmin && (
+        {roleLabel && (
           <Badge
             variant="outline"
             className="h-5 gap-1 border-primary/25 bg-primary/5 px-1.5 text-[9px] font-semibold text-primary"
           >
             <ShieldCheck className="size-3" />
-            Admin
+            {roleLabel}
           </Badge>
         )}
       </div>
@@ -324,7 +325,7 @@ function Identity({ displayName, email, greeting, isAdmin }) {
 /* Admin panel button                                              */
 /* --------------------------------------------------------------- */
 
-function AdminPanelButton({ compact = false }) {
+function AdminPanelButton({ onNavigate }) {
   const reduceMotion = useReducedMotion();
 
   return (
@@ -333,18 +334,24 @@ function AdminPanelButton({ compact = false }) {
       whileTap={reduceMotion ? undefined : { scale: 0.97 }}
       transition={popSpring}
     >
-      <Button variant="default" className="w-full mx-auto">
-        <Link href="/admin" className="flex items-center gap-2">
-          <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
+      {/* A single link styled as a button, so the whole area is clickable */}
+      <Link
+        href="/admin"
+        onClick={onNavigate}
+        className={buttonVariants({
+          variant: "default",
+          className: "group w-full gap-2",
+        })}
+      >
+        <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
 
-          <span className="whitespace-nowrap">Admin Panel</span>
+        <span className="whitespace-nowrap">Admin Panel</span>
 
-          <ArrowUpRight
-            className="size-3.5 shrink-0  transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary motion-reduce:transition-none"
-            aria-hidden="true"
-          />
-        </Link>
-      </Button>
+        <ArrowUpRight
+          className="size-3.5 shrink-0 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
+          aria-hidden="true"
+        />
+      </Link>
     </motion.div>
   );
 }
@@ -371,14 +378,16 @@ function GuestButtons({ stacked, onNavigate }) {
         whileHover={reduceMotion ? undefined : { y: -1 }}
         whileTap={reduceMotion ? undefined : { scale: 0.97 }}
       >
-        <Button
-          variant="ghost"
-          className={cn("font-medium", stacked && "w-full")}
+        <Link
+          href="/login"
+          onClick={onNavigate}
+          className={buttonVariants({
+            variant: "ghost",
+            className: cn("font-medium", stacked && "w-full"),
+          })}
         >
-          <Link href="/login" onClick={onNavigate}>
-            Log in
-          </Link>
-        </Button>
+          Log in
+        </Link>
       </motion.div>
 
       <motion.div
@@ -386,17 +395,19 @@ function GuestButtons({ stacked, onNavigate }) {
         whileHover={reduceMotion ? undefined : { y: -2 }}
         whileTap={reduceMotion ? undefined : { scale: 0.97 }}
       >
-        <Button
-          className={cn(
-            "gap-2 shadow-sm shadow-primary/20 transition-shadow hover:shadow-md hover:shadow-primary/25",
-            stacked && "w-full",
-          )}
+        <Link
+          href="/register"
+          onClick={onNavigate}
+          className={buttonVariants({
+            className: cn(
+              "gap-2 shadow-sm shadow-primary/20 transition-shadow hover:shadow-md hover:shadow-primary/25",
+              stacked && "w-full",
+            ),
+          })}
         >
-          <Link href="/register" onClick={onNavigate}>
-            Get started
-            <ArrowRight className="size-4" />
-          </Link>
-        </Button>
+          Get started
+          <ArrowRight className="size-4" />
+        </Link>
       </motion.div>
     </motion.div>
   );
@@ -423,7 +434,7 @@ function AccountNavigation({
     >
       {isAdmin && (
         <motion.div variants={rowVariants} className="mb-2">
-          <AdminPanelButton compact />
+          <AdminPanelButton onNavigate={onNavigate} />
         </motion.div>
       )}
 
@@ -494,6 +505,7 @@ function StackedMenu({
   pathname,
   notificationCount,
   isAdmin,
+  roleLabel,
   onNavigate,
 }) {
   const greeting = useGreeting();
@@ -516,7 +528,7 @@ function StackedMenu({
             displayName={displayName}
             email={email}
             greeting={greeting}
-            isAdmin={isAdmin}
+            roleLabel={roleLabel}
           />
         </div>
 
@@ -552,6 +564,7 @@ function AccountDropdown({
   pathname,
   notificationCount,
   isAdmin,
+  roleLabel,
 }) {
   const router = useRouter();
   const greeting = useGreeting();
@@ -622,7 +635,7 @@ function AccountDropdown({
       <DropdownMenuContent
         align="end"
         sideOffset={10}
-        className="w-[min(21rem,calc(100vw-1.5rem))]  rounded-2xl border-border bg-popover p-0 text-popover-foreground shadow-xl shadow-black/10 overflow-auto"
+        className="w-[min(21rem,calc(100vw-1.5rem))] overflow-auto rounded-2xl border-border bg-popover p-0 text-popover-foreground shadow-xl shadow-black/10"
       >
         {/* Account identity */}
         <div className="relative overflow-hidden border-b border-border bg-muted/40 p-4">
@@ -646,7 +659,7 @@ function AccountDropdown({
               displayName={displayName}
               email={email}
               greeting={greeting}
-              isAdmin={isAdmin}
+              roleLabel={roleLabel}
             />
           </div>
 
@@ -672,7 +685,7 @@ function AccountDropdown({
               </DropdownMenuLabel>
 
               <div className="px-1 pb-2">
-                <AdminPanelButton compact />
+                <AdminPanelButton onNavigate={() => setOpen(false)} />
               </div>
 
               <DropdownMenuSeparator />
@@ -763,7 +776,13 @@ export function AuthNav({
   const { user, loading, profile } = useAuth();
   const pathname = usePathname();
 
-  const { isAdmin } = useAdminRole(user, profile);
+  // Hooks stay above every early return so their order never changes.
+  const { isAdmin: profileAdmin } = useAdminRole(user, profile);
+  const staff = useStaffAccess(user);
+
+  // `admins` collection (server) is the source of truth; profile/claims are a fallback.
+  const isAdmin = staff.isStaff || profileAdmin;
+  const roleLabel = isAdmin ? ROLE_LABELS[staff.role] || ROLE_LABELS.admin : "";
 
   if (loading) {
     return (
@@ -814,6 +833,7 @@ export function AuthNav({
     pathname,
     notificationCount,
     isAdmin,
+    roleLabel,
   };
 
   if (stacked) {

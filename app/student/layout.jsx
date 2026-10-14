@@ -13,8 +13,12 @@ export const metadata = {
 
 export default async function StudentLayout({ children }) {
   const user = await requireUser();
-  const profile = await userService.getProfile(user.uid);
-  const cookieStore = await cookies();
+const profile = await userService.ensureProfile(
+  user.uid,
+  user.email,
+  user.name,
+  user.photoURL,
+); const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("student-sidebar")?.value !== "0";
 
   const person = {

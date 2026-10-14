@@ -246,7 +246,7 @@ export function WishlistExtras() {
         </div>
         <Accordion
           type="single"
-          collapsible
+          
           className="rounded-xl border bg-card px-5"
         >
           {WISHLIST_FAQ.map((f, i) => (

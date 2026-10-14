@@ -28,7 +28,7 @@ export function PaymentFaq() {
   return (
     <section className="rounded-xl border bg-card p-5 shadow-sm">
       <h2 className="mb-2 text-lg font-semibold">Billing FAQ</h2>
-      <Accordion type="single" collapsible>
+      <Accordion type="single" >
         {faqs.map(({ q, a }, i) => (
           <AccordionItem key={q} value={`faq-${i}`}>
             <AccordionTrigger>{q}</AccordionTrigger>

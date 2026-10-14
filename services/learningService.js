@@ -14,7 +14,7 @@ import { progressRepository } from "@/repositories/progressRepository";
 import { userRepository } from "@/repositories/userRepository";
 import { groupBySection } from "@/services/lessonService";
 import { emailService } from "@/services/email/emailService";
-
+import { signAttachments } from "@/lib/storage/signedUrl";
 import { safeExternalUrl } from "@/lib/utils/url";
 import { AppError } from "@/lib/errors";
 

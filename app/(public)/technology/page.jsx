@@ -41,6 +41,11 @@ export const metadata = {
 const h2Class =
   "text-balance text-[clamp(1.5rem,3vw,2.25rem)] font-semibold leading-tight tracking-tight";
 
+// Hover fix: the outer "group" element never moves. Only the inner card
+// transforms, so the cursor cannot leave the hover area and cause flicker.
+const cardHover =
+  "transition-all duration-300 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-lg motion-reduce:transition-none motion-reduce:group-hover:translate-y-0";
+
 const chips = [
   { icon: FiHelpCircle, text: "What it is" },
   { icon: FiTarget, text: "Why it matters" },
@@ -208,17 +213,21 @@ export default async function TechnologyPage() {
             {stats.map(({ icon: Icon, value, label }, i) => (
               <li key={label} className="min-w-0">
                 <Reveal delay={i * 0.08} className="h-full">
-                  <div className="group flex h-full items-center gap-4 rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                    <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                      <Icon aria-hidden="true" className="size-5" />
-                    </span>
-                    <div>
-                      <p className="font-serif text-3xl font-semibold leading-none">
-                        {value}
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {label}
-                      </p>
+                  <div className="group h-full">
+                    <div
+                      className={`flex h-full items-center gap-4 rounded-2xl border bg-card p-5 ${cardHover}`}
+                    >
+                      <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
+                        <Icon aria-hidden="true" className="size-5" />
+                      </span>
+                      <div>
+                        <p className="font-serif text-3xl font-semibold leading-none">
+                          {value}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {label}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </Reveal>
@@ -230,50 +239,52 @@ export default async function TechnologyPage() {
         {/* Featured AI hub, with the single 3D scene of this page */}
         <Container className="relative pt-8">
           <Reveal>
-            <Link
-              href="/ai"
-              className="group relative block overflow-hidden rounded-3xl border border-primary/30 bg-accent p-6 outline-none transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-8"
-            >
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
-              />
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/15 blur-3xl transition-transform duration-700 group-hover:scale-125 motion-reduce:transition-none"
-              />
-              <div className="relative grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_18rem]">
-                <div className="flex items-start gap-4">
-                  <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground transition-transform duration-300 group-hover:rotate-6 motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                    <FiCpu aria-hidden="true" className="size-6" />
-                  </span>
-                  <div>
-                    <Badge className="mb-2">Featured hub</Badge>
-                    <h2 className="font-serif text-xl font-semibold sm:text-2xl">
-                      Artificial Intelligence
-                    </h2>
-                    <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                      Generative AI, agents, automation, and machine learning,
-                      in one dedicated hub.
-                    </p>
-                    <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary">
-                      Explore the AI hub
-                      <FiArrowRight
-                        aria-hidden="true"
-                        className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
-                      />
+            <div className="group">
+              <Link
+                href="/ai"
+                className="relative block overflow-hidden rounded-3xl border border-primary/30 bg-accent p-6 outline-none transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0 sm:p-8"
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
+                />
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/15 blur-3xl transition-transform duration-700 group-hover:scale-125 motion-reduce:transition-none"
+                />
+                <div className="relative grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_18rem]">
+                  <div className="flex items-start gap-4">
+                    <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground transition-transform duration-300 group-hover:rotate-6 motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
+                      <FiCpu aria-hidden="true" className="size-6" />
                     </span>
+                    <div>
+                      <Badge className="mb-2">Featured hub</Badge>
+                      <h2 className="font-serif text-xl font-semibold sm:text-2xl">
+                        Artificial Intelligence
+                      </h2>
+                      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                        Generative AI, agents, automation, and machine learning,
+                        in one dedicated hub.
+                      </p>
+                      <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                        Explore the AI hub
+                        <FiArrowRight
+                          aria-hidden="true"
+                          className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
+                        />
+                      </span>
+                    </div>
+                  </div>
+                  <div className="pointer-events-none relative h-44 md:h-52">
+                    <TechScene
+                      nodeCount={Math.max(categorySet.size, 6)}
+                      scrollLinked={false}
+                      className="absolute inset-0"
+                    />
                   </div>
                 </div>
-                <div className="relative h-44 md:h-52">
-                  <TechScene
-                    nodeCount={Math.max(categorySet.size, 6)}
-                    scrollLinked={false}
-                    className="absolute inset-0"
-                  />
-                </div>
-              </div>
-            </Link>
+              </Link>
+            </div>
           </Reveal>
         </Container>
 
@@ -329,19 +340,23 @@ export default async function TechnologyPage() {
               {howTo.map(({ icon: Icon, title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group relative h-full rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="absolute right-4 top-3 font-serif text-4xl font-semibold text-primary/10">
-                        {i + 1}
-                      </span>
-                      <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold">
-                        {title}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {text}
-                      </p>
+                    <div className="group h-full">
+                      <div
+                        className={`relative h-full rounded-2xl border bg-card p-5 ${cardHover}`}
+                      >
+                        <span className="pointer-events-none absolute right-4 top-3 font-serif text-4xl font-semibold text-primary/10">
+                          {i + 1}
+                        </span>
+                        <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
+                          <Icon aria-hidden="true" className="size-5" />
+                        </span>
+                        <h3 className="mt-4 font-sans text-base font-semibold">
+                          {title}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {text}
+                        </p>
+                      </div>
                     </div>
                   </Reveal>
                 </li>
@@ -369,16 +384,20 @@ export default async function TechnologyPage() {
               {whyItMatters.map(({ icon: Icon, title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group h-full rounded-2xl border bg-card p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="mx-auto grid size-12 place-items-center rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:scale-100">
-                        <Icon aria-hidden="true" className="size-5" />
-                      </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold">
-                        {title}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {text}
-                      </p>
+                    <div className="group h-full">
+                      <div
+                        className={`h-full rounded-2xl border bg-card p-5 text-center ${cardHover}`}
+                      >
+                        <span className="mx-auto grid size-12 place-items-center rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+                          <Icon aria-hidden="true" className="size-5" />
+                        </span>
+                        <h3 className="mt-4 font-sans text-base font-semibold">
+                          {title}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {text}
+                        </p>
+                      </div>
                     </div>
                   </Reveal>
                 </li>
@@ -405,7 +424,7 @@ export default async function TechnologyPage() {
             <ol className="relative mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
               <span
                 aria-hidden="true"
-                className="absolute left-[16%] right-[16%] top-9 hidden h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent md:block"
+                className="pointer-events-none absolute left-[16%] right-[16%] top-9 hidden h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent md:block"
               />
               {path.map(({ title, text }, i) => (
                 <li key={title} className="min-w-0">
@@ -437,7 +456,7 @@ export default async function TechnologyPage() {
               <div className="relative overflow-hidden rounded-3xl border bg-card p-8 sm:p-10">
                 <span
                   aria-hidden="true"
-                  className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
                 />
                 <div className="flex flex-col items-start gap-5 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-start gap-4">

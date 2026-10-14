@@ -428,7 +428,7 @@ export function NotificationsExtras() {
           </div>
           <Accordion
             type="single"
-            collapsible
+            
             className="rounded-xl border bg-card px-5"
           >
             {NOTIFICATION_FAQ.map((f, i) => (

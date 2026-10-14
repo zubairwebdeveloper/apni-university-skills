@@ -413,7 +413,7 @@ export function CertificatesExtras({ inProgress = [] }) {
         </div>
         <Accordion
           type="single"
-          collapsible
+          
           className="rounded-xl border bg-card px-5"
         >
           {CERT_FAQ.map((f, i) => (

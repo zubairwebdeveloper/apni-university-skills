@@ -309,7 +309,7 @@ export default async function CoursePage({ params }) {
               <h2 id="cfaq-title" className={headingClass}>
                 Frequently asked questions
               </h2>
-              <Accordion type="single" collapsible>
+              <Accordion type="single" >
                 {course.faqs.map((f, i) => (
                   <AccordionItem key={f.q} value={`f-${i}`}>
                     <AccordionTrigger className="min-h-12 text-left text-base">

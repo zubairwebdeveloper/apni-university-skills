@@ -404,7 +404,7 @@ function NavItem({ item, active, collapsed, liveNow }) {
 function NavGroup({ title, items, pathname, collapsed, liveNow, first }) {
   const hasActiveItem = items.some((item) => isActivePath(pathname, item.href));
   const [open, setOpen] = useState(true);
-  const expanded = collapsed ? false : open;
+  const expanded = collapsed ? true : open;
   return (
     <section
       className="relative min-w-0"
@@ -1064,7 +1064,7 @@ export function StudentSidebar({
       if (key === "b") {
         if (isTyping) return;
         event.preventDefault();
-        setOpen((previous) => !previous);
+        setOpen(!open); // <-- functional updater hata diya
       } else if (key === "k") {
         event.preventDefault();
         openSearch();
@@ -1072,7 +1072,7 @@ export function StudentSidebar({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [filter, openSearch, setOpen]);
+  }, [filter, open, openSearch, setOpen]); // <-- open dependency add ki, [filter, openSearch, setOpen]);
 
   const triggerLogout = () =>
     logoutRef.current?.querySelector("button")?.click();

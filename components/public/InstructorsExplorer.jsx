@@ -137,12 +137,13 @@ export function InstructorsExplorer({ instructors = [] }) {
 
         {skills.length > 1 && (
           <div
-            className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]"
+            className="mt-4 flex flex-wrap items-center gap-2 pb-1"
             role="group"
             aria-label="Filter by expertise"
           >
             {skills.map((s) => {
               const active = skill === s.name;
+
               return (
                 <button
                   key={s.name}
@@ -156,6 +157,7 @@ export function InstructorsExplorer({ instructors = [] }) {
                   }`}
                 >
                   {s.name}
+
                   <span
                     className={`rounded-full px-1.5 text-xs ${
                       active ? "bg-primary-foreground/20" : "bg-muted"

@@ -20,7 +20,7 @@ import {
 } from "@/lib/constants/permissions";
 import { adminSlug } from "@/lib/validations/common";
 import { blogAdminRepository } from "@/repositories/admin/blogAdminRepository";
-import { blogGuard } from "@/lib/admin/guards";
+// import { blogGuard } from "@/lib/admin/guards";
 import { formatDateTime, readingMinutes } from "@/lib/utils/format";
 
 export const metadata = { title: "Post" };

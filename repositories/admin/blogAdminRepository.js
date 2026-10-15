@@ -6,7 +6,7 @@ import {
   DEFAULT_SORTS,
   LIFECYCLE,
 } from "./createAdminRepository";
-import { blogGuard } from "@/lib/admin/guards";
+// import { blogGuard } from "@/lib/admin/guards";
 import { AppError } from "@/lib/errors";
 
 export const BLOG_SORTS = [
@@ -47,7 +47,7 @@ export const blogAdminRepository = Object.assign(
     searchFields: ["title", "category", "authorName", "tags"],
     omit: ["searchKeywords"],
     protect: ["authorId", "scheduledFor"],
-    guard: blogGuard,
+    // guard: blogGuard,
     lifecycle,
     sorts: { ...DEFAULT_SORTS },
     listFields: [

@@ -2,29 +2,36 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import {
   AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Check,
   ChevronLeft,
   ChevronRight,
   Clock,
   Copy,
   Download,
+  Eye,
   GraduationCap,
   LayoutGrid,
   Loader2,
   Mail,
+  Minus,
   MoreHorizontal,
   Pencil,
-  Plus,
   RefreshCw,
   Rows3,
   Search,
   ShieldCheck,
   Trash2,
   UserCog,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
@@ -43,7 +50,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -60,6 +67,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+// Run once if missing: npx shadcn@latest add sheet
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -78,50 +93,102 @@ import { cn } from "@/lib/utils";
 /* Config                                                              */
 /* ------------------------------------------------------------------ */
 
-const PAGE_SIZES = [8, 16, 24];
+const PAGE_SIZES = [8, 16, 24, 48];
+const DAY = 86400000;
+const PREF_KEY = "admin-users-table:prefs";
 
 const ROLE_META = {
   admin: {
     label: "Admin",
+    plural: "Admins",
     badge: "border-primary/25 bg-primary/10 text-primary",
+    tint: "bg-primary/10 text-primary",
+    bar: "bg-primary",
     icon: ShieldCheck,
+    summary: "Full control of the dashboard, including who else has access.",
   },
   editor: {
     label: "Editor",
+    plural: "Editors",
     badge: "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    tint: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    bar: "bg-sky-500",
     icon: UserCog,
+    summary: "Creates and publishes content. Can moderate reviews.",
   },
   instructor: {
     label: "Instructor",
+    plural: "Instructors",
     badge:
       "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    tint: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    bar: "bg-amber-500",
     icon: GraduationCap,
+    summary: "Can view courses and lessons. Cannot publish or delete.",
   },
 };
 
-const ROLE_GUIDE = [
+const ROLE_RANK = { admin: 0, editor: 1, instructor: 2 };
+
+// Edit these rows to match your real permissions.
+const PERMISSIONS = [
   {
-    role: "admin",
-    title: "Admin",
-    text: "Full access to every section, including adding and removing other admins.",
+    area: "Courses and lessons",
+    admin: "full",
+    editor: "full",
+    instructor: "view",
+  },
+  { area: "Blog posts", admin: "full", editor: "full", instructor: "none" },
+  {
+    area: "Careers and jobs",
+    admin: "full",
+    editor: "full",
+    instructor: "none",
+  },
+  { area: "Reviews", admin: "full", editor: "full", instructor: "none" },
+  {
+    area: "Students and enrollments",
+    admin: "full",
+    editor: "none",
+    instructor: "none",
   },
   {
-    role: "editor",
-    title: "Editor",
-    text: "Creates and publishes courses, blog posts, careers and jobs. Can moderate reviews.",
+    area: "Payments and analytics",
+    admin: "full",
+    editor: "none",
+    instructor: "none",
   },
   {
-    role: "instructor",
-    title: "Instructor",
-    text: "Read-only access to courses and lessons. Cannot publish or delete anything.",
+    area: "Admin users and settings",
+    admin: "full",
+    editor: "none",
+    instructor: "none",
   },
 ];
+
+const LEVEL = {
+  full: {
+    label: "Can manage",
+    icon: Check,
+    cls: "text-emerald-600 dark:text-emerald-300",
+  },
+  view: {
+    label: "View only",
+    icon: Eye,
+    cls: "text-amber-600 dark:text-amber-300",
+  },
+  none: { label: "No access", icon: Minus, cls: "text-muted-foreground/60" },
+};
 
 const roleMeta = (role) =>
   ROLE_META[role] ?? {
     label: String(role || "admin").replace(/[_-]/g, " "),
+    plural: "Others",
     badge: "border-border bg-muted text-muted-foreground",
+    tint: "bg-muted text-muted-foreground",
+    bar: "bg-muted-foreground",
     icon: ShieldCheck,
+    summary: "",
   };
 
 /* ------------------------------------------------------------------ */
@@ -136,14 +203,17 @@ function toMs(ts) {
   return Number.isNaN(d) ? 0 : d;
 }
 
+const byName = (a, b) => (a.name || a.id).localeCompare(b.name || b.id);
+const byRole = (a, b) =>
+  (ROLE_RANK[a.role] ?? 9) - (ROLE_RANK[b.role] ?? 9) || byName(a, b);
+
 const SORTS = {
-  "name-asc": {
-    label: "Name (A-Z)",
-    fn: (a, b) => (a.name || "").localeCompare(b.name || ""),
-  },
-  "name-desc": {
-    label: "Name (Z-A)",
-    fn: (a, b) => (b.name || "").localeCompare(a.name || ""),
+  "name-asc": { label: "Name, A to Z", fn: byName },
+  "name-desc": { label: "Name, Z to A", fn: (a, b) => byName(b, a) },
+  "role-asc": { label: "Role, most access first", fn: byRole },
+  "role-desc": {
+    label: "Role, least access first",
+    fn: (a, b) => byRole(b, a),
   },
   newest: {
     label: "Newest first",
@@ -157,7 +227,7 @@ const SORTS = {
 
 function formatDate(ts) {
   const ms = toMs(ts);
-  if (!ms) return "—";
+  if (!ms) return "Unknown";
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
@@ -186,6 +256,11 @@ function timeAgo(ts) {
 const initialOf = (name, email) =>
   (name || email || "A").trim().slice(0, 1).toUpperCase();
 
+const isNewAdmin = (a) => {
+  const ms = toMs(a.createdAt);
+  return ms > 0 && Date.now() - ms < 7 * DAY;
+};
+
 function pageList(current, total) {
   if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
   const set = new Set([1, total, current - 1, current, current + 1]);
@@ -200,11 +275,9 @@ function pageList(current, total) {
   return out;
 }
 
-function csvCell(v) {
-  return `"${String(v ?? "").replace(/"/g, '""')}"`;
-}
+const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-function exportCsv(rows) {
+function exportCsv(rows, scope) {
   const header = ["Name", "Email", "Role", "Added", "Added by"];
   const lines = rows.map((a) =>
     [
@@ -224,11 +297,14 @@ function exportCsv(rows) {
     },
   );
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `admin-users-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `admin-users-${scope}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
   URL.revokeObjectURL(url);
+  toast.success(
+    `Exported ${rows.length} ${rows.length === 1 ? "admin" : "admins"}`,
+  );
 }
 
 function useCountUp(value, reduce) {
@@ -237,9 +313,8 @@ function useCountUp(value, reduce) {
     if (reduce) return;
     let raf;
     const start = performance.now();
-    const dur = 600;
     const tick = (t) => {
-      const p = Math.min(1, (t - start) / dur);
+      const p = Math.min(1, (t - start) / 700);
       setN(Math.round(value * (1 - Math.pow(1 - p, 3))));
       if (p < 1) raf = requestAnimationFrame(tick);
     };
@@ -253,15 +328,13 @@ function useCountUp(value, reduce) {
 /* Small pieces                                                        */
 /* ------------------------------------------------------------------ */
 
-// Gives a small checkbox a finger-sized (40px) tap area without changing
-// how it looks. Clicking the padding toggles the checkbox.
-function TapTarget({ children, disabled, className }) {
+// Gives a small checkbox a finger-sized tap area without changing its look.
+function TapTarget({ children, disabled }) {
   return (
     <label
       className={cn(
         "-m-3 flex size-10 items-center justify-center",
         disabled ? "cursor-not-allowed" : "cursor-pointer",
-        className,
       )}
     >
       {children}
@@ -280,83 +353,189 @@ function RoleBadge({ role }) {
   );
 }
 
-function PersonCell({ admin, isMe, size = "size-10" }) {
+function PersonCell({ admin, isMe, size = "size-10", onOpen }) {
+  const m = roleMeta(admin.role);
+  const name = admin.name || "Unnamed admin";
   return (
     <div className="flex min-w-0 items-center gap-3">
       <Avatar className={cn(size, "shrink-0 ring-2 ring-background")}>
-        {admin.image ? (
-          <AvatarImage src={admin.image} alt={admin.name || admin.id} />
-        ) : null}
-        <AvatarFallback className="bg-primary/10 font-semibold text-primary">
+        {admin.image ? <AvatarImage src={admin.image} alt={name} /> : null}
+        <AvatarFallback className={cn("font-semibold", m.tint)}>
           {initialOf(admin.name, admin.id)}
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0">
-        <p className="flex items-center gap-2 truncate text-sm font-semibold leading-tight text-foreground">
-          <span className="truncate">{admin.name || "Unnamed"}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          {onOpen ? (
+            <button
+              type="button"
+              onClick={onOpen}
+              className="truncate rounded text-left text-sm font-semibold leading-tight text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {name}
+            </button>
+          ) : (
+            <span className="truncate text-sm font-semibold leading-tight">
+              {name}
+            </span>
+          )}
           {isMe ? (
             <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
               You
             </span>
           ) : null}
-        </p>
+          {isNewAdmin(admin) ? (
+            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+              New
+            </span>
+          ) : null}
+        </div>
         <p className="truncate text-xs text-muted-foreground">{admin.id}</p>
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value, icon: Icon, tone, delay, active, onClick }) {
-  const reduce = useReducedMotion();
-  const shown = useCountUp(value, reduce);
+function SortHead({ label, first, second, sort, setSort, className }) {
+  const dir = sort === first ? "asc" : sort === second ? "desc" : null;
+  const Icon =
+    dir === "asc" ? ArrowUp : dir === "desc" ? ArrowDown : ArrowUpDown;
   return (
-    <motion.button
+    <TableHead
+      className={className}
+      aria-sort={
+        dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none"
+      }
+    >
+      <button
+        type="button"
+        onClick={() => setSort(sort === first ? second : first)}
+        className={cn(
+          "-ml-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+          dir ? "text-foreground" : "text-muted-foreground",
+        )}
+      >
+        {label}
+        <Icon aria-hidden="true" className="size-3.5" />
+      </button>
+    </TableHead>
+  );
+}
+
+/* Overview: one card that shows how access is split across roles. */
+function Overview({ counts, recent, roleFilter, onPick }) {
+  const reduce = useReducedMotion();
+  const total = counts.total || 1;
+  const items = [
+    {
+      key: "all",
+      label: "Everyone",
+      value: counts.total,
+      icon: Users,
+      tint: "bg-foreground/5 text-foreground",
+    },
+    ...["admin", "editor", "instructor"].map((k) => ({
+      key: k,
+      label: ROLE_META[k].plural,
+      value: counts[k],
+      icon: ROLE_META[k].icon,
+      tint: ROLE_META[k].tint,
+    })),
+  ];
+
+  return (
+    <Card className="gap-0 overflow-hidden py-0">
+      <div className="flex flex-wrap items-end justify-between gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight">
+            Who has access
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {counts.total === 0
+              ? "No one has been added yet."
+              : recent > 0
+                ? `${recent} added in the last 30 days.`
+                : "No new people in the last 30 days."}
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Select a role to filter the list.
+        </p>
+      </div>
+
+      <div
+        className="mx-4 mt-4 flex h-2.5 overflow-hidden rounded-full bg-muted sm:mx-5"
+        role="img"
+        aria-label={`Admins ${counts.admin}, editors ${counts.editor}, instructors ${counts.instructor}`}
+      >
+        {["admin", "editor", "instructor"].map((k) => (
+          <motion.div
+            key={k}
+            className={cn("h-full", ROLE_META[k].bar)}
+            initial={reduce ? false : { width: 0 }}
+            animate={{ width: `${(counts[k] / total) * 100}%` }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+          />
+        ))}
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-px border-t bg-border lg:grid-cols-4">
+        {items.map((it) => (
+          <OverviewTile
+            key={it.key}
+            item={it}
+            share={
+              it.key === "all" ? null : Math.round((it.value / total) * 100)
+            }
+            active={roleFilter === it.key}
+            onClick={() => onPick(it.key)}
+            reduce={reduce}
+          />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function OverviewTile({ item, share, active, onClick, reduce }) {
+  const Icon = item.icon;
+  const shown = useCountUp(item.value, reduce);
+  return (
+    <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      initial={reduce ? false : { opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay, ease: [0.22, 1, 0.36, 1] }}
-      className="min-w-0 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className={cn(
+        "flex items-center gap-3 bg-card p-3.5 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:p-4",
+        active &&
+          "bg-primary/5 shadow-[inset_0_-2px_0_0_var(--color-primary,theme(colors.primary.DEFAULT))]",
+      )}
     >
-      <Card
+      <span
         className={cn(
-          "h-full gap-0 py-0 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
-          active && "border-primary ring-1 ring-primary/40",
+          "flex size-10 shrink-0 items-center justify-center rounded-lg",
+          item.tint,
         )}
       >
-        {/* Stacked on very narrow phones, side by side from ~420px */}
-        <CardContent className="flex flex-col items-start gap-2.5 p-3 min-[420px]:flex-row min-[420px]:items-center min-[420px]:gap-3 sm:gap-4 sm:p-4">
-          <div
-            className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11",
-              tone,
-            )}
-          >
-            <Icon aria-hidden="true" className="size-5" />
-          </div>
-          <div className="min-w-0 max-w-full">
-            <p className="text-xl font-semibold tabular-nums leading-none tracking-tight sm:text-2xl">
-              {shown}
-            </p>
-            <p className="mt-1.5 truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
-              {label}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.button>
+        <Icon aria-hidden="true" className="size-5" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xl font-semibold tabular-nums leading-none tracking-tight sm:text-2xl">
+          {shown}
+        </span>
+        <span className="mt-1.5 block truncate text-xs font-medium text-muted-foreground">
+          {item.label}
+          {share !== null ? ` · ${share}%` : ""}
+        </span>
+      </span>
+    </button>
   );
 }
 
 function LoadingState() {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-[72px] rounded-xl" />
-        ))}
-      </div>
+    <div className="space-y-5">
+      <Skeleton className="h-[188px] rounded-xl" />
       <Skeleton className="h-10 w-full rounded-lg" />
       <div className="space-y-2">
         {Array.from({ length: 5 }).map((_, i) => (
@@ -369,7 +548,7 @@ function LoadingState() {
 
 function EmptyState({ filtered, onClear }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center sm:py-16">
+    <div className="flex flex-col items-center justify-center gap-3 px-4 py-14 text-center">
       <div className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
         {filtered ? (
           <Search className="size-6" />
@@ -379,12 +558,12 @@ function EmptyState({ filtered, onClear }) {
       </div>
       <div className="space-y-1">
         <h3 className="text-base font-semibold tracking-tight">
-          {filtered ? "No results found" : "No admins yet"}
+          {filtered ? "No admins match these filters" : "No admins yet"}
         </h3>
         <p className="max-w-sm text-sm leading-6 text-muted-foreground">
           {filtered
-            ? "Try a different search term or clear the filters."
-            : "Add your first admin so they can start using the dashboard."}
+            ? "Check the spelling, or clear the filters to see everyone."
+            : "Add the first person who should manage this dashboard."}
         </p>
       </div>
       {filtered ? (
@@ -396,14 +575,21 @@ function EmptyState({ filtered, onClear }) {
           href="/admin/admin-users/create"
           className={buttonVariants({ size: "sm" })}
         >
-          <Plus className="mr-1.5 size-4" /> Add admin
+          <UserPlus className="mr-1.5 size-4" /> Add admin
         </Link>
       )}
     </div>
   );
 }
 
-function RowMenu({ admin, canDelete, blockedReason, onCopy, onDelete }) {
+function RowMenu({
+  admin,
+  canDelete,
+  blockedReason,
+  onOpen,
+  onCopy,
+  onDelete,
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger >
@@ -419,8 +605,11 @@ function RowMenu({ admin, canDelete, blockedReason, onCopy, onDelete }) {
       <DropdownMenuContent
         align="end"
         collisionPadding={12}
-        className="w-52 max-w-[calc(100vw-1.5rem)]"
+        className="w-56 max-w-[calc(100vw-1.5rem)]"
       >
+        <DropdownMenuItem onClick={() => onOpen(admin)}>
+          <Eye className="mr-2 size-4" /> View details
+        </DropdownMenuItem>
         <DropdownMenuItem >
           <Link
             href={`/admin/admin-users/${encodeURIComponent(admin.id)}/edit`}
@@ -450,11 +639,215 @@ function RowMenu({ admin, canDelete, blockedReason, onCopy, onDelete }) {
   );
 }
 
+function FilterChip({ children, onRemove, label }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border bg-muted/50 py-0.5 pl-2.5 pr-1 text-xs font-medium">
+      {children}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={label}
+        className="rounded-full p-1 text-muted-foreground outline-none transition-colors hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <X className="size-3" />
+      </button>
+    </span>
+  );
+}
+
+/* Side panel with full details and the permissions for that person's role. */
+function DetailSheet({ admin, isMe, del, onClose, onCopy, onDelete }) {
+  const m = admin ? roleMeta(admin.role) : null;
+  const key = admin && ROLE_META[admin.role] ? admin.role : null;
+  return (
+    <Sheet open={!!admin} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-md">
+        {admin ? (
+          <>
+            <SheetHeader className="border-b bg-muted/30 p-5 pr-12">
+              <div className="flex items-center gap-4">
+                <Avatar className="size-14 shrink-0 ring-2 ring-background">
+                  {admin.image ? (
+                    <AvatarImage
+                      src={admin.image}
+                      alt={admin.name || admin.id}
+                    />
+                  ) : null}
+                  <AvatarFallback
+                    className={cn("text-lg font-semibold", m.tint)}
+                  >
+                    {initialOf(admin.name, admin.id)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <SheetTitle className="truncate text-lg">
+                    {admin.name || "Unnamed admin"}
+                    {isMe ? (
+                      <span className="ml-2 text-xs font-medium text-emerald-600">
+                        You
+                      </span>
+                    ) : null}
+                  </SheetTitle>
+                  <SheetDescription className="truncate">
+                    {admin.id}
+                  </SheetDescription>
+                  <div className="mt-2">
+                    <RoleBadge role={admin.role} />
+                  </div>
+                </div>
+              </div>
+            </SheetHeader>
+
+            <div className="space-y-6 p-5">
+              <dl className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">Added on</dt>
+                  <dd className="mt-0.5 font-medium">
+                    {formatDate(admin.createdAt)}
+                  </dd>
+                  <dd className="text-xs text-muted-foreground">
+                    {timeAgo(admin.createdAt)}
+                  </dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">Added by</dt>
+                  <dd className="mt-0.5 truncate font-medium">
+                    {admin.createdBy || "Unknown"}
+                  </dd>
+                </div>
+              </dl>
+
+              <div>
+                <h3 className="text-sm font-semibold">What this role can do</h3>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {m.summary}
+                </p>
+                {key ? (
+                  <ul className="mt-3 divide-y rounded-lg border">
+                    {PERMISSIONS.map((p) => {
+                      const lv = LEVEL[p[key]];
+                      const Icon = lv.icon;
+                      return (
+                        <li
+                          key={p.area}
+                          className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
+                        >
+                          <span>{p.area}</span>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1.5 text-xs font-medium",
+                              lv.cls,
+                            )}
+                          >
+                            <Icon aria-hidden="true" className="size-3.5" />
+                            {lv.label}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/admin/admin-users/${encodeURIComponent(admin.id)}/edit`}
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  <Pencil className="mr-1.5 size-4" /> Edit admin
+                </Link>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCopy(admin.id)}
+                >
+                  <Copy className="mr-1.5 size-4" /> Copy email
+                </Button>
+                <a
+                  href={`mailto:${admin.id}`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  <Mail className="mr-1.5 size-4" /> Send email
+                </a>
+              </div>
+
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                <p className="text-sm font-medium">Remove access</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {del.ok
+                    ? "This person will lose dashboard access immediately."
+                    : `${del.reason}.`}
+                </p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="mt-3"
+                  disabled={!del.ok}
+                  onClick={() => onDelete(admin)}
+                >
+                  <Trash2 className="mr-1.5 size-4" /> Delete admin
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function PermissionMatrix() {
+  const roles = ["admin", "editor", "instructor"];
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/40 hover:bg-muted/40">
+            <TableHead className="pl-4 text-xs font-semibold">Area</TableHead>
+            {roles.map((r) => (
+              <TableHead key={r} className="text-xs font-semibold">
+                <RoleBadge role={r} />
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {PERMISSIONS.map((p) => (
+            <TableRow key={p.area}>
+              <TableCell className="pl-4 text-sm font-medium">
+                {p.area}
+              </TableCell>
+              {roles.map((r) => {
+                const lv = LEVEL[p[r]];
+                const Icon = lv.icon;
+                return (
+                  <TableCell key={r}>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 text-xs font-medium",
+                        lv.cls,
+                      )}
+                    >
+                      <Icon aria-hidden="true" className="size-3.5" />
+                      {lv.label}
+                    </span>
+                  </TableCell>
+                );
+              })}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
 
 export function AdminUsersTable() {
+  const router = useRouter();
   const reduce = useReducedMotion();
   const searchRef = useRef(null);
 
@@ -469,12 +862,33 @@ export function AdminUsersTable() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [sort, setSort] = useState("name-asc");
   const [view, setView] = useState("table");
+  const [density, setDensity] = useState("comfortable");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+  const [showMatrix, setShowMatrix] = useState(false);
 
   const [selected, setSelected] = useState(() => new Set());
-  const [pending, setPending] = useState([]); // admins waiting for delete confirmation
+  const [pending, setPending] = useState([]);
   const [deleting, setDeleting] = useState(false);
+  const [detail, setDetail] = useState(null);
+
+  // Remember view, density and page size between visits
+  useEffect(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
+      if (p.view) setView(p.view);
+      if (p.density) setDensity(p.density);
+      if (PAGE_SIZES.includes(p.pageSize)) setPageSize(p.pageSize);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        PREF_KEY,
+        JSON.stringify({ view, density, pageSize }),
+      );
+    } catch {}
+  }, [view, density, pageSize]);
 
   const load = useCallback(async ({ soft = false } = {}) => {
     soft ? setRefreshing(true) : setLoading(true);
@@ -499,19 +913,29 @@ export function AdminUsersTable() {
     return unsub;
   }, [load]);
 
-  // Press "/" to jump to the search box
+  // Keyboard shortcuts: / search, r refresh, n new admin
   useEffect(() => {
     const onKey = (e) => {
-      const tag = e.target?.tagName;
-      if (e.key !== "/" || e.metaKey || e.ctrlKey) return;
-      if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable)
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target;
+      if (
+        t?.tagName === "INPUT" ||
+        t?.tagName === "TEXTAREA" ||
+        t?.isContentEditable
+      )
         return;
-      e.preventDefault();
-      searchRef.current?.focus();
+      if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === "r") {
+        load({ soft: true });
+      } else if (e.key === "n") {
+        router.push("/admin/admin-users/create");
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [load, router]);
 
   /* ---------- derived data ---------- */
 
@@ -520,6 +944,14 @@ export function AdminUsersTable() {
     for (const a of admins) if (c[a.role] !== undefined) c[a.role] += 1;
     return c;
   }, [admins]);
+
+  const recent = useMemo(
+    () =>
+      admins.filter(
+        (a) => toMs(a.createdAt) && Date.now() - toMs(a.createdAt) < 30 * DAY,
+      ).length,
+    [admins],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -550,23 +982,30 @@ export function AdminUsersTable() {
       if (a.id === me)
         return { ok: false, reason: "You can't delete yourself" };
       if (a.role === "admin" && counts.admin <= 1)
-        return { ok: false, reason: "Last admin can't be deleted" };
+        return { ok: false, reason: "The last admin can't be deleted" };
       return { ok: true, reason: "" };
     },
     [me, counts.admin],
   );
 
   const selectablePage = pageItems.filter((a) => deleteState(a).ok);
+  const selectableAll = filtered.filter((a) => deleteState(a).ok);
   const allPageSelected =
     selectablePage.length > 0 &&
     selectablePage.every((a) => selected.has(a.id));
   const somePageSelected = selectablePage.some((a) => selected.has(a.id));
+  const allFilteredSelected =
+    selectableAll.length > 0 && selectableAll.every((a) => selected.has(a.id));
+  const showSelectAllStrip =
+    allPageSelected && selectableAll.length > selectablePage.length;
 
   const selectedAdmins = admins.filter((a) => selected.has(a.id));
   const selectedAdminRoleCount = selectedAdmins.filter(
     (a) => a.role === "admin",
   ).length;
   const bulkBlocked = selectedAdminRoleCount >= counts.admin;
+
+  const compact = density === "compact";
 
   function clearFilters() {
     setQuery("");
@@ -590,6 +1029,14 @@ export function AdminUsersTable() {
     });
   }
 
+  function selectAllFiltered() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      selectableAll.forEach((a) => next.add(a.id));
+      return next;
+    });
+  }
+
   function pickRole(role) {
     setRoleFilter((cur) => (cur === role ? "all" : role));
     setPage(1);
@@ -597,14 +1044,15 @@ export function AdminUsersTable() {
 
   /* ---------- actions ---------- */
 
-  async function copyEmail(email) {
+  async function copyText(text, okMsg) {
     try {
-      await navigator.clipboard.writeText(email);
-      toast.success("Email copied");
+      await navigator.clipboard.writeText(text);
+      toast.success(okMsg);
     } catch {
-      toast.error("Couldn't copy the email");
+      toast.error("Couldn't copy to the clipboard");
     }
   }
+  const copyEmail = (email) => copyText(email, "Email copied");
 
   async function confirmDelete() {
     if (!pending.length) return;
@@ -623,6 +1071,7 @@ export function AdminUsersTable() {
       okIds.forEach((id) => next.delete(id));
       return next;
     });
+    if (detail && okIds.includes(detail.id)) setDetail(null);
 
     if (okIds.length)
       toast.success(
@@ -663,45 +1112,12 @@ export function AdminUsersTable() {
 
   return (
     <div className="min-w-0 space-y-5 pb-28 sm:space-y-6 sm:pb-24">
-      {/* Stats (click to filter) */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Total admins"
-          value={counts.total}
-          icon={Users}
-          tone="bg-primary/10 text-primary"
-          delay={0}
-          active={roleFilter === "all"}
-          onClick={() => pickRole("all")}
-        />
-        <StatCard
-          label="Admins"
-          value={counts.admin}
-          icon={ShieldCheck}
-          tone="bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
-          delay={0.06}
-          active={roleFilter === "admin"}
-          onClick={() => pickRole("admin")}
-        />
-        <StatCard
-          label="Editors"
-          value={counts.editor}
-          icon={UserCog}
-          tone="bg-sky-500/10 text-sky-600 dark:text-sky-300"
-          delay={0.12}
-          active={roleFilter === "editor"}
-          onClick={() => pickRole("editor")}
-        />
-        <StatCard
-          label="Instructors"
-          value={counts.instructor}
-          icon={GraduationCap}
-          tone="bg-amber-500/10 text-amber-600 dark:text-amber-300"
-          delay={0.18}
-          active={roleFilter === "instructor"}
-          onClick={() => pickRole("instructor")}
-        />
-      </div>
+      <Overview
+        counts={counts}
+        recent={recent}
+        roleFilter={roleFilter}
+        onPick={pickRole}
+      />
 
       {/* Toolbar */}
       <div className="space-y-3">
@@ -718,7 +1134,7 @@ export function AdminUsersTable() {
                 setQuery(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search by name or email…"
+              placeholder="Search by name or email"
               aria-label="Search admins"
               className="px-9"
             />
@@ -738,69 +1154,74 @@ export function AdminUsersTable() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
-            <Select
-              value={roleFilter}
-              onValueChange={(v) => {
-                setRoleFilter(v);
-                setPage(1);
-              }}
+          <Select value={sort} onValueChange={setSort}>
+            <SelectTrigger
+              className="w-full md:w-[210px]"
+              aria-label="Sort admins"
             >
-              <SelectTrigger
-                className="w-full md:w-[140px]"
-                aria-label="Filter by role"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All roles</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="editor">Editor</SelectItem>
-                <SelectItem value="instructor">Instructor</SelectItem>
-              </SelectContent>
-            </Select>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(SORTS).map(([key, s]) => (
+                <SelectItem key={key} value={key}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <Select value={sort} onValueChange={setSort}>
-              <SelectTrigger
-                className="w-full md:w-[150px]"
-                aria-label="Sort admins"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(SORTS).map(([key, s]) => (
-                  <SelectItem key={key} value={key}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Link
+            href="/admin/admin-users/create"
+            className={cn(buttonVariants(), "hidden gap-1.5 md:inline-flex")}
+          >
+            <UserPlus aria-hidden="true" className="size-4" /> Add admin
+          </Link>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground" aria-live="polite">
-            <span className="font-medium text-foreground">
-              {filtered.length}
-            </span>{" "}
-            {filtered.length === 1 ? "admin" : "admins"}
-            {hasFilters ? " found" : ""}
+          <div
+            className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground"
+            aria-live="polite"
+          >
+            <span>
+              <span className="font-medium text-foreground">
+                {filtered.length}
+              </span>{" "}
+              {filtered.length === 1 ? "admin" : "admins"}
+              {hasFilters ? " match" : ""}
+            </span>
+            {query.trim() ? (
+              <FilterChip
+                onRemove={() => setQuery("")}
+                label="Remove search filter"
+              >
+                Search: {query.trim()}
+              </FilterChip>
+            ) : null}
+            {roleFilter !== "all" ? (
+              <FilterChip
+                onRemove={() => setRoleFilter("all")}
+                label="Remove role filter"
+              >
+                Role: {roleMeta(roleFilter).label}
+              </FilterChip>
+            ) : null}
             {hasFilters ? (
               <button
                 type="button"
                 onClick={clearFilters}
-                className="ml-2 py-1 font-medium text-primary underline-offset-4 hover:underline"
+                className="py-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
               >
-                Clear filters
+                Clear all
               </button>
             ) : null}
-          </p>
+          </div>
 
           <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
             {syncedAt ? (
               <span className="hidden items-center gap-1 text-xs text-muted-foreground lg:inline-flex">
                 <Clock aria-hidden="true" className="size-3" />
-                Synced{" "}
+                Updated{" "}
                 {new Intl.DateTimeFormat("en-GB", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -808,7 +1229,32 @@ export function AdminUsersTable() {
               </span>
             ) : null}
 
-            {/* View toggle: desktop only, phones always get cards */}
+            {/* Density: table only */}
+            {showTable ? (
+              <div
+                className="hidden rounded-lg border bg-muted/40 p-0.5 lg:inline-flex"
+                role="group"
+                aria-label="Row density"
+              >
+                {["comfortable", "compact"].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDensity(d)}
+                    aria-pressed={density === d}
+                    className={cn(
+                      "rounded-md px-2.5 py-1.5 text-xs font-medium capitalize transition-colors motion-reduce:transition-none",
+                      density === d
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
             <div
               className="hidden rounded-lg border bg-muted/40 p-0.5 md:inline-flex"
               role="group"
@@ -839,7 +1285,9 @@ export function AdminUsersTable() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportCsv(filtered)}
+              onClick={() =>
+                exportCsv(filtered, hasFilters ? "filtered" : "all")
+              }
               disabled={!filtered.length}
               className="h-10 flex-1 gap-1.5 sm:h-8 sm:flex-none"
             >
@@ -865,11 +1313,41 @@ export function AdminUsersTable() {
 
       {/* Content */}
       <Card className="min-w-0 gap-0 overflow-hidden py-0">
+        {showSelectAllStrip ? (
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b bg-primary/5 px-4 py-2.5 text-sm">
+            {allFilteredSelected ? (
+              <>
+                <span>All {selectableAll.length} admins are selected.</span>
+                <button
+                  type="button"
+                  onClick={() => setSelected(new Set())}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Clear selection
+                </button>
+              </>
+            ) : (
+              <>
+                <span>
+                  All {selectablePage.length} admins on this page are selected.
+                </span>
+                <button
+                  type="button"
+                  onClick={selectAllFiltered}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Select all {selectableAll.length}
+                </button>
+              </>
+            )}
+          </div>
+        ) : null}
+
         {pageItems.length === 0 ? (
           <EmptyState filtered={hasFilters} onClear={clearFilters} />
         ) : (
           <>
-            {/* Table: md and up (scrolls sideways inside the card if needed) */}
+            {/* Table: md and up */}
             <div className={cn(showTable ? "hidden md:block" : "hidden")}>
               <Table>
                 <TableHeader>
@@ -890,33 +1368,41 @@ export function AdminUsersTable() {
                         />
                       </TapTarget>
                     </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                      Admin
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                      Role
-                    </TableHead>
-                    <TableHead className="hidden text-xs font-semibold uppercase tracking-wide lg:table-cell">
-                      Added
-                    </TableHead>
-                    <TableHead className="pr-4 text-right text-xs font-semibold uppercase tracking-wide">
+                    <SortHead
+                      label="Admin"
+                      first="name-asc"
+                      second="name-desc"
+                      sort={sort}
+                      setSort={setSort}
+                    />
+                    <SortHead
+                      label="Role"
+                      first="role-asc"
+                      second="role-desc"
+                      sort={sort}
+                      setSort={setSort}
+                    />
+                    <SortHead
+                      label="Added"
+                      first="newest"
+                      second="oldest"
+                      sort={sort}
+                      setSort={setSort}
+                      className="hidden lg:table-cell"
+                    />
+                    <TableHead className="pr-4 text-right text-xs font-semibold text-muted-foreground">
                       Actions
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pageItems.map((a, i) => {
+                  {pageItems.map((a) => {
                     const isMe = a.id === me;
                     const del = deleteState(a);
                     return (
                       <TableRow
                         key={a.id}
                         data-state={selected.has(a.id) ? "selected" : undefined}
-                        style={{
-                          animationDelay: `${i * 45}ms`,
-                          animationFillMode: "backwards",
-                        }}
-                        className="animate-in fade-in slide-in-from-bottom-1 duration-500 motion-reduce:animate-none"
                       >
                         <TableCell className="pl-4">
                           <TapTarget disabled={!del.ok}>
@@ -930,11 +1416,25 @@ export function AdminUsersTable() {
                             />
                           </TapTarget>
                         </TableCell>
-                        <TableCell className="max-w-[12rem] py-3 md:max-w-[16rem] lg:max-w-[22rem]">
-                          <PersonCell admin={a} isMe={isMe} />
-                          {/* "Added" moves under the person on tablets, where its column is hidden */}
-                          {a.createdAt ? (
-                            <p className="mt-1 truncate pl-[3.25rem] text-xs text-muted-foreground lg:hidden">
+                        <TableCell
+                          className={cn(
+                            "max-w-[12rem] md:max-w-[16rem] lg:max-w-[22rem]",
+                            compact ? "py-2" : "py-3.5",
+                          )}
+                        >
+                          <PersonCell
+                            admin={a}
+                            isMe={isMe}
+                            size={compact ? "size-8" : "size-10"}
+                            onOpen={() => setDetail(a)}
+                          />
+                          {a.createdAt && !compact ? (
+                            <p
+                              className={cn(
+                                "mt-1 truncate text-xs text-muted-foreground lg:hidden",
+                                "pl-[3.25rem]",
+                              )}
+                            >
                               Added {timeAgo(a.createdAt)}
                             </p>
                           ) : null}
@@ -946,10 +1446,12 @@ export function AdminUsersTable() {
                           <p className="text-foreground/80">
                             {formatDate(a.createdAt)}
                           </p>
-                          <p className="max-w-[16rem] truncate text-xs">
-                            {timeAgo(a.createdAt)}
-                            {a.createdBy ? ` · by ${a.createdBy}` : ""}
-                          </p>
+                          {!compact ? (
+                            <p className="max-w-[16rem] truncate text-xs">
+                              {timeAgo(a.createdAt)}
+                              {a.createdBy ? ` by ${a.createdBy}` : ""}
+                            </p>
+                          ) : null}
                         </TableCell>
                         <TableCell className="pr-4">
                           <div className="flex justify-end">
@@ -957,6 +1459,7 @@ export function AdminUsersTable() {
                               admin={a}
                               canDelete={del.ok}
                               blockedReason={del.reason}
+                              onOpen={setDetail}
                               onCopy={copyEmail}
                               onDelete={(x) => setPending([x])}
                             />
@@ -976,26 +1479,26 @@ export function AdminUsersTable() {
                 showTable && "md:hidden",
               )}
             >
-              {pageItems.map((a, i) => {
+              {pageItems.map((a) => {
                 const isMe = a.id === me;
                 const del = deleteState(a);
                 const isSel = selected.has(a.id);
                 return (
-                  <motion.div
+                  <div
                     key={a.id}
-                    initial={reduce ? false : { opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35, delay: i * 0.04 }}
                     className={cn(
-                      "group relative min-w-0 overflow-hidden rounded-xl border bg-card p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-4",
+                      "relative min-w-0 overflow-hidden rounded-xl border bg-card p-3.5 transition-colors hover:border-primary/40 motion-reduce:transition-none sm:p-4",
                       isSel && "border-primary ring-1 ring-primary/40",
                     )}
                   >
-                    <div
+                    <span
                       aria-hidden="true"
-                      className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/60 via-primary/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                      className={cn(
+                        "absolute inset-y-0 left-0 w-1",
+                        roleMeta(a.role).bar,
+                      )}
                     />
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 pl-1.5">
                       <div className="mt-1 shrink-0">
                         <TapTarget disabled={!del.ok}>
                           <Checkbox
@@ -1007,25 +1510,31 @@ export function AdminUsersTable() {
                         </TapTarget>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <PersonCell admin={a} isMe={isMe} size="size-11" />
+                        <PersonCell
+                          admin={a}
+                          isMe={isMe}
+                          size="size-11"
+                          onOpen={() => setDetail(a)}
+                        />
                       </div>
                       <RowMenu
                         admin={a}
                         canDelete={del.ok}
                         blockedReason={del.reason}
+                        onOpen={setDetail}
                         onCopy={copyEmail}
                         onDelete={(x) => setPending([x])}
                       />
                     </div>
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3 pl-1.5">
                       <RoleBadge role={a.role} />
                       <span className="text-xs text-muted-foreground">
                         {a.createdAt
                           ? `Added ${timeAgo(a.createdAt)}`
-                          : "Added —"}
+                          : "Added date unknown"}
                       </span>
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -1039,7 +1548,7 @@ export function AdminUsersTable() {
               <p>
                 Showing{" "}
                 <span className="font-medium text-foreground">
-                  {from}-{to}
+                  {from} to {to}
                 </span>{" "}
                 of{" "}
                 <span className="font-medium text-foreground">
@@ -1047,7 +1556,7 @@ export function AdminUsersTable() {
                 </span>
               </p>
               <label className="inline-flex items-center gap-2">
-                <span className="text-xs">Per page</span>
+                <span className="text-xs">Rows per page</span>
                 <Select
                   value={String(pageSize)}
                   onValueChange={(v) => {
@@ -1125,30 +1634,37 @@ export function AdminUsersTable() {
         ) : null}
       </Card>
 
-      {/* Role guide */}
+      {/* Role guide with a full permission comparison */}
       <section aria-labelledby="role-guide" className="space-y-3">
-        <div className="space-y-1">
-          <h2
-            id="role-guide"
-            className="text-base font-semibold tracking-tight"
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div className="space-y-1">
+            <h2
+              id="role-guide"
+              className="text-base font-semibold tracking-tight"
+            >
+              Choosing a role
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Give people the lowest role that lets them do their job.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowMatrix((s) => !s)}
+            aria-expanded={showMatrix}
           >
-            Role guide
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            What each role can do in the dashboard.
-          </p>
+            {showMatrix ? "Hide permission details" : "Compare permissions"}
+          </Button>
         </div>
+
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {ROLE_GUIDE.map((r, i) => {
-            const m = roleMeta(r.role);
+          {["admin", "editor", "instructor"].map((r) => {
+            const m = roleMeta(r);
             const Icon = m.icon;
             return (
-              <motion.div
-                key={r.role}
-                initial={reduce ? false : { opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.35, delay: i * 0.06 }}
+              <div
+                key={r}
                 className="flex items-start gap-3 rounded-xl border bg-card p-4 md:block"
               >
                 <span
@@ -1161,21 +1677,45 @@ export function AdminUsersTable() {
                 </span>
                 <div className="min-w-0">
                   <h3 className="text-sm font-semibold tracking-tight">
-                    {r.title}
+                    {m.label}{" "}
+                    <span className="font-normal text-muted-foreground">
+                      ({counts[r]})
+                    </span>
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {r.text}
+                    {m.summary}
                   </p>
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>
+
+        <AnimatePresence initial={false}>
+          {showMatrix ? (
+            <motion.div
+              key="matrix"
+              initial={reduce ? false : { opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              <Card className="gap-0 overflow-hidden py-0">
+                <PermissionMatrix />
+              </Card>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </section>
 
-      {/* Floating bulk action bar.
-          Phones/tablets: leaves room on the right for the scroll-to-top button
-          and respects the iOS home-indicator safe area. */}
+      <p className="hidden text-xs text-muted-foreground md:block">
+        Shortcuts: <kbd className="rounded border bg-muted px-1">/</kbd> search,{" "}
+        <kbd className="rounded border bg-muted px-1">r</kbd> refresh,{" "}
+        <kbd className="rounded border bg-muted px-1">n</kbd> add admin.
+      </p>
+
+      {/* Floating bulk action bar */}
       <AnimatePresence>
         {selected.size > 0 && (
           <motion.div
@@ -1183,7 +1723,7 @@ export function AdminUsersTable() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.25 }}
-            className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 right-[4.75rem] z-40 mx-auto flex max-w-xl flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card/95 p-3 shadow-xl backdrop-blur sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] md:right-3"
+            className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 right-[4.75rem] z-40 mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card/95 p-3 shadow-xl backdrop-blur sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] md:right-3"
             role="region"
             aria-label="Bulk actions"
           >
@@ -1195,13 +1735,36 @@ export function AdminUsersTable() {
                 </span>
               ) : null}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelected(new Set())}
               >
                 Clear
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() =>
+                  copyText(
+                    selectedAdmins.map((a) => a.id).join(", "),
+                    "Emails copied",
+                  )
+                }
+              >
+                <Copy aria-hidden="true" className="size-4" />
+                <span className="hidden sm:inline">Copy emails</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => exportCsv(selectedAdmins, "selected")}
+              >
+                <Download aria-hidden="true" className="size-4" />
+                <span className="hidden sm:inline">Export</span>
               </Button>
               <Button
                 variant="destructive"
@@ -1217,6 +1780,16 @@ export function AdminUsersTable() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Details panel */}
+      <DetailSheet
+        admin={detail}
+        isMe={detail?.id === me}
+        del={detail ? deleteState(detail) : { ok: false, reason: "" }}
+        onClose={() => setDetail(null)}
+        onCopy={copyEmail}
+        onDelete={(x) => setPending([x])}
+      />
 
       {/* Delete dialog (single and bulk) */}
       <AlertDialog
@@ -1247,7 +1820,7 @@ export function AdminUsersTable() {
                   immediately.
                 </>
               )}{" "}
-              This action can&apos;t be undone.
+              This can&apos;t be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1263,7 +1836,7 @@ export function AdminUsersTable() {
               {deleting ? (
                 <Loader2 className="mr-2 size-4 animate-spin" />
               ) : null}
-              {deleting ? "Deleting…" : "Yes, delete"}
+              {deleting ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

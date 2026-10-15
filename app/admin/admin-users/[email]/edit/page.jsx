@@ -236,7 +236,7 @@ export default async function EditAdminPage({ params }) {
         </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-6 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Form (existing loader, unchanged) */}
         <section
           aria-label="Edit admin form"

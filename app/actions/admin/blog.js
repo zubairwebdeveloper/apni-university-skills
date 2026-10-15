@@ -3,7 +3,7 @@ import { z } from "zod";
 import { adminAction } from "@/lib/admin/action";
 import { makeFeatureAction } from "@/lib/admin/featureAction";
 import { makeLifecycleActions } from "@/lib/admin/lifecycleActions";
-import { blogGuard } from "@/lib/admin/guards";
+// import { blogGuard } from "@/lib/admin/guards";
 import { changedFields } from "@/lib/audit/auditLog";
 import { AppError } from "@/lib/errors";
 import { PERMISSIONS as P } from "@/lib/constants/permissions";

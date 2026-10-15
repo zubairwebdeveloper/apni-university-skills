@@ -15,6 +15,11 @@ import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { ShareButton } from "@/components/public/courses/ShareButton";
 import { BlogCard } from "@/components/public/BlogCard";
+import {
+  BackToTop,
+  ReadingProgress,
+  TableOfContents,
+} from "@/components/public/blog/ArticleTools";
 
 import { blogService } from "@/services/blogService";
 
@@ -23,14 +28,16 @@ import { formatDate, readingMinutes } from "@/lib/utils/format";
 
 export const revalidate = 300;
 
+const BODY_ID = "article-body";
+const DAY = 24 * 60 * 60 * 1000;
+
 const getPost = cache((slug) => blogService.getPostBySlug(slug));
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 const iso = (ms) => (ms ? new Date(ms).toISOString() : undefined);
 
-// Derive initials from an author's name for the avatar badge, so nothing
-// is invented beyond the authorName the post already carries.
+// Initials for the author avatar, derived only from the authorName the post carries.
 function initialsFrom(name) {
   if (!name) return "A";
   return name
@@ -49,25 +56,18 @@ export async function generateMetadata({ params }) {
   if (!post) {
     return {
       title: "Article not found",
-      robots: {
-        index: false,
-      },
+      robots: { index: false },
     };
   }
 
   const url = `/blog/${post.slug}`;
-
   const images = post.coverImage ? [{ url: post.coverImage }] : undefined;
 
   return {
     title: post.title,
     description: post.excerpt,
     keywords: post.tags?.length ? post.tags : undefined,
-
-    alternates: {
-      canonical: url,
-    },
-
+    alternates: { canonical: url },
     openGraph: {
       title: post.title,
       description: post.excerpt,
@@ -79,9 +79,9 @@ export async function generateMetadata({ params }) {
       tags: post.tags,
       images,
     },
-
     twitter: {
-      card: "summary_large_image",
+      // Without a cover image a large-image card would render empty.
+      card: images ? "summary_large_image" : "summary",
       title: post.title,
       description: post.excerpt,
       images: images?.map((image) => image.url),
@@ -93,15 +93,16 @@ export default async function BlogPostPage({ params }) {
   const { slug } = await params;
 
   const post = await getPost(slug);
-
-  if (!post) {
-    notFound();
-  }
+  if (!post) notFound();
 
   const related = await safe(blogService.getRelatedPosts(post, 3), []);
 
   const pageUrl = `${siteUrl}/blog/${post.slug}`;
   const minutes = readingMinutes(post.content);
+  const wasUpdated =
+    post.updatedAt &&
+    post.publishedAt &&
+    post.updatedAt - post.publishedAt > DAY;
 
   return (
     <>
@@ -111,42 +112,51 @@ export default async function BlogPostPage({ params }) {
           "@type": "BlogPosting",
           headline: post.title,
           description: post.excerpt,
-          image: post.coverImage,
+          image: post.coverImage ? [post.coverImage] : undefined,
           datePublished: iso(post.publishedAt),
           dateModified: iso(post.updatedAt),
-
+          timeRequired: `PT${minutes}M`,
+          keywords: post.tags?.length ? post.tags.join(", ") : undefined,
           author: post.authorName
-            ? {
-                "@type": "Person",
-                name: post.authorName,
-              }
+            ? { "@type": "Person", name: post.authorName }
             : undefined,
-
-          publisher: {
-            "@type": "Organization",
-            name: "Apni University",
-          },
-
+          publisher: { "@type": "Organization", name: "Apni University" },
           mainEntityOfPage: pageUrl,
         }}
       />
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: siteUrl },
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: "Blog",
+              item: `${siteUrl}/blog`,
+            },
+            {
+              "@type": "ListItem",
+              position: 3,
+              name: post.title,
+              item: pageUrl,
+            },
+          ],
+        }}
+      />
+
+      <ReadingProgress targetId={BODY_ID} />
+      <BackToTop />
 
       <article>
-        <Container className="max-w-3xl py-8 sm:py-12">
+        <Container className="max-w-5xl py-8 sm:py-12">
           <div className="flex items-center justify-between gap-4">
             <PageBreadcrumbs
               items={[
-                {
-                  label: "Home",
-                  href: "/",
-                },
-                {
-                  label: "Blog",
-                  href: "/blog",
-                },
-                {
-                  label: post.title,
-                },
+                { label: "Home", href: "/" },
+                { label: "Blog", href: "/blog" },
+                { label: post.title },
               ]}
             />
             <Link
@@ -157,116 +167,154 @@ export default async function BlogPostPage({ params }) {
             </Link>
           </div>
 
-          <header className="mt-6">
-            <div className="flex flex-wrap items-center gap-2">
-              {post.category && (
-                <Badge variant="secondary">{post.category}</Badge>
-              )}
-              <Badge variant="outline">{minutes} min read</Badge>
-            </div>
+          {/* Header: kept to a readable width even though the page is wider */}
+          <header className="mt-8 max-w-3xl">
+            {post.category && (
+              <Badge variant="secondary">{post.category}</Badge>
+            )}
 
-            <h1 className="mt-3 text-3xl text-foreground sm:text-4xl lg:text-5xl">
+            <h1 className="mt-4 text-balance text-3xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-4xl lg:text-5xl">
               {post.title}
             </h1>
 
             {post.excerpt && (
-              <p className="mt-4 text-lg text-muted-foreground">
+              <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                 {post.excerpt}
               </p>
             )}
 
-            <div className="mt-6 flex items-center gap-3 border-t border-border pt-5">
+            <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
               {post.authorName && (
-                <span
-                  aria-hidden="true"
-                  className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 font-sans text-sm font-semibold text-primary"
-                >
-                  {initialsFrom(post.authorName)}
-                </span>
-              )}
-              <p className="text-sm text-muted-foreground">
-                {post.authorName && (
-                  <span className="block font-medium text-foreground">
+                <div className="flex items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 font-sans text-sm font-semibold text-primary"
+                  >
+                    {initialsFrom(post.authorName)}
+                  </span>
+                  <span className="text-sm font-medium text-foreground">
                     {post.authorName}
                   </span>
-                )}
+                </div>
+              )}
+              <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 <time dateTime={iso(post.publishedAt)}>
                   {formatDate(post.publishedAt)}
                 </time>
-                {post.updatedAt && post.updatedAt !== post.publishedAt && (
-                  <> · Updated {formatDate(post.updatedAt)}</>
+                <span>{minutes} min read</span>
+                {wasUpdated && (
+                  <span>Updated {formatDate(post.updatedAt)}</span>
                 )}
               </p>
             </div>
           </header>
 
           {post.coverImage && (
-            <div className="relative mt-8 aspect-[16/9] overflow-hidden rounded-2xl border border-border bg-muted">
+            <div className="relative mt-10 aspect-[16/9] overflow-hidden rounded-2xl border border-border bg-muted">
               <Image
                 src={post.coverImage}
                 alt=""
                 fill
                 priority
-                sizes="(min-width:768px) 768px, 100vw"
+                sizes="(min-width:1024px) 1024px, 100vw"
                 className="object-cover"
               />
             </div>
           )}
 
-          <div className="mt-8">
-            <ArticleBody text={post.content} />
-          </div>
+          {/* Contents list for small screens */}
+          <TableOfContents targetId={BODY_ID} variant="mobile" />
 
-          {post.tags?.length > 0 && (
-            <ul
-              className="mt-10 flex flex-wrap gap-2 border-t border-border pt-6"
-              aria-label="Tags"
-            >
-              {post.tags.map((tag) => (
-                <li key={tag}>
-                  <Link href={`/blog?tag=${encodeURIComponent(tag)}`}>
-                    <Badge
-                      variant="outline"
-                      className="transition-colors hover:border-primary/50 hover:text-primary"
-                    >
-                      #{tag}
-                    </Badge>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_15rem]">
+            <div className="min-w-0 max-w-3xl">
+              <div id={BODY_ID}>
+                <ArticleBody text={post.content} />
+              </div>
 
-          <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Found this useful?
-              </p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Share it with someone who&apos;s learning this too.
-              </p>
+              {post.tags?.length > 0 && (
+                <ul
+                  className="mt-10 flex flex-wrap gap-2 border-t border-border pt-6"
+                  aria-label="Tags"
+                >
+                  {post.tags.map((tag) => (
+                    <li key={tag}>
+                      <Link href={`/blog?tag=${encodeURIComponent(tag)}`}>
+                        <Badge
+                          variant="outline"
+                          className="transition-colors hover:border-primary/50 hover:text-primary"
+                        >
+                          #{tag}
+                        </Badge>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {post.authorName && (
+                <div className="mt-8 flex items-center gap-4 rounded-2xl border border-border bg-card p-5">
+                  <span
+                    aria-hidden="true"
+                    className="grid size-12 shrink-0 place-items-center rounded-full bg-primary/10 font-sans font-semibold text-primary"
+                  >
+                    {initialsFrom(post.authorName)}
+                  </span>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Written by</p>
+                    <p className="font-medium text-foreground">
+                      {post.authorName}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    Found this useful?
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Share it with someone who&apos;s learning this too.
+                  </p>
+                </div>
+
+                <div className="sm:shrink-0">
+                  <ShareButton
+                    url={pageUrl}
+                    title={post.title}
+                    label="Share this article"
+                  />
+                </div>
+              </div>
             </div>
-            <ShareButton
-              url={pageUrl}
-              title={post.title}
-              label="Share this article"
-            />
+
+            {/* Sticky side column: contents + quick share (large screens) */}
+            <TableOfContents targetId={BODY_ID} variant="desktop">
+              <div>
+                <p className="mb-3 text-sm font-medium text-foreground">
+                  Share
+                </p>
+                <ShareButton url={pageUrl} title={post.title} label="Share" />
+              </div>
+            </TableOfContents>
           </div>
         </Container>
       </article>
 
-      {/* Keep learning CTA, using only routes already used elsewhere on the site */}
+      {/* Keep learning: only routes already used elsewhere on the site */}
       <section className="border-t border-border py-10 sm:py-12">
-        <Container className="max-w-3xl">
-          <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-r from-primary/10 via-card to-highlight/20 p-6 text-center dark:from-primary/15 dark:via-card dark:to-highlight/10 sm:p-8">
-            <h2 className="text-xl text-foreground sm:text-2xl">
-              Turn what you just read into a skill
-            </h2>
-            <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground sm:text-base">
-              Articles explain the idea. Courses help you actually build with
-              it.
-            </p>
-            <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
+        <Container className="max-w-5xl">
+          <div className="flex flex-col gap-6 rounded-3xl border border-border bg-card p-6 sm:p-8 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-xl">
+              <h2 className="text-xl text-foreground sm:text-2xl">
+                Turn what you just read into a skill
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+                Articles explain the idea. Courses help you actually build with
+                it.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row md:shrink-0">
               <Link href="/courses" className={buttonVariants({ size: "lg" })}>
                 Browse courses
               </Link>

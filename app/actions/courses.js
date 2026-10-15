@@ -31,52 +31,60 @@ const slugSchema = z
 
 /**
  * Preview/validate a coupon for a course.
+ * Returns { ok: true, data: { couponId, code, discount, final, originalPrice, currency } }
  */
-export async function previewCoupon({ code, courseId }) {
+export async function previewCoupon({ code, courseId } = {}) {
   try {
     const user = await getSessionUser();
 
-    if (!user) {
-      return UNAUTH;
-    }
-
-    if (!user.emailVerified) {
-      return UNVERIFIED;
-    }
+    if (!user) return UNAUTH;
+    if (!user.emailVerified) return UNVERIFIED;
 
     const normalizedCode = String(code ?? "").trim();
 
     if (!normalizedCode) {
-      return {
-        ok: false,
-        error: "Please enter a coupon code.",
-      };
+      return { ok: false, error: "Please enter a coupon code." };
     }
 
     if (!courseId) {
-      return {
-        ok: false,
-        error: "Course is required.",
-      };
+      return { ok: false, error: "Course is required." };
     }
 
-    const result = await couponService.preview({
+    // NOTE: courseService.getCourseById must return { id, categoryId, price, salePrice, currency }
+    const course = await courseService.getCourseById(courseId);
+
+    if (!course) {
+      return { ok: false, error: "Course not found." };
+    }
+
+    const price = Number(course.salePrice ?? course.price ?? 0);
+
+    if (!Number.isFinite(price) || price <= 0) {
+      return { ok: false, error: "This course is not eligible for coupons." };
+    }
+
+    const result = await couponService.quote({
       code: normalizedCode,
-      courseId,
+      course,
+      price,
       studentId: user.uid,
     });
 
     return {
       ok: true,
-      data: result,
+      data: {
+        couponId: result.coupon.id,
+        code: result.coupon.code ?? normalizedCode,
+        discount: result.discount,
+        final: result.final,
+        originalPrice: price,
+        currency: course.currency,
+      },
     };
   } catch (error) {
     console.error("[previewCoupon]", error);
 
-    return {
-      ok: false,
-      error: toActionError(error),
-    };
+    return { ok: false, error: toActionError(error) };
   }
 }
 
@@ -88,20 +96,14 @@ export async function getCourseAccess(rawSlug) {
   const user = await getSessionUser();
 
   if (!slug.success || !user) {
-    return {
-      state: "anonymous",
-      wishlisted: false,
-    };
+    return { state: "anonymous", wishlisted: false };
   }
 
   try {
     const course = await courseService.getCourseBySlug(slug.data);
 
     if (!course) {
-      return {
-        state: "none",
-        wishlisted: false,
-      };
+      return { state: "none", wishlisted: false };
     }
 
     const [enrollment, wishlisted] = await Promise.all([
@@ -120,10 +122,7 @@ export async function getCourseAccess(rawSlug) {
   } catch (error) {
     console.error("[getCourseAccess]", error);
 
-    return {
-      state: "anonymous",
-      wishlisted: false,
-    };
+    return { state: "anonymous", wishlisted: false };
   }
 }
 
@@ -134,21 +133,13 @@ export async function enrollInFreeCourse(rawSlug) {
   const slug = slugSchema.safeParse(rawSlug);
 
   if (!slug.success) {
-    return {
-      ok: false,
-      error: "Invalid course.",
-    };
+    return { ok: false, error: "Invalid course." };
   }
 
   const user = await getSessionUser();
 
-  if (!user) {
-    return UNAUTH;
-  }
-
-  if (!user.emailVerified) {
-    return UNVERIFIED;
-  }
+  if (!user) return UNAUTH;
+  if (!user.emailVerified) return UNVERIFIED;
 
   try {
     await enrollmentService.enrollInFreeCourse({
@@ -156,41 +147,29 @@ export async function enrollInFreeCourse(rawSlug) {
       courseSlug: slug.data,
     });
 
-    return {
-      ok: true,
-    };
+    return { ok: true };
   } catch (error) {
     console.error("[enrollInFreeCourse]", error);
 
-    return {
-      ok: false,
-      error: toActionError(error),
-    };
+    return { ok: false, error: toActionError(error) };
   }
 }
 
 /**
- * Start Stripe Checkout for a paid course.
+ * Start Stripe Checkout for a paid course, with an optional coupon code.
+ * The coupon is re-validated server-side inside paymentService.createCheckoutSession.
  */
-export async function startCheckout(rawSlug) {
+export async function startCheckout(rawSlug, rawCode) {
   const slug = slugSchema.safeParse(rawSlug);
 
   if (!slug.success) {
-    return {
-      ok: false,
-      error: "Invalid course.",
-    };
+    return { ok: false, error: "Invalid course." };
   }
 
   const user = await getSessionUser();
 
-  if (!user) {
-    return UNAUTH;
-  }
-
-  if (!user.emailVerified) {
-    return UNVERIFIED;
-  }
+  if (!user) return UNAUTH;
+  if (!user.emailVerified) return UNVERIFIED;
 
   const limit = await rateLimit("checkout", {
     key: user.uid,
@@ -205,23 +184,20 @@ export async function startCheckout(rawSlug) {
     };
   }
 
+  const couponCode = String(rawCode ?? "").trim() || null;
+
   try {
     const url = await paymentService.createCheckoutSession({
       user,
       courseSlug: slug.data,
+      couponCode,
     });
 
-    return {
-      ok: true,
-      url,
-    };
+    return { ok: true, url };
   } catch (error) {
     console.error("[startCheckout]", error);
 
-    return {
-      ok: false,
-      error: toActionError(error),
-    };
+    return { ok: false, error: toActionError(error) };
   }
 }
 
@@ -232,17 +208,12 @@ export async function toggleWishlist(rawSlug) {
   const slug = slugSchema.safeParse(rawSlug);
 
   if (!slug.success) {
-    return {
-      ok: false,
-      error: "Invalid course.",
-    };
+    return { ok: false, error: "Invalid course." };
   }
 
   const user = await getSessionUser();
 
-  if (!user) {
-    return UNAUTH;
-  }
+  if (!user) return UNAUTH;
 
   try {
     const result = await wishlistService.toggle({
@@ -250,16 +221,10 @@ export async function toggleWishlist(rawSlug) {
       courseSlug: slug.data,
     });
 
-    return {
-      ok: true,
-      ...result,
-    };
+    return { ok: true, ...result };
   } catch (error) {
     console.error("[toggleWishlist]", error);
 
-    return {
-      ok: false,
-      error: toActionError(error),
-    };
+    return { ok: false, error: toActionError(error) };
   }
 }

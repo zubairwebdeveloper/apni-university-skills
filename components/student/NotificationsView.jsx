@@ -1,34 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  AnimatePresence,
+  LayoutGroup,
   MotionConfig,
-  animate,
   motion,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
-  useTransform,
 } from "framer-motion";
 import {
   ArrowRight,
   ArrowUpDown,
   Award,
   Bell,
+  BellOff,
   BellRing,
   BookOpen,
+  Check,
   CheckCheck,
+  CheckSquare,
   ChevronDown,
-  Clock,
   HelpCircle,
   Inbox,
+  LayoutList,
   Lightbulb,
   Link2,
-  Megaphone,
+  List,
   MailOpen,
+  Mail,
+  Megaphone,
   Search,
+  Square,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -47,29 +53,40 @@ import {
   NOTIFICATION_KINDS,
   NOTIFICATION_TIPS,
 } from "@/lib/notifications-data";
+import {
+  setNotificationsDismissed,
+  setNotificationsRead,
+} from "@/app/actions/notificationInbox";
 
 /* ---------------- Helpers ---------------- */
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
 
-// Derived from the link (your notifications have no type field)
-const getKind = (n) => {
-  const l = (n.href ?? "").toLowerCase();
-  if (l.includes("certificate")) return "certificate";
-  if (l.includes("course") || l.includes("learning")) return "course";
-  return "announcement";
-};
-
 const KIND_META = {
-  announcement: { icon: Megaphone, tone: "bg-primary/10 text-primary" },
+  announcement: {
+    icon: Megaphone,
+    tone: "bg-primary/10 text-primary",
+    label: "Announcement",
+  },
   course: {
     icon: BookOpen,
     tone: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    label: "Course",
   },
   certificate: {
     icon: Award,
     tone: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    label: "Certificate",
   },
+};
+
+// Uses n.type when the page passes it, otherwise derives it from the link
+const getKind = (n) => {
+  if (n.type && KIND_META[n.type]) return n.type;
+  const l = (n.href ?? "").toLowerCase();
+  if (l.includes("certificate")) return "certificate";
+  if (l.includes("course") || l.includes("learning")) return "course";
+  return "announcement";
 };
 
 // `now` comes from the server so server and client render identical text
@@ -96,7 +113,7 @@ function bucketOf(ms, now) {
 
 const BUCKETS = [
   { key: "day", label: "Last 24 hours" },
-  { key: "week", label: "Earlier this week" },
+  { key: "week", label: "This week" },
   { key: "earlier", label: "Earlier" },
 ];
 
@@ -104,171 +121,141 @@ const TIP_ICONS = { check: CheckCheck, link: Link2, clear: MailOpen };
 
 const listVariants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.05 } },
+  show: { transition: { staggerChildren: 0.04 } },
 };
 const itemVariants = {
-  hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.28 } },
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.25 } },
 };
 
 /* ---------------- Building blocks ---------------- */
-function AnimatedNumber({ value }) {
-  const mv = useMotionValue(0);
-  const rounded = useTransform(mv, (v) => Math.round(v));
-
-  useEffect(() => {
-    const controls = animate(mv, value, { duration: 0.9, ease: "easeOut" });
-    return () => controls.stop();
-  }, [value, mv]);
-
-  return <motion.span>{rounded}</motion.span>;
-}
-
-// 3D hero scene: tilted orbit rings that follow the pointer.
-// Text stays flat (outside the 3D layer) so it is always readable.
-function BellBadge({ unread }) {
-  const reduce = useReducedMotion();
-  const rx = useMotionValue(0);
-  const ry = useMotionValue(0);
-  const sx = useSpring(rx, { stiffness: 110, damping: 14 });
-  const sy = useSpring(ry, { stiffness: 110, damping: 14 });
-
-  const onMove = (e) => {
-    if (reduce) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    ry.set(((e.clientX - r.left) / r.width - 0.5) * 26);
-    rx.set(-((e.clientY - r.top) / r.height - 0.5) * 26);
-  };
-  const onLeave = () => {
-    rx.set(0);
-    ry.set(0);
-  };
-
-  const rings = [
-    { size: "100%", z: -36, dur: 34, tone: "border-primary/25" },
-    { size: "78%", z: 0, dur: 24, tone: "border-primary/40" },
-    { size: "56%", z: 36, dur: 16, tone: "border-primary/60" },
-  ];
-
+// Circular progress: how much of the inbox has been read
+function ProgressRing({ read, total }) {
+  const pct = total ? Math.round((read / total) * 100) : 100;
+  const r = 44;
+  const c = 2 * Math.PI * r;
   return (
-    <div
-      onPointerMove={onMove}
-      onPointerLeave={onLeave}
-      className="relative size-44 shrink-0 sm:size-56"
-      style={{ perspective: 800 }}
-    >
-      <motion.div
-        aria-hidden
-        className="absolute inset-0"
-        style={{ rotateX: sx, rotateY: sy, transformStyle: "preserve-3d" }}
-      >
-        {rings.map((r, i) => (
-          <motion.div
-            key={r.size}
-            className={cn(
-              "absolute left-1/2 top-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border",
-              r.tone,
-            )}
-            style={{ width: r.size, rotateX: 68, translateZ: r.z }}
-            animate={{ rotate: i % 2 ? -360 : 360 }}
-            transition={{ duration: r.dur, repeat: Infinity, ease: "linear" }}
-          />
-        ))}
-
-        {/* brand-yellow node travelling across the orbit */}
-        <motion.span
-          className="absolute left-1/2 top-1/2 size-2.5 rounded-full bg-amber-400 shadow-[0_0_12px_#F5B82E]"
-          style={{ translateZ: 36 }}
-          animate={{ x: [80, 0, -80, 0, 80], y: [0, 30, 0, -30, 0] }}
-          transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+    <div className="relative size-32 shrink-0 sm:size-36">
+      <svg viewBox="0 0 100 100" className="size-full -rotate-90">
+        <circle
+          cx="50"
+          cy="50"
+          r={r}
+          fill="none"
+          strokeWidth="8"
+          className="stroke-muted"
         />
-
-        <div
-          className="absolute inset-[26%] rounded-full bg-gradient-to-br from-primary/30 to-primary/5 backdrop-blur-sm"
-          style={{ transform: "translateZ(18px)" }}
+        <motion.circle
+          cx="50"
+          cy="50"
+          r={r}
+          fill="none"
+          strokeWidth="8"
+          strokeLinecap="round"
+          className="stroke-primary"
+          strokeDasharray={c}
+          initial={{ strokeDashoffset: c }}
+          animate={{ strokeDashoffset: c * (1 - pct / 100) }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
         />
-      </motion.div>
-
+      </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span
-          animate={
-            unread > 0 ? { rotate: [0, 14, -14, 10, -10, 0] } : { rotate: 0 }
-          }
-          transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 2.5 }}
-          className="inline-flex origin-top"
-        >
-          {unread > 0 ? (
-            <BellRing className="size-9 text-primary sm:size-11" />
-          ) : (
-            <Bell className="size-9 text-primary sm:size-11" />
-          )}
-        </motion.span>
-        <span className="mt-1 text-3xl font-bold sm:text-4xl">
-          <AnimatedNumber value={unread} />
-        </span>
-        <span className="text-[11px] text-muted-foreground">Unread</span>
+        <span className="text-3xl font-bold leading-none">{pct}%</span>
+        <span className="mt-1 text-[11px] text-muted-foreground">read</span>
       </div>
     </div>
   );
 }
 
-function NotificationCard({ n, now }) {
+function IconAction({ label, onClick, children, className }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function NotificationCard({
+  n,
+  now,
+  compact,
+  selectMode,
+  selected,
+  onSelect,
+  onRead,
+  onDismiss,
+}) {
   const [expanded, setExpanded] = useState(false);
   const kind = getKind(n);
   const meta = KIND_META[kind];
   const Icon = meta.icon;
-  const isLong = (n.body ?? "").length > 180;
+  const isLong = (n.body ?? "").length > (compact ? 90 : 180);
 
-  // Cursor spotlight: sets CSS variables only, so it causes no re-render
-  const spot = (e) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
-    e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+  const toggleExpand = () => {
+    setExpanded((v) => !v);
+    // Opening an unread message marks it as read
+    if (!expanded && !n.read) onRead([n.id], true);
   };
 
   return (
     <div
-      onMouseMove={spot}
       className={cn(
-        "group relative overflow-hidden rounded-xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5 motion-reduce:hover:translate-y-0 sm:p-5",
+        "group relative overflow-hidden rounded-xl border transition-all",
+        compact ? "p-3" : "p-4 sm:p-5",
         n.read
           ? "bg-card hover:border-primary/30"
-          : "border-primary/40 bg-primary/5 hover:border-primary/60",
+          : "border-primary/40 bg-primary/[0.04] hover:border-primary/60",
+        selected && "ring-2 ring-primary",
       )}
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background:
-            "radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), hsl(var(--primary) / 0.12), transparent 70%)",
-        }}
-      />
-
       {!n.read && (
-        <motion.span
+        <span
           aria-hidden
-          initial={{ scaleY: 0 }}
-          animate={{ scaleY: 1 }}
-          className="absolute inset-y-0 left-0 w-1 origin-top bg-primary"
+          className="absolute inset-y-0 left-0 w-1 bg-primary"
         />
       )}
 
-      <div className="relative flex items-start gap-3 sm:gap-4">
-        <span
-          className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-110 motion-reduce:group-hover:scale-100",
-            meta.tone,
-          )}
-        >
-          <Icon className="size-5" />
-        </span>
+      <div className="flex items-start gap-3 sm:gap-4">
+        {selectMode ? (
+          <button
+            type="button"
+            onClick={() => onSelect(n.id)}
+            aria-pressed={selected}
+            aria-label={selected ? "Deselect" : "Select"}
+            className="mt-0.5 text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {selected ? (
+              <CheckSquare className="size-6" />
+            ) : (
+              <Square className="size-6 text-muted-foreground" />
+            )}
+          </button>
+        ) : (
+          <span
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-lg",
+              compact ? "size-8" : "size-10",
+              meta.tone,
+            )}
+          >
+            <Icon className={compact ? "size-4" : "size-5"} />
+          </span>
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <h3
               className={cn(
-                "font-serif text-base transition-colors group-hover:text-primary",
+                "font-serif text-base",
                 n.read ? "font-medium" : "font-semibold",
               )}
             >
@@ -277,10 +264,7 @@ function NotificationCard({ n, now }) {
             </h3>
             <div className="flex shrink-0 items-center gap-2">
               {!n.read && (
-                <span className="relative flex size-2.5">
-                  <span className="absolute inline-flex size-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
-                  <span className="relative inline-flex size-2.5 rounded-full bg-primary" />
-                </span>
+                <span className="size-2 rounded-full bg-primary" aria-hidden />
               )}
               <time
                 title={n.dateLabel}
@@ -293,22 +277,24 @@ function NotificationCard({ n, now }) {
 
           <p
             className={cn(
-              "mt-1.5 whitespace-pre-line text-sm text-muted-foreground",
-              !expanded && isLong && "line-clamp-3",
+              "mt-1 whitespace-pre-line text-sm text-muted-foreground",
+              !expanded && (compact ? "line-clamp-1" : "line-clamp-3"),
             )}
           >
             {n.body}
           </p>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="text-[10px]">
-              {NOTIFICATION_KINDS.find((k) => k.value === kind)?.label}
-            </Badge>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            {!compact && (
+              <Badge variant="secondary" className="text-[10px]">
+                {meta.label}
+              </Badge>
+            )}
 
             {isLong && (
               <button
                 type="button"
-                onClick={() => setExpanded((v) => !v)}
+                onClick={toggleExpand}
                 aria-expanded={expanded}
                 className="inline-flex items-center gap-1 rounded text-xs font-medium text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
@@ -322,18 +308,42 @@ function NotificationCard({ n, now }) {
               </button>
             )}
 
-            {n.href && (
-              <Link
-                href={n.href}
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "sm" }),
-                  "group/btn ml-auto h-7 px-2.5 text-xs",
-                )}
-              >
-                Open
-                <ArrowRight className="size-3.5 transition-transform group-hover/btn:translate-x-1" />
-              </Link>
-            )}
+            <div className="ml-auto flex items-center gap-0.5">
+              {!selectMode && (
+                <>
+                  <IconAction
+                    label={n.read ? "Mark as unread" : "Mark as read"}
+                    onClick={() => onRead([n.id], !n.read)}
+                  >
+                    {n.read ? (
+                      <Mail className="size-4" />
+                    ) : (
+                      <Check className="size-4" />
+                    )}
+                  </IconAction>
+                  <IconAction
+                    label="Dismiss"
+                    onClick={() => onDismiss([n.id])}
+                    className="hover:text-destructive"
+                  >
+                    <X className="size-4" />
+                  </IconAction>
+                </>
+              )}
+              {n.href && !selectMode && (
+                <Link
+                  href={n.href}
+                  onClick={() => !n.read && onRead([n.id], true)}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "group/btn ml-1 h-8 px-2.5 text-xs",
+                  )}
+                >
+                  Open
+                  <ArrowRight className="size-3.5 transition-transform group-hover/btn:translate-x-1" />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -358,7 +368,7 @@ export function NotificationsExtras() {
             className="grid gap-4 md:grid-cols-3"
           >
             {NOTIFICATION_KINDS.map((k) => {
-              const meta = KIND_META[k.value];
+              const meta = KIND_META[k.value] ?? KIND_META.announcement;
               const Icon = meta.icon;
               return (
                 <motion.div
@@ -400,7 +410,7 @@ export function NotificationsExtras() {
             className="grid gap-4 md:grid-cols-3"
           >
             {NOTIFICATION_TIPS.map((t) => {
-              const Icon = TIP_ICONS[t.icon];
+              const Icon = TIP_ICONS[t.icon] ?? Lightbulb;
               return (
                 <motion.div
                   key={t.title}
@@ -426,11 +436,7 @@ export function NotificationsExtras() {
               Frequently asked questions
             </h2>
           </div>
-          <Accordion
-            type="single"
-            
-            className="rounded-xl border bg-card px-5"
-          >
+          <Accordion type="single" className="rounded-xl border bg-card px-5">
             {NOTIFICATION_FAQ.map((f, i) => (
               <AccordionItem key={f.q} value={`faq-${i}`}>
                 <AccordionTrigger className="text-left hover:text-primary hover:no-underline">
@@ -450,13 +456,22 @@ export function NotificationsExtras() {
 
 /* ---------------- Main view ---------------- */
 export function NotificationsView({ items, now }) {
+  const router = useRouter();
+
+  // Local copy so read/dismiss feel instant (optimistic updates)
+  const [list, setList] = useState(items);
+  useEffect(() => setList(items), [items]);
+
   const [tab, setTab] = useState("all");
   const [kind, setKind] = useState("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
+  const [compact, setCompact] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
   const searchRef = useRef(null);
 
-  // Press "/" to jump to search (ignored while typing in a field)
+  // "/" jumps to search (ignored while typing in a field)
   useEffect(() => {
     const onKey = (e) => {
       const tag = e.target?.tagName;
@@ -474,29 +489,104 @@ export function NotificationsView({ items, now }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  /* ----- actions (optimistic, rolled back on failure) ----- */
+  const markRead = useCallback(
+    async (ids, read) => {
+      let snapshot;
+      setList((l) => {
+        snapshot = l;
+        return l.map((n) => (ids.includes(n.id) ? { ...n, read } : n));
+      });
+      const res = await setNotificationsRead({ ids, read }).catch(() => null);
+      if (!res?.ok) {
+        setList(snapshot);
+        toast.error(res?.error ?? "Could not update. Please try again.");
+        return;
+      }
+      router.refresh();
+    },
+    [router],
+  );
+
+  const dismiss = useCallback(
+    async (ids) => {
+      let snapshot;
+      let removed = [];
+      setList((l) => {
+        snapshot = l;
+        removed = l.filter((n) => ids.includes(n.id));
+        return l.filter((n) => !ids.includes(n.id));
+      });
+      setSelected(new Set());
+      const res = await setNotificationsDismissed({
+        ids,
+        dismissed: true,
+      }).catch(() => null);
+      if (!res?.ok) {
+        setList(snapshot);
+        toast.error(res?.error ?? "Could not dismiss. Please try again.");
+        return;
+      }
+      toast(
+        ids.length > 1
+          ? `${ids.length} notifications dismissed`
+          : "Notification dismissed",
+        {
+          action: {
+            label: "Undo",
+            onClick: async () => {
+              setList((l) => [...l, ...removed]);
+              const undo = await setNotificationsDismissed({
+                ids,
+                dismissed: false,
+              }).catch(() => null);
+              if (!undo?.ok) toast.error("Could not restore.");
+              router.refresh();
+            },
+          },
+        },
+      );
+      router.refresh();
+    },
+    [router],
+  );
+
+  const toggleSelect = (id) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+
+  /* ----- derived data ----- */
   const stats = useMemo(() => {
-    const unread = items.filter((n) => !n.read).length;
+    const unread = list.filter((n) => !n.read).length;
     return {
-      total: items.length,
+      total: list.length,
       unread,
-      read: items.length - unread,
-      week: items.filter((n) => n.createdAt && now - n.createdAt < 7 * DAY)
+      read: list.length - unread,
+      week: list.filter((n) => n.createdAt && now - n.createdAt < 7 * DAY)
         .length,
     };
-  }, [items, now]);
+  }, [list, now]);
 
   const kindCounts = useMemo(() => {
-    const c = { all: items.length };
-    for (const n of items) {
+    const c = { all: list.length };
+    for (const n of list) {
       const k = getKind(n);
       c[k] = (c[k] ?? 0) + 1;
     }
     return c;
-  }, [items]);
+  }, [list]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items
+    return list
       .filter((n) => {
         if (tab === "unread" && n.read) return false;
         if (tab === "read" && !n.read) return false;
@@ -510,42 +600,15 @@ export function NotificationsView({ items, now }) {
           ? b.createdAt - a.createdAt
           : a.createdAt - b.createdAt,
       );
-  }, [items, tab, kind, query, sort]);
+  }, [list, tab, kind, query, sort]);
 
   const groups = useMemo(() => {
-    const list = BUCKETS.map((b) => ({
+    const out = BUCKETS.map((b) => ({
       ...b,
       items: filtered.filter((n) => bucketOf(n.createdAt, now) === b.key),
     })).filter((g) => g.items.length);
-    return sort === "oldest" ? list.reverse() : list;
+    return sort === "oldest" ? out.reverse() : out;
   }, [filtered, now, sort]);
-
-  const statCards = [
-    {
-      label: "Total",
-      value: stats.total,
-      icon: Inbox,
-      tone: "text-primary bg-primary/10",
-    },
-    {
-      label: "Unread",
-      value: stats.unread,
-      icon: BellRing,
-      tone: "text-amber-700 bg-amber-500/15 dark:text-amber-300",
-    },
-    {
-      label: "Read",
-      value: stats.read,
-      icon: CheckCheck,
-      tone: "text-emerald-700 bg-emerald-500/15 dark:text-emerald-300",
-    },
-    {
-      label: "Last 7 days",
-      value: stats.week,
-      icon: Clock,
-      tone: "text-sky-700 bg-sky-500/15 dark:text-sky-300",
-    },
-  ];
 
   const kindChips = [
     { value: "all", label: "All types" },
@@ -558,30 +621,37 @@ export function NotificationsView({ items, now }) {
     setQuery("");
   };
 
+  const allVisibleSelected =
+    filtered.length > 0 && filtered.every((n) => selected.has(n.id));
+  const filtersActive = tab !== "all" || kind !== "all" || query.trim();
+
   return (
     <MotionConfig reducedMotion="user">
       <div className="space-y-8">
         {/* Hero */}
         <motion.section
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.35 }}
           className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5 sm:p-8"
         >
-          <motion.div
+          <div
             aria-hidden
-            animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
-            transition={{ duration: 6, repeat: Infinity }}
-            className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/20 blur-3xl"
+            className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-primary/15 blur-3xl"
           />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <Badge variant="secondary" className="gap-1">
-                <Inbox className="size-3" /> Your inbox
+                {stats.unread > 0 ? (
+                  <BellRing className="size-3" />
+                ) : (
+                  <Bell className="size-3" />
+                )}
+                Your inbox
               </Badge>
               <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
                 {stats.unread > 0
-                  ? `You have ${stats.unread} unread notification${stats.unread > 1 ? "s" : ""}`
+                  ? `${stats.unread} unread notification${stats.unread > 1 ? "s" : ""}`
                   : "You're all caught up"}
               </h2>
               <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">
@@ -589,10 +659,16 @@ export function NotificationsView({ items, now }) {
                   ? "Catch up on the latest announcements and updates from our team."
                   : "No new messages right now. We will let you know when there is something new."}
               </p>
-              <p className="mt-2 text-sm font-medium">
-                {stats.week} new in the last 7 days
+              <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                <span>
+                  <strong className="text-foreground">{stats.total}</strong>{" "}
+                  total
+                </span>
+                <span>
+                  <strong className="text-foreground">{stats.week}</strong> in
+                  the last 7 days
+                </span>
               </p>
-
               {stats.unread > 0 && tab !== "unread" && (
                 <Button onClick={() => setTab("unread")} className="group mt-5">
                   View unread
@@ -600,44 +676,11 @@ export function NotificationsView({ items, now }) {
                 </Button>
               )}
             </div>
-
-            <div className="flex justify-center lg:justify-end">
-              <BellBadge unread={stats.unread} />
+            <div className="flex justify-center sm:justify-end">
+              <ProgressRing read={stats.read} total={stats.total} />
             </div>
           </div>
         </motion.section>
-
-        {/* Stats */}
-        <motion.div
-          variants={listVariants}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
-        >
-          {statCards.map((s) => (
-            <motion.div
-              key={s.label}
-              variants={itemVariants}
-              whileHover={{ y: -3 }}
-              className="flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40"
-            >
-              <span
-                className={cn(
-                  "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                  s.tone,
-                )}
-              >
-                <s.icon className="size-5" />
-              </span>
-              <div>
-                <p className="text-2xl font-bold leading-none">
-                  <AnimatedNumber value={s.value} />
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
 
         {/* Toolbar */}
         <section className="space-y-4">
@@ -668,67 +711,128 @@ export function NotificationsView({ items, now }) {
                   ref={searchRef}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setQuery("");
+                      e.currentTarget.blur();
+                    }
+                  }}
                   placeholder="Search notifications..."
                   aria-label="Search notifications"
                   className="pl-9 pr-9"
                 />
-                <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-muted px-1.5 text-[10px] text-muted-foreground sm:block">
-                  /
-                </kbd>
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    aria-label="Clear search"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                ) : (
+                  <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-muted px-1.5 text-[10px] text-muted-foreground sm:block">
+                    /
+                  </kbd>
+                )}
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  setSort((s) => (s === "newest" ? "oldest" : "newest"))
-                }
-                className="group justify-center"
-              >
-                <ArrowUpDown className="size-4 transition-transform group-hover:scale-110" />
-                {sort === "newest" ? "Newest first" : "Oldest first"}
-              </Button>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setSort((s) => (s === "newest" ? "oldest" : "newest"))
+                  }
+                >
+                  <ArrowUpDown className="size-4" />
+                  {sort === "newest" ? "Newest" : "Oldest"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCompact((v) => !v)}
+                  aria-pressed={compact}
+                  aria-label={compact ? "Comfortable view" : "Compact view"}
+                  title={compact ? "Comfortable view" : "Compact view"}
+                >
+                  {compact ? (
+                    <LayoutList className="size-4" />
+                  ) : (
+                    <List className="size-4" />
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant={selectMode ? "default" : "outline"}
+                  onClick={() =>
+                    selectMode ? exitSelect() : setSelectMode(true)
+                  }
+                >
+                  <CheckSquare className="size-4" />
+                  {selectMode ? "Done" : "Select"}
+                </Button>
+              </div>
             </div>
           </div>
 
           {/* Type chips */}
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-            {kindChips.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                onClick={() => setKind(c.value)}
-                aria-pressed={kind === c.value}
-                className={cn(
-                  "relative shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  kind === c.value
-                    ? "border-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:border-primary/40 hover:text-primary",
-                )}
-              >
-                {kind === c.value && (
-                  <motion.span
-                    layoutId="kind-chip-pill"
-                    className="absolute inset-0 rounded-full bg-primary"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10">
-                  {c.label}
-                  <span className="ml-1.5 opacity-70">
-                    {kindCounts[c.value] ?? 0}
+            <LayoutGroup id="kind-chips">
+              {kindChips.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setKind(c.value)}
+                  aria-pressed={kind === c.value}
+                  className={cn(
+                    "relative shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    kind === c.value
+                      ? "border-primary text-primary-foreground"
+                      : "bg-muted/50 text-muted-foreground hover:border-primary/40 hover:text-primary",
+                  )}
+                >
+                  {kind === c.value && (
+                    <motion.span
+                      layoutId="kind-chip-pill"
+                      className="absolute inset-0 rounded-full bg-primary"
+                      transition={{
+                        type: "spring",
+                        stiffness: 380,
+                        damping: 30,
+                      }}
+                    />
+                  )}
+                  <span className="relative z-10">
+                    {c.label}
+                    <span className="ml-1.5 opacity-70">
+                      {kindCounts[c.value] ?? 0}
+                    </span>
                   </span>
-                </span>
-              </button>
-            ))}
+                </button>
+              ))}
+            </LayoutGroup>
           </div>
 
-          <p className="text-sm text-muted-foreground" aria-live="polite">
-            Showing {filtered.length} of {stats.total} notifications
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              Showing {filtered.length} of {stats.total} notifications
+            </p>
+            {filtersActive ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Clear filters
+              </button>
+            ) : null}
+          </div>
 
           {/* Grouped list */}
           {groups.length ? (
-            <div className="space-y-8">
+            <div className={cn("space-y-8", selectMode && "pb-24")}>
               {groups.map((g) => (
                 <div key={g.key}>
                   <div className="mb-3 flex items-center gap-3">
@@ -740,31 +844,51 @@ export function NotificationsView({ items, now }) {
                       {g.items.length}
                     </span>
                   </div>
-                  <motion.ul
-                    key={`${g.key}-${tab}-${kind}-${sort}`}
-                    variants={listVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="space-y-3"
-                  >
-                    {g.items.map((n) => (
-                      <motion.li key={n.id} variants={itemVariants}>
-                        <NotificationCard n={n} now={now} />
-                      </motion.li>
-                    ))}
-                  </motion.ul>
+                  <ul className={cn(compact ? "space-y-2" : "space-y-3")}>
+                    <AnimatePresence initial={false}>
+                      {g.items.map((n) => (
+                        <motion.li
+                          key={n.id}
+                          layout="position"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -24, height: 0 }}
+                          transition={{ duration: 0.22 }}
+                        >
+                          <NotificationCard
+                            n={n}
+                            now={now}
+                            compact={compact}
+                            selectMode={selectMode}
+                            selected={selected.has(n.id)}
+                            onSelect={toggleSelect}
+                            onRead={markRead}
+                            onDismiss={dismiss}
+                          />
+                        </motion.li>
+                      ))}
+                    </AnimatePresence>
+                  </ul>
                 </div>
               ))}
             </div>
           ) : (
             <EmptyState
-              icon={Search}
-              title="No matching notifications"
-              description="Try a different keyword or switch to another tab."
+              icon={filtersActive ? Search : BellOff}
+              title={
+                filtersActive ? "No matching notifications" : "Nothing here"
+              }
+              description={
+                filtersActive
+                  ? "Try a different keyword or switch to another tab."
+                  : "Announcements from our team will appear here."
+              }
               action={
-                <Button variant="outline" onClick={clearFilters}>
-                  Clear filters
-                </Button>
+                filtersActive ? (
+                  <Button variant="outline" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                ) : undefined
               }
             />
           )}
@@ -772,6 +896,83 @@ export function NotificationsView({ items, now }) {
 
         <NotificationsExtras />
       </div>
+
+      {/* Bulk action bar */}
+      <AnimatePresence>
+        {selectMode && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 380, damping: 32 }}
+            className="fixed inset-x-3 bottom-4 z-40 mx-auto flex max-w-2xl flex-wrap items-center gap-2 rounded-2xl border bg-background/95 p-3 shadow-lg backdrop-blur"
+            role="toolbar"
+            aria-label="Bulk actions"
+          >
+            <span className="px-1 text-sm font-medium">
+              {selected.size} selected
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setSelected(
+                  allVisibleSelected
+                    ? new Set()
+                    : new Set(filtered.map((n) => n.id)),
+                )
+              }
+            >
+              {allVisibleSelected ? "Select none" : "Select all"}
+            </Button>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!selected.size}
+                onClick={() => {
+                  markRead([...selected], true);
+                  exitSelect();
+                }}
+              >
+                <Check className="size-4" /> Read
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!selected.size}
+                onClick={() => {
+                  markRead([...selected], false);
+                  exitSelect();
+                }}
+              >
+                <Mail className="size-4" /> Unread
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={!selected.size}
+                onClick={() => dismiss([...selected])}
+              >
+                <X className="size-4" /> Dismiss
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={exitSelect}
+                aria-label="Cancel selection"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </MotionConfig>
   );
 }

@@ -22,25 +22,31 @@ async function recipients(n, cursor) {
   let q;
   if (a.kind === "course")
     q = col("enrollments").where("courseId", "==", a.courseId);
-  else if (a.kind === "all_students")
-    q = col("users")
-      .where("role", "==", "student")
-      .where("isActive", "==", true);
   else
-    q = col("users")
-      .where("role", "==", a.kind === "admins" ? "admin" : "instructor")
-      .where("isActive", "==", true);
+    // FIX: filter by role only. `isActive` is checked below, because many user
+    // documents don't have that field and an `== true` query would skip them all.
+    q = col("users").where(
+      "role",
+      "==",
+      a.kind === "all_students"
+        ? "student"
+        : a.kind === "admins"
+          ? "admin"
+          : "instructor",
+    );
   q = q.orderBy("__name__");
   if (cursor) q = q.startAfter(cursor);
   const snap = await q.limit(PAGE).get();
   const ids = snap.docs
     .filter(
       (d) =>
-        a.kind !== "course" ||
-        ["active", "completed"].includes(d.get("status")),
+        a.kind === "course"
+          ? ["active", "completed"].includes(d.get("status"))
+          : d.get("isActive") !== false, // only skip explicitly deactivated users
     )
-    .map((d) => (a.kind === "course" ? d.get("studentId") : d.id));
-  return {
+    .map((d) =>
+      a.kind === "course" ? d.get("studentId") : (d.get("uid") ?? d.id),
+    );  return {
     ids: [...new Set(ids)],
     last: snap.docs.at(-1)?.id ?? cursor,
     exhausted: snap.size < PAGE,
@@ -154,4 +160,3 @@ export async function processNotifications(now) {
   }
   return { started, delivered };
 }
-

@@ -4,7 +4,7 @@ import { courseRepository } from "@/repositories/courseRepository";
 import { categoryRepository } from "@/repositories/categoryRepository";
 import { toKeyword } from "@/lib/utils/search";
 import { PAGE_SIZE } from "@/config/courses";
-
+import { db } from "@/lib/firebase/admin/firestore";
 export const courseService = {
   getPublishedCourses: (filters) => courseRepository.findPublished(filters),
   getCourseBySlug: (slug) => courseRepository.findBySlug(slug),
@@ -60,6 +60,11 @@ export const courseService = {
       limit: limit + 1,
     });
     return items.filter((c) => c.id !== course.id).slice(0, limit);
+  },
+  async getCourseById(id) {
+    if (!id) return null;
+    const snap = await db.collection("courses").doc(String(id)).get();
+    return snap.exists ? { id: snap.id, ...snap.data() } : null;
   },
 };
 

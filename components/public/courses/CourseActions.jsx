@@ -67,10 +67,19 @@ export function CourseActions({ course }) {
 
     if (!trimmed) return;
 
+    // Coupons need a logged-in user
+    if (access?.state === "anonymous") {
+      return goLogin();
+    }
+
     setChecking(true);
 
     try {
-      const res = await previewCoupon(course.slug, trimmed);
+      // FIX: server action expects an object { code, courseId }
+      const res = await previewCoupon({
+        code: trimmed,
+        courseId: course.id,
+      });
 
       if (!res.ok) {
         setQuote(null);
@@ -80,8 +89,13 @@ export function CourseActions({ course }) {
           : toast.error(res.error);
       }
 
-      setQuote(res);
+      // FIX: the action returns { ok, data: {...} }
+      setQuote(res.data);
       toast.success("Coupon applied.");
+    } catch (error) {
+      console.error(error);
+      setQuote(null);
+      toast.error("Could not check the coupon. Please try again.");
     } finally {
       setChecking(false);
     }
@@ -94,25 +108,31 @@ export function CourseActions({ course }) {
 
     setBusy(true);
 
-    const res = course.isFree
-      ? await enrollInFreeCourse(course.slug)
-      : await startCheckout(course.slug, quote?.code);
+    try {
+      const res = course.isFree
+        ? await enrollInFreeCourse(course.slug)
+        : await startCheckout(course.slug, quote?.code);
 
-    if (!res.ok) {
+      if (!res.ok) {
+        setBusy(false);
+
+        return res.code === "UNAUTHENTICATED"
+          ? goLogin()
+          : toast.error(res.error);
+      }
+
+      if (course.isFree) {
+        toast.success("You're enrolled. Happy learning!");
+
+        router.push(`/student/learning/${course.slug}`);
+      } else {
+        // Stripe Checkout; stay busy during redirect.
+        window.location.assign(res.url);
+      }
+    } catch (error) {
+      console.error(error);
       setBusy(false);
-
-      return res.code === "UNAUTHENTICATED"
-        ? goLogin()
-        : toast.error(res.error);
-    }
-
-    if (course.isFree) {
-      toast.success("You're enrolled. Happy learning!");
-
-      router.push(`/student/learning/${course.slug}`);
-    } else {
-      // Stripe Checkout; stay busy during redirect.
-      window.location.assign(res.url);
+      toast.error("Something went wrong. Please try again.");
     }
   }
 
@@ -231,8 +251,9 @@ export function CourseActions({ course }) {
 
           {quote && (
             <FieldDescription>
-              −{formatPrice(quote.discount, course.currency)}. You&apos;ll pay{" "}
-              {formatPrice(quote.final, course.currency)}.
+              −{formatPrice(quote.discount, quote.currency ?? course.currency)}.
+              You&apos;ll pay{" "}
+              {formatPrice(quote.final, quote.currency ?? course.currency)}.
             </FieldDescription>
           )}
         </Field>
@@ -264,4 +285,3 @@ export function CourseActions({ course }) {
     </div>
   );
 }
-

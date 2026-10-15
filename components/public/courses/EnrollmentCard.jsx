@@ -79,6 +79,7 @@ export function EnrollmentCard({ course, lessonCount, shareUrl }) {
         </div>
         <CourseActions
           course={{
+            id: course.id,
             slug: course.slug,
             isFree: !!course.isFree,
             currency: course.currency,

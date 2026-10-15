@@ -1,176 +1,104 @@
 // services/paymentService.js
-
+// NOTE: merge this with your existing paymentService.js. The parts that matter are
+// createCheckoutSession (coupon quote -> reserve -> Stripe) and the two webhook helpers.
 import "server-only";
-
-import { getStripe } from "@/lib/stripe/server";
-
-import { courseRepository } from "@/repositories/courseRepository";
-import { enrollmentRepository } from "@/repositories/enrollmentRepository";
-import { paymentRepository } from "@/repositories/paymentRepository";
-
+import { stripe } from "@/lib/stripe"; // <-- adjust to your Stripe client path
+import { AppError } from "@/lib/errors";
+import { courseService } from "@/services/courseService";
+import { enrollmentService } from "@/services/enrollmentService";
 import { couponService } from "@/services/couponService";
 
-import { AppError } from "@/lib/errors";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-export const priceOf = (course) =>
-  course.salePrice != null && course.salePrice < course.price
-    ? course.salePrice
-    : course.price;
+// Stripe wants the smallest currency unit (2-decimal currencies like USD/PKR).
+// If you sell in zero-decimal currencies (JPY etc.) handle that here.
+const toMinor = (amount) => Math.round(amount * 100);
 
 export const paymentService = {
-  async createCheckoutSession({ user, courseSlug, couponCode }) {
-    const course = await courseRepository.findBySlug(courseSlug);
+  async createCheckoutSession({ user, courseSlug, couponCode = null }) {
+    const course = await courseService.getCourseBySlug(courseSlug);
+    if (!course) throw new AppError("Course not found.", 404);
+    if (course.isFree) throw new AppError("This course is free.", 400);
 
-    if (!course) {
-      throw new AppError("Course not found.", 404);
-    }
+    const existing = await enrollmentService.getActiveEnrollment(
+      user.uid,
+      course.id,
+    );
+    if (existing) throw new AppError("You're already enrolled.", 409);
 
-    if (course.isFree) {
-      throw new AppError("This course is free. Use Enroll Free.", 400);
-    }
+    const price = Number(course.salePrice ?? course.price ?? 0);
+    if (!Number.isFinite(price) || price <= 0)
+      throw new AppError("Invalid course price.", 400);
 
-    if (await enrollmentRepository.findActive(user.uid, course.id)) {
-      throw new AppError("You're already enrolled in this course.", 409);
-    }
-
-    // Always calculate the price from the database.
-    // Never trust a price sent by the client.
-    const price = priceOf(course);
-
-    let final = price;
-    let discount = 0;
-    let reservationId = null;
-    let appliedCode = null;
-
+    // 1) Re-validate the coupon on the server. Never trust the client's discount.
+    let quote = null;
+    let redemptionId = null;
     if (couponCode) {
-      const quote = await couponService.quote({
+      quote = await couponService.quote({
         code: couponCode,
         course,
         price,
         studentId: user.uid,
       });
-
-      reservationId = await couponService.reserve({
+      // 2) Reserve it (transaction) so limits can't be exceeded by concurrent checkouts.
+      redemptionId = await couponService.reserve({
         coupon: quote.coupon,
         studentId: user.uid,
         courseId: course.id,
         discount: quote.discount,
       });
-
-      final = quote.final;
-      discount = quote.discount;
-      appliedCode = quote.coupon.code;
     }
 
+    const finalPrice = quote ? quote.final : price;
+
     try {
-      const unitAmount = Math.round(final * 100);
-
-      // Stripe's minimum charge is approximately $0.50
-      // for USD; the exact minimum can vary by currency.
-      if (!(unitAmount >= 50)) {
-        throw new AppError("This course can't be purchased right now.", 400);
-      }
-
-      const site = process.env.NEXT_PUBLIC_SITE_URL;
-
-      if (!site) {
-        throw new AppError("Payment configuration is incomplete.", 500);
-      }
-
-      const metadata = {
-        studentId: user.uid,
-        courseId: course.id,
-        courseSlug: course.slug,
-        ...(reservationId ? { reservationId } : {}),
-      };
-
-      const session = await getStripe().checkout.sessions.create({
+      const session = await stripe.checkout.sessions.create({
         mode: "payment",
-
-        customer_email: user.email ?? undefined,
-
-        client_reference_id: user.uid,
-
+        customer_email: user.email,
         line_items: [
           {
             quantity: 1,
             price_data: {
-              currency: course.currency.toLowerCase(),
-              unit_amount: unitAmount,
+              currency: String(course.currency).toLowerCase(),
+              unit_amount: toMinor(finalPrice),
               product_data: {
                 name: course.title,
+                ...(quote
+                  ? { description: `Coupon ${quote.coupon.code} applied` }
+                  : {}),
               },
             },
           },
         ],
-
-        metadata,
-
-        payment_intent_data: {
-          metadata,
+        metadata: {
+          uid: user.uid,
+          courseId: course.id,
+          courseSlug: course.slug,
+          couponCode: quote?.coupon.code ?? "",
+          redemptionId: redemptionId ?? "",
         },
-
-        ...(reservationId
-          ? {
-              expires_at: Math.floor(Date.now() / 1000) + 35 * 60,
-            }
-          : {}),
-
-        success_url: `${site}/student/courses/${course.slug}?paid=1`,
-        cancel_url: `${site}/courses/${course.slug}`,
+        success_url: `${siteUrl}/student/learning/${course.slug}?checkout=success`,
+        cancel_url: `${siteUrl}/courses/${course.slug}?checkout=cancelled`,
+        // Stripe minimum is 30 minutes; unpaid reservations get released on expiry.
+        expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       });
 
-      await paymentRepository.createPending({
-        studentId: user.uid,
-        courseId: course.id,
-        courseSlug: course.slug,
-        courseTitle: course.title,
-        stripeSessionId: session.id,
-        amount: final,
-        originalAmount: price,
-        discountAmount: discount,
-        couponCode: appliedCode,
-        reservationId,
-        currency: course.currency,
-      });
-
-      if (reservationId) {
-        await couponService.attach(reservationId, session.id);
-      }
-
+      if (redemptionId) await couponService.attach(redemptionId, session.id);
       return session.url;
     } catch (error) {
-      if (reservationId) {
-        await couponService.release(reservationId).catch(() => {});
-      }
-
+      // Stripe failed: give the coupon slot back.
+      if (redemptionId) await couponService.release(redemptionId);
       throw error;
     }
   },
 
-  async previewCoupon({ user, courseSlug, code }) {
-    const course = await courseRepository.findBySlug(courseSlug);
-
-    if (!course || course.isFree) {
-      throw new AppError("Coupons apply to paid courses only.", 400);
-    }
-
-    const price = priceOf(course);
-
-    const quote = await couponService.quote({
-      code,
-      course,
-      price,
-      studentId: user.uid,
-    });
-
-    return {
-      code: quote.coupon.code,
-      discount: quote.discount,
-      final: quote.final,
-    };
+  /** Call from the webhook on checkout.session.completed (after enrolling the user). */
+  async onCheckoutCompleted(session) {
+    await couponService.redeem(session.metadata?.redemptionId || null);
   },
 
-  listForStudent: (uid) => paymentRepository.listByStudent(uid),
+  /** Call from the webhook on checkout.session.expired. */
+  async onCheckoutExpired(session) {
+    await couponService.release(session.metadata?.redemptionId || null);
+  },
 };
-

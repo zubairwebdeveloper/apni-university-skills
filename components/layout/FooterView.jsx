@@ -22,8 +22,10 @@ import {
 } from "lucide-react";
 import {
   FaFacebookF,
+  FaGithub,
   FaInstagram,
   FaLinkedinIn,
+  FaXTwitter,
   FaYoutube,
 } from "react-icons/fa6";
 
@@ -105,15 +107,21 @@ const defaultTrustedBy = [
   "Techlogix",
 ];
 
-const defaultSocial = {
-  facebook: "https://facebook.com",
-  instagram: "https://instagram.com",
-  linkedin: "https://linkedin.com",
-  youtube: "https://youtube.com",
-};
-
 const FOCUS =
   "outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ft-a))] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+// A social link is shown only when the admin saved a real https:// URL.
+// There are deliberately no fallback links: blank, missing or malformed
+// values all mean "hide this icon".
+function safeHttpsUrl(value) {
+  if (typeof value !== "string") return "";
+  const v = value.trim();
+  return /^https:\/\/\S+$/i.test(v) ? v : "";
+}
+
+function cleanText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 /* ------------------------------------------------------------------ */
 /* Small pieces                                                        */
@@ -392,7 +400,12 @@ function FooterBackdrop() {
 // Props:
 // - isLoggedIn: optional. Leave it out and the client checks Firebase auth.
 //   Only pass true/false if you already know the state on the server.
-// - phone: hidden unless a real number is provided
+// - contactEmail / phone / address: each row is hidden when blank. There is
+//   no default email, so nothing from another project can leak in.
+//   `address` falls back to "Islamabad, Pakistan" only when not passed at
+//   all; pass "" to hide it.
+// - social: { facebook, instagram, linkedin, youtube, x, github }. Only
+//   valid https:// URLs are shown; blank or missing keys are hidden.
 // - newsletter: optional node (e.g. <Newsletter variant="inline" />) shown in
 //   its own band; nothing is rendered when it is not passed
 // - showCta / showStats / showExplore / showTrust / showBadges: toggle sections
@@ -401,8 +414,9 @@ function FooterBackdrop() {
 // - rating / statusHref: override the new social-proof / status pills
 export function FooterView({
   siteName = "Apni University",
-  contactEmail = "support@ztskillspro.com",
+  contactEmail,
   phone,
+  address = "Islamabad, Pakistan",
   social,
   newsletter,
   isLoggedIn, // leave undefined: FooterClient checks Firebase itself
@@ -421,27 +435,43 @@ export function FooterView({
   dashboardHref = "/dashboard",
   myCoursesHref = "/dashboard/courses",
 }) {
-  const socialUrls = { ...defaultSocial, ...social };
+  const email = cleanText(contactEmail);
+  const phoneText = cleanText(phone);
+  const addressText = cleanText(address);
 
   const contactInfo = [
-    contactEmail && {
+    email && {
       icon: Mail,
-      label: contactEmail,
-      href: `mailto:${contactEmail}`,
+      label: email,
+      href: `mailto:${email}`,
     },
-    phone && {
+    phoneText && {
       icon: Phone,
-      label: phone,
-      href: `tel:${String(phone).replace(/[^\d+]/g, "")}`,
+      label: phoneText,
+      href: `tel:${phoneText.replace(/[^\d+]/g, "")}`,
     },
-    { icon: MapPin, label: "Islamabad, Pakistan" },
+    addressText && { icon: MapPin, label: addressText },
   ].filter(Boolean);
 
   const socials = [
-    { icon: FaFacebookF, label: "Facebook", href: socialUrls.facebook },
-    { icon: FaInstagram, label: "Instagram", href: socialUrls.instagram },
-    { icon: FaLinkedinIn, label: "LinkedIn", href: socialUrls.linkedin },
-    { icon: FaYoutube, label: "YouTube", href: socialUrls.youtube },
+    {
+      icon: FaFacebookF,
+      label: "Facebook",
+      href: safeHttpsUrl(social?.facebook),
+    },
+    {
+      icon: FaInstagram,
+      label: "Instagram",
+      href: safeHttpsUrl(social?.instagram),
+    },
+    {
+      icon: FaLinkedinIn,
+      label: "LinkedIn",
+      href: safeHttpsUrl(social?.linkedin),
+    },
+    { icon: FaYoutube, label: "YouTube", href: safeHttpsUrl(social?.youtube) },
+    { icon: FaXTwitter, label: "X", href: safeHttpsUrl(social?.x) },
+    { icon: FaGithub, label: "GitHub", href: safeHttpsUrl(social?.github) },
   ].filter((s) => s.href);
 
   return (
@@ -601,21 +631,25 @@ export function FooterView({
                 </ul>
               )}
 
-              <ul className="space-y-3">
-                {contactInfo.map((item) => (
-                  <li key={item.label}>
-                    <ContactRow {...item} />
-                  </li>
-                ))}
-              </ul>
+              {contactInfo.length > 0 && (
+                <ul className="space-y-3">
+                  {contactInfo.map((item) => (
+                    <li key={item.label}>
+                      <ContactRow {...item} />
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-              <div className="flex flex-wrap items-center gap-3">
-                {socials.map((s) => (
-                  <Magnetic key={s.label} className="inline-flex">
-                    <SocialLink {...s} />
-                  </Magnetic>
-                ))}
-              </div>
+              {socials.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                  {socials.map((s) => (
+                    <Magnetic key={s.label} className="inline-flex">
+                      <SocialLink {...s} />
+                    </Magnetic>
+                  ))}
+                </div>
+              )}
             </Reveal>
 
             <div className="grid grid-cols-2 gap-x-6 gap-y-10 sm:flex sm:flex-wrap sm:justify-between sm:gap-8 lg:flex-1 lg:flex-nowrap lg:justify-around">

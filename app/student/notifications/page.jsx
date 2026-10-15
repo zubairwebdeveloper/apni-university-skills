@@ -28,7 +28,7 @@ const toMs = (v) => {
 export default async function StudentNotificationsPage() {
   const user = await requireUser();
   const raw = await notificationInboxRepository.listByUser(user.uid);
-
+  console.log("[notif debug]", { uid: user.uid, count: raw.length });
   // Only plain, serializable fields go to the client component
   const items = raw.map((n) => ({
     id: n.id,

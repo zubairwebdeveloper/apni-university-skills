@@ -2,6 +2,7 @@
 "use server";
 import { z } from "zod";
 import { adminAction } from "@/lib/admin/action";
+import { assertFresh } from "@/lib/auth/authorize";
 import { AppError } from "@/lib/errors";
 import { PERMISSIONS as P } from "@/lib/constants/permissions";
 import { notificationSchema } from "@/lib/validations/notification";
@@ -47,9 +48,12 @@ async function resolveAudience(i) {
 export const createNotification = adminAction({
   permission: P.NOTIFICATIONS_CREATE,
   schema: notificationSchema,
-  fresh: true,
+  // No blanket `fresh: true`: saving a draft is harmless.
+  // A recent sign-in is only required when the notification is sent or scheduled.
   limit: { limit: 10, windowSec: 60 },
   handler: async ({ input, actor }) => {
+    if (input.mode !== "draft") assertFresh(actor);
+
     const audience = await resolveAudience(input);
     const status =
       input.mode === "now"
@@ -110,4 +114,3 @@ const move = (to, action) =>
   });
 export const sendNotification = move("sending", "notification.sent");
 export const cancelNotification = move("cancelled", "notification.cancelled");
-

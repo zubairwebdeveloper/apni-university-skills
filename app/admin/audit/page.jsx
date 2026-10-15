@@ -1,8 +1,17 @@
 // app/admin/audit/page.jsx
-import { FiChevronRight, FiClipboard } from "react-icons/fi";
+import {
+  FiActivity,
+  FiChevronRight,
+  FiClipboard,
+  FiEdit3,
+  FiLogIn,
+  FiPlusCircle,
+  FiTrash2,
+  FiUsers,
+} from "react-icons/fi";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DataTableToolbar } from "@/components/admin/table/DataTableToolbar";
-import { CursorPagination } from "@/components/shared/CursorPagination";
+import { AuditPagination } from "@/components/shared/AuditPagination";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ExportCsvButton } from "@/components/shared/ExportCsvButton";
 import { CopyJsonButton } from "@/components/admin/audit/CopyJsonButton";
@@ -15,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { requirePermission } from "@/lib/auth/authorize";
 import { PERMISSIONS as P } from "@/lib/constants/permissions";
 import { AUDIT_RESOURCES, formatAuditAction } from "@/lib/constants/audit";
@@ -44,28 +54,122 @@ const FILTERS = [
   },
 ];
 
-// Groups raw action strings into a meaning, not just a label, so the same
-// blue/emerald/amber/rose vocabulary used elsewhere in admin (roles,
-// completion rates) also applies here. Falls back to a neutral badge for
-// anything it doesn't recognize, so new/unexpected actions never break.
-function actionTone(action) {
+// Raw action string -> a meaning (kind), so badge colour, row accent and the
+// summary cards all share one vocabulary. Unknown actions fall back to
+// "other" so new actions never break the page.
+const KINDS = {
+  destructive: {
+    label: "Destructive",
+    icon: FiTrash2,
+    badge: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    accent: "border-l-rose-500",
+    iconWrap: "bg-rose-500/10 text-rose-600 dark:text-rose-300",
+  },
+  create: {
+    label: "Created",
+    icon: FiPlusCircle,
+    badge:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    accent: "border-l-emerald-500",
+    iconWrap: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+  },
+  update: {
+    label: "Updated",
+    icon: FiEdit3,
+    badge: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    accent: "border-l-sky-500",
+    iconWrap: "bg-sky-500/10 text-sky-600 dark:text-sky-300",
+  },
+  session: {
+    label: "Sessions",
+    icon: FiLogIn,
+    badge:
+      "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    accent: "border-l-amber-500",
+    iconWrap: "bg-amber-500/10 text-amber-600 dark:text-amber-300",
+  },
+  other: {
+    label: "Other",
+    icon: FiActivity,
+    badge: "border-border bg-muted text-muted-foreground",
+    accent: "border-l-border",
+    iconWrap: "bg-muted text-muted-foreground",
+  },
+};
+
+function actionKind(action) {
   const a = String(action || "").toLowerCase();
-  if (/(delete|remove|revoke|ban|suspend|reject)/.test(a))
-    return "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300";
+  if (/(delete|remove|revoke|ban|suspend|reject)/.test(a)) return "destructive";
   if (/(create|add|grant|approve|publish|restore|activate)/.test(a))
-    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
-  if (/(update|edit|change|rename|move)/.test(a))
-    return "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300";
-  if (/(login|logout|session)/.test(a))
-    return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300";
-  return "border-border bg-muted text-muted-foreground";
+    return "create";
+  if (/(update|edit|change|rename|move)/.test(a)) return "update";
+  if (/(login|logout|session)/.test(a)) return "session";
+  return "other";
+}
+
+function timeAgo(date) {
+  const t = new Date(date).getTime();
+  if (Number.isNaN(t)) return "";
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return "";
+}
+
+function initials(email) {
+  if (!email) return "SY";
+  return email.split("@")[0].slice(0, 2).toUpperCase();
+}
+
+function parseTrail(raw) {
+  if (typeof raw !== "string") return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 100);
+}
+
+function StatCard({ icon: Icon, label, value, iconWrap }) {
+  return (
+    <Card className="py-0">
+      <CardContent className="flex items-center gap-3 p-4">
+        <span
+          className={cn(
+            "grid size-10 shrink-0 place-items-center rounded-lg",
+            iconWrap,
+          )}
+        >
+          <Icon aria-hidden="true" className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-2xl font-semibold leading-none tabular-nums">
+            {value}
+          </p>
+          <p className="mt-1 truncate text-xs text-muted-foreground">{label}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default async function AuditPage({ searchParams }) {
   await requirePermission(P.AUDIT_READ);
-  const p = parseAuditParams(await searchParams);
+  const sp = await searchParams;
+  const p = parseAuditParams(sp);
+  const trail = parseTrail(sp?.trail);
   const { items, nextCursor, total } = await auditRepository.list(p);
   const { after, ...linkParams } = p;
+
+  // Quick insights computed from the current page only (no extra queries).
+  const kinds = items.map((a) => actionKind(a.action));
+  const countOf = (k) => kinds.filter((x) => x === k).length;
+  const uniqueActors = new Set(items.map((a) => a.actorEmail ?? "system")).size;
 
   return (
     <div className="ea-stagger">
@@ -76,6 +180,7 @@ export default async function AuditPage({ searchParams }) {
           .ea-stagger > *:nth-child(1) { animation-delay: 0ms; }
           .ea-stagger > *:nth-child(2) { animation-delay: 60ms; }
           .ea-stagger > *:nth-child(3) { animation-delay: 120ms; }
+          .ea-stagger > *:nth-child(4) { animation-delay: 180ms; }
         }
       `}</style>
 
@@ -83,7 +188,38 @@ export default async function AuditPage({ searchParams }) {
         title="Audit log"
         description="Every administrative change, newest first. Entries can't be edited or deleted."
       />
+
+      {items.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            icon={FiClipboard}
+            label="Entries on this page"
+            value={items.length}
+            iconWrap="bg-primary/10 text-primary"
+          />
+          <StatCard
+            icon={FiUsers}
+            label="Unique actors"
+            value={uniqueActors}
+            iconWrap={KINDS.update.iconWrap}
+          />
+          <StatCard
+            icon={KINDS.create.icon}
+            label="Creations"
+            value={countOf("create")}
+            iconWrap={KINDS.create.iconWrap}
+          />
+          <StatCard
+            icon={KINDS.destructive.icon}
+            label="Destructive actions"
+            value={countOf("destructive")}
+            iconWrap={KINDS.destructive.iconWrap}
+          />
+        </div>
+      )}
+
       <DataTableToolbar searchable={false} filters={FILTERS} total={total} />
+
       <div className="mt-4">
         {!items.length ? (
           <EmptyState
@@ -93,7 +229,10 @@ export default async function AuditPage({ searchParams }) {
           />
         ) : (
           <>
-            <div className="mb-3 flex justify-end">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                Click “View details” to inspect or copy the raw metadata.
+              </p>
               <ExportCsvButton
                 filename={`audit-log-${p.range ?? "all"}`}
                 headers={[
@@ -114,6 +253,7 @@ export default async function AuditPage({ searchParams }) {
                 ])}
               />
             </div>
+
             <div className="overflow-x-auto rounded-xl border bg-card">
               <Table className="min-w-[760px]">
                 <TableHeader>
@@ -126,66 +266,98 @@ export default async function AuditPage({ searchParams }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {formatDateTime(a.createdAt)}
-                      </TableCell>
-                      <TableCell>
-                        <p className="text-sm">{a.actorEmail ?? "system"}</p>
-                        <Badge variant="outline" className="mt-1">
-                          {a.actorRole}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={cn("font-medium", actionTone(a.action))}
-                        >
-                          {formatAuditAction(a.action)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="capitalize">{a.resource}</span>
-                        {a.resourceSlug && (
-                          <p className="font-mono text-xs text-muted-foreground">
-                            {a.resourceSlug}
+                  {items.map((a, i) => {
+                    const kind = KINDS[kinds[i]];
+                    const KindIcon = kind.icon;
+                    const ago = timeAgo(a.createdAt);
+                    return (
+                      <TableRow
+                        key={a.id}
+                        className={cn("border-l-2", kind.accent)}
+                      >
+                        <TableCell className="whitespace-nowrap">
+                          <p className="text-sm">
+                            {formatDateTime(a.createdAt)}
                           </p>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {a.metadata && Object.keys(a.metadata).length > 0 && (
-                          <details className="group">
-                            <summary className="flex cursor-pointer select-none items-center gap-1 text-xs font-medium text-primary">
-                              <FiChevronRight
-                                aria-hidden="true"
-                                className="size-3 transition-transform duration-200 group-open:rotate-90"
-                              />
-                              View details
-                            </summary>
-                            <div className="mt-2 max-w-xs space-y-1.5">
-                              <div className="flex justify-end">
-                                <CopyJsonButton data={a.metadata} />
-                              </div>
-                              <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md border bg-muted p-2 text-xs">
-                                {JSON.stringify(a.metadata, null, 2)}
-                              </pre>
+                          {ago && (
+                            <p className="text-xs text-muted-foreground">
+                              {ago}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              aria-hidden="true"
+                              className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground"
+                            >
+                              {initials(a.actorEmail)}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm">
+                                {a.actorEmail ?? "system"}
+                              </p>
+                              <Badge variant="outline" className="mt-0.5">
+                                {a.actorRole}
+                              </Badge>
                             </div>
-                          </details>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={cn("gap-1.5 font-medium", kind.badge)}
+                          >
+                            <KindIcon aria-hidden="true" className="size-3" />
+                            {formatAuditAction(a.action)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="capitalize">{a.resource}</span>
+                          {a.resourceSlug && (
+                            <p className="font-mono text-xs text-muted-foreground">
+                              {a.resourceSlug}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {a.metadata && Object.keys(a.metadata).length > 0 && (
+                            <details className="group">
+                              <summary className="flex cursor-pointer select-none items-center gap-1 text-xs font-medium text-primary">
+                                <FiChevronRight
+                                  aria-hidden="true"
+                                  className="size-3 transition-transform duration-200 group-open:rotate-90"
+                                />
+                                View details
+                              </summary>
+                              <div className="mt-2 max-w-xs space-y-1.5">
+                                <div className="flex justify-end">
+                                  <CopyJsonButton data={a.metadata} />
+                                </div>
+                                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md border bg-muted p-2 text-xs">
+                                  {JSON.stringify(a.metadata, null, 2)}
+                                </pre>
+                              </div>
+                            </details>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
           </>
         )}
-        <CursorPagination
+
+        <AuditPagination
           basePath="/admin/audit"
           params={linkParams}
           after={after}
+          trail={trail}
           nextCursor={nextCursor}
+          shown={items.length}
+          total={total}
         />
       </div>
     </div>

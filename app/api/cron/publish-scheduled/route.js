@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase/admin/firestore";
 import { writeAuditTx } from "@/lib/audit/auditLog";
-import { blogGuard } from "@/lib/admin/guards";
+// import { blogGuard } from "@/lib/admin/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

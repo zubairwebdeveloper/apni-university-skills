@@ -20,6 +20,7 @@ import {
   FiBookOpen,
   FiCheck,
   FiGrid,
+  FiHeart,
   FiLayers,
   FiPlayCircle,
   FiTool,
@@ -54,12 +55,14 @@ const guestHighlights = [
   { icon: FiCheck, text: "No credit card required" },
   { icon: FiZap, text: "Start learning in minutes" },
   { icon: FiTrendingUp, text: "Learn at your own pace" },
+  { icon: FiHeart, text: "Backed by a free support community" },
 ];
 
 const memberHighlights = [
   { icon: FiPlayCircle, text: "Continue from your dashboard" },
   { icon: FiCheck, text: "Your progress is saved" },
   { icon: FiTrendingUp, text: "Learn at your own pace" },
+  { icon: FiHeart, text: "Backed by a free support community" },
 ];
 
 const guestSteps = [
@@ -117,6 +120,7 @@ const PATH_LINKS = [
   { id: "cloud", label: "Cloud" },
   { id: "security", label: "Cybersecurity" },
   { id: "devops", label: "DevOps" },
+  { id: "data", label: "Data Science" },
 ];
 
 // Technology topics shown in the scrolling strip (edit freely).
@@ -131,6 +135,8 @@ const DEFAULT_TOPICS = [
   "Docker",
   "Machine Learning",
   "UI/UX Design",
+  "TypeScript",
+  "Git & GitHub",
 ];
 
 const STEP_MS = 4500;
@@ -178,7 +184,7 @@ function Stars({ value = 5 }) {
 
   return (
     <span
-      className="flex items-center gap-0.5 text-highlight"
+      className="flex items-center gap-0.5 text-pink-500"
       aria-hidden="true"
     >
       {Array.from({ length: 5 }).map((_, i) => {
@@ -378,7 +384,7 @@ function StepTabs({ steps, live, reduce }) {
                   className={cn(
                     "grid size-9 shrink-0 place-items-center rounded-xl ring-1 transition-colors duration-300 motion-reduce:transition-none",
                     on
-                      ? "bg-[rgb(var(--cta-a))] text-white ring-transparent dark:text-[#080B12]"
+                      ? "bg-[rgb(var(--cta-a))] text-white ring-transparent"
                       : "bg-[rgb(var(--cta-a)/0.12)] text-[rgb(var(--cta-a))] ring-[rgb(var(--cta-a)/0.2)]",
                   )}
                 >
@@ -558,7 +564,7 @@ function Backdrop({ live, px, py }) {
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
     >
-      {/* Soft base wash: emerald to blue */}
+      {/* Soft base wash: pink to rose */}
       <div
         className="absolute inset-0"
         style={{
@@ -778,8 +784,8 @@ export function CTASection({
               pxRaw.set(0);
               pyRaw.set(0);
             }}
-            // Emerald + blue accents per theme (RGB triplets).
-            className="relative isolate overflow-hidden rounded-3xl bg-border p-px shadow-xl [--cta-a:5_150_105] [--cta-b:37_99_235] dark:[--cta-a:52_211_153] dark:[--cta-b:79_140_255]"
+            // Two pink tones per theme (RGB triplets): a deep pink paired with rose.
+            className="relative isolate overflow-hidden rounded-3xl bg-border p-px shadow-xl [--cta-a:219_39_119] [--cta-b:244_63_94] dark:[--cta-a:244_114_182] dark:[--cta-b:251_113_133]"
           >
             {/* Slowly rotating conic highlight that travels around the edge */}
             <motion.div
@@ -819,6 +825,14 @@ export function CTASection({
                 className="right-[3%] top-[34%]"
               >
                 Certificates to share
+              </FloatChip>
+              <FloatChip
+                icon={FiHeart}
+                live={live}
+                delay={2.6}
+                className="left-[6%] top-[8%]"
+              >
+                Mentor support included
               </FloatChip>
 
               {/* ---------- Content ---------- */}
@@ -875,7 +889,24 @@ export function CTASection({
                 ))}
               </ul>
 
-             
+              {/* Primary / secondary actions */}
+              <div className="relative mx-auto mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Magnetic>
+                  <Link
+                    href={user ? dashboard : "/register"}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[rgb(var(--cta-a))] px-6 text-sm font-semibold text-white shadow-lg shadow-[rgb(var(--cta-a)/0.35)] transition-transform hover:scale-[1.03] motion-reduce:transition-none motion-reduce:hover:scale-100"
+                  >
+                    {user ? "Go to dashboard" : "Create free account"}
+                    <FiArrowRight className="size-4" aria-hidden="true" />
+                  </Link>
+                </Magnetic>
+                <Link
+                  href={user ? secondaryHref : primaryHref}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[rgb(var(--cta-a)/0.4)] bg-background/70 px-6 text-sm font-semibold text-foreground backdrop-blur-sm transition-colors hover:border-[rgb(var(--cta-a)/0.7)] motion-reduce:transition-none"
+                >
+                  Browse courses
+                </Link>
+              </div>
 
               {/* Quick links to the learning paths */}
               <nav

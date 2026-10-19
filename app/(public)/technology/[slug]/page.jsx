@@ -2,6 +2,21 @@
 import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  ArrowRight,
+  BookOpen,
+  Briefcase,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Gauge,
+  Hammer,
+  HelpCircle,
+  Layers,
+  ListChecks,
+  Route,
+  Wrench,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Container, Section } from "@/components/layout/Container";
@@ -12,11 +27,7 @@ import { BlogCard } from "@/components/public/BlogCard";
 import { CareerCard } from "@/components/public/CareerCard";
 import { CourseCard } from "@/components/public/CourseCard";
 import { JobCard } from "@/components/public/JobCard";
-import {
-  ProgressLine,
-  Reveal,
-  Tilt,
-} from "@/components/public/Reveal";
+import { ProgressLine, Reveal, Tilt } from "@/components/public/Reveal";
 import { SectionNav } from "@/components/public/SectionNav";
 import { TechScene } from "@/components/public/TechScene";
 import { technologyService } from "@/services/technologyService";
@@ -36,6 +47,9 @@ const MATURITY = {
   experimental: "Experimental, still developing",
 };
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const t = await safe(getTech(slug), null);
@@ -52,20 +66,29 @@ export async function generateMetadata({ params }) {
   };
 }
 
+function Eyebrow({ children }) {
+  return (
+    <p className="inline-flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+      <span aria-hidden="true" className="h-px w-6 bg-primary" />
+      {children}
+    </p>
+  );
+}
+
 function Heading({ id, eyebrow, title, description }) {
   return (
-    <div className="mb-8 max-w-2xl">
-      <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-primary">
-        {eyebrow}
-      </p>
+    <div className="mb-10 max-w-2xl">
+      <Eyebrow>{eyebrow}</Eyebrow>
       <h2
         id={id}
-        className="text-balance text-[clamp(1.5rem,3vw,2.25rem)] font-semibold leading-tight tracking-tight"
+        className="mt-3 text-balance text-[clamp(1.75rem,3.2vw,2.5rem)] font-semibold leading-[1.1] tracking-tight"
       >
         {title}
       </h2>
       {description && (
-        <p className="mt-3 text-muted-foreground">{description}</p>
+        <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
+          {description}
+        </p>
       )}
     </div>
   );
@@ -93,10 +116,22 @@ export default async function TechnologyDetailPage({ params }) {
 
   // Only real, optional fields are shown; nothing is invented.
   const facts = [
-    skills.length > 0 && { label: "Skills covered", value: skills.length },
-    careers.length > 0 && { label: "Career paths", value: careers.length },
-    tech.level && { label: "Level", value: tech.level },
-    tech.duration && { label: "Typical time", value: tech.duration },
+    skills.length > 0 && {
+      label: "Skills covered",
+      value: skills.length,
+      icon: Layers,
+    },
+    careers.length > 0 && {
+      label: "Career paths",
+      value: careers.length,
+      icon: Briefcase,
+    },
+    tech.level && { label: "Level", value: tech.level, icon: Gauge },
+    tech.duration && {
+      label: "Typical time",
+      value: tech.duration,
+      icon: Clock,
+    },
   ].filter(Boolean);
 
   const journey = [
@@ -157,17 +192,17 @@ export default async function TechnologyDetailPage({ params }) {
           aria-hidden="true"
           className="pointer-events-none absolute -bottom-32 -left-32 -z-10 size-80 rounded-full bg-primary/10 blur-3xl"
         />
-        <Container className="grid items-center gap-10 py-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:py-20">
+        <Container className="grid items-center gap-12 py-14 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-16 lg:py-24">
           <div className="min-w-0">
             <nav
               aria-label="Breadcrumb"
-              className="mb-6 text-sm text-muted-foreground"
+              className="mb-7 text-sm text-muted-foreground"
             >
               <ol className="flex flex-wrap items-center gap-1.5">
                 <li>
                   <Link
                     href="/"
-                    className="rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className={`rounded transition-colors hover:text-foreground motion-reduce:transition-none ${focusRing}`}
                   >
                     Home
                   </Link>
@@ -176,13 +211,13 @@ export default async function TechnologyDetailPage({ params }) {
                 <li>
                   <Link
                     href="/technology"
-                    className="rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className={`rounded transition-colors hover:text-foreground motion-reduce:transition-none ${focusRing}`}
                   >
                     Technology
                   </Link>
                 </li>
                 <li aria-hidden="true">/</li>
-                <li aria-current="page" className="text-foreground">
+                <li aria-current="page" className="font-medium text-foreground">
                   {tech.title}
                 </li>
               </ol>
@@ -190,33 +225,44 @@ export default async function TechnologyDetailPage({ params }) {
 
             {MATURITY[tech.maturity] && (
               <Reveal>
-                <Badge variant="secondary" className="mb-4">
+                <Badge variant="secondary" className="mb-5">
                   {MATURITY[tech.maturity]}
                 </Badge>
               </Reveal>
             )}
 
-            <h1 className="text-balance text-[clamp(2.25rem,5.5vw,4.25rem)] font-semibold leading-[1.05] tracking-tight">
+            <h1 className="text-balance text-[clamp(2.5rem,5.5vw,4.5rem)] font-semibold leading-[1.02] tracking-tight">
               {tech.title}
             </h1>
 
             <Reveal delay={0.1}>
-              <p className="mt-5 max-w-xl text-pretty text-lg text-muted-foreground">
+              <p className="mt-6 max-w-xl text-pretty text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
                 {tech.summary}
               </p>
             </Reveal>
 
             <Reveal delay={0.2}>
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-9 flex flex-wrap gap-3">
                 <Link
                   href={coursesHref}
-                  className={buttonVariants({ size: "lg" })}
+                  className={buttonVariants({
+                    size: "lg",
+                    className: "group/btn min-h-11",
+                  })}
                 >
                   Explore courses
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="size-4 transition-transform duration-200 group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                  />
                 </Link>
                 <Link
                   href="#journey"
-                  className={buttonVariants({ variant: "outline", size: "lg" })}
+                  className={buttonVariants({
+                    variant: "outline",
+                    size: "lg",
+                    className: "min-h-11",
+                  })}
                 >
                   See the learning journey
                 </Link>
@@ -225,13 +271,22 @@ export default async function TechnologyDetailPage({ params }) {
 
             {facts.length > 0 && (
               <Reveal delay={0.3}>
-                <dl className="mt-10 grid max-w-xl grid-cols-2 gap-x-6 gap-y-4 border-t pt-6 sm:grid-cols-4">
+                <dl className="mt-12 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
                   {facts.map((f) => (
-                    <div key={f.label}>
-                      <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                    <div
+                      key={f.label}
+                      className="min-w-0 rounded-xl border bg-card/80 p-4 shadow-sm"
+                    >
+                      <f.icon
+                        aria-hidden="true"
+                        className="size-4 text-primary"
+                      />
+                      <dt className="mt-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                         {f.label}
                       </dt>
-                      <dd className="mt-1 text-xl font-semibold">{f.value}</dd>
+                      <dd className="mt-1 break-words text-xl font-semibold leading-tight">
+                        {f.value}
+                      </dd>
                     </div>
                   ))}
                 </dl>
@@ -251,12 +306,12 @@ export default async function TechnologyDetailPage({ params }) {
       <SectionNav items={navItems} />
 
       {/* Overview */}
-      <Container className="grid gap-12 py-12 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 space-y-14">
+      <Container className="grid gap-14 py-14 sm:py-20 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-16">
+        <div className="min-w-0 space-y-16">
           <section aria-labelledby="what" id="overview">
             <Reveal>
               <Heading id="what" eyebrow="Overview" title="What it is" />
-              <div className="max-w-prose">
+              <div className="max-w-prose text-base leading-8 text-muted-foreground sm:text-lg [&_p+p]:mt-4">
                 <Paragraphs text={tech.whatItIs} />
               </div>
             </Reveal>
@@ -264,7 +319,7 @@ export default async function TechnologyDetailPage({ params }) {
           <section aria-labelledby="why">
             <Reveal>
               <Heading id="why" eyebrow="Context" title="Why it matters" />
-              <div className="max-w-prose">
+              <div className="max-w-prose border-l-2 border-primary/40 pl-6 text-base leading-8 text-muted-foreground sm:text-lg [&_p+p]:mt-4">
                 <Paragraphs text={tech.whyItMatters} />
               </div>
             </Reveal>
@@ -278,10 +333,15 @@ export default async function TechnologyDetailPage({ params }) {
           >
             {skills.length > 0 && (
               <Reveal>
-                <div className="rounded-2xl border bg-card p-6">
-                  <h2 id="skills-t" className="mb-4 text-lg font-semibold">
-                    Skills required
-                  </h2>
+                <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                  <div className="mb-5 flex items-center gap-3">
+                    <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                      <Wrench aria-hidden="true" className="size-5" />
+                    </span>
+                    <h2 id="skills-t" className="text-lg font-semibold">
+                      Skills required
+                    </h2>
+                  </div>
                   <ul className="flex flex-wrap gap-2">
                     {skills.map((s) => (
                       <li key={s}>
@@ -294,16 +354,19 @@ export default async function TechnologyDetailPage({ params }) {
             )}
             {prerequisites.length > 0 && (
               <Reveal delay={0.1}>
-                <div className="rounded-2xl border bg-card p-6">
-                  <h2 className="mb-4 text-lg font-semibold">
-                    Before you start
-                  </h2>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
+                <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                  <div className="mb-5 flex items-center gap-3">
+                    <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                      <ListChecks aria-hidden="true" className="size-5" />
+                    </span>
+                    <h2 className="text-lg font-semibold">Before you start</h2>
+                  </div>
+                  <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
                     {prerequisites.map((p) => (
-                      <li key={p} className="flex gap-2">
-                        <span
+                      <li key={p} className="flex gap-3">
+                        <CheckCircle2
                           aria-hidden="true"
-                          className="mt-2 size-1.5 shrink-0 rounded-full bg-primary"
+                          className="mt-0.5 size-4 shrink-0 text-primary"
                         />
                         <span>{p}</span>
                       </li>
@@ -329,20 +392,26 @@ export default async function TechnologyDetailPage({ params }) {
           <ProgressLine className="max-w-3xl">
             <ol className="space-y-6">
               {journey.map((s, i) => (
-                <li key={s.id} className="relative pl-12">
-                  <span className="absolute left-0 top-3 z-10 grid size-7 place-items-center rounded-full border bg-background text-xs font-semibold text-primary">
+                <li key={s.id} className="relative pl-14">
+                  <span className="absolute left-0 top-4 z-10 grid size-8 place-items-center rounded-full bg-primary text-xs font-semibold tabular-nums text-primary-foreground shadow-md shadow-primary/20 ring-4 ring-background">
                     {i + 1}
                   </span>
                   <Reveal delay={0.05}>
                     <Tilt max={3}>
                       <a
                         href={`#${s.id}`}
-                        className="group block rounded-xl border bg-card p-5 transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className={`group flex items-center justify-between gap-4 rounded-xl border bg-card p-5 shadow-sm transition-all hover:border-primary/50 hover:shadow-md motion-reduce:transition-none ${focusRing}`}
                       >
-                        <h3 className="font-semibold">{s.title}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {s.text}
-                        </p>
+                        <span className="min-w-0">
+                          <span className="block font-semibold">{s.title}</span>
+                          <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                            {s.text}
+                          </span>
+                        </span>
+                        <ArrowRight
+                          aria-hidden="true"
+                          className="size-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-1 group-hover:text-primary motion-reduce:transition-none"
+                        />
                       </a>
                     </Tilt>
                   </Reveal>
@@ -370,16 +439,21 @@ export default async function TechnologyDetailPage({ params }) {
                 className="h-full"
               >
                 <Tilt className="h-full">
-                  <article className="flex h-full flex-col rounded-2xl border bg-card p-6">
-                    <div className="mb-4 flex items-center justify-between">
-                      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Project {String(i + 1).padStart(2, "0")}
+                  <article className="flex h-full flex-col rounded-2xl border bg-card p-6 shadow-sm transition-colors hover:border-primary/40 motion-reduce:transition-none sm:p-7">
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                      <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                        <Hammer aria-hidden="true" className="size-5" />
                       </span>
                       {p.level && <Badge variant="outline">{p.level}</Badge>}
                     </div>
-                    <h3 className="text-lg font-semibold">{p.title}</h3>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] tabular-nums text-primary">
+                      Project {String(i + 1).padStart(2, "0")}
+                    </p>
+                    <h3 className="mt-1.5 text-lg font-semibold leading-snug">
+                      {p.title}
+                    </h3>
                     {p.description && (
-                      <p className="mt-2 text-sm text-muted-foreground">
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
                         {p.description}
                       </p>
                     )}
@@ -488,20 +562,40 @@ export default async function TechnologyDetailPage({ params }) {
       {/* FAQ (optional `faqs` field: [{ q, a }]) */}
       {faqs.length > 0 && (
         <Section labelledBy="faq" className="border-t bg-secondary/40">
-          <Heading id="faq" eyebrow="FAQ" title="Common questions" />
-          <div className="max-w-3xl divide-y rounded-2xl border bg-card">
-            {faqs.map((f) => (
-              <details key={f.q} className="group px-6 py-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                  {f.q}
-                  <span
-                    aria-hidden="true"
-                    className="text-xl text-muted-foreground transition-transform group-open:rotate-45"
-                  >
-                    +
+          <Heading
+            id="faq"
+            eyebrow="FAQ"
+            title="Common questions"
+            description={`Quick answers about ${tech.title}.`}
+          />
+          <div className="max-w-3xl space-y-3">
+            {faqs.map((f, i) => (
+              <details
+                key={f.q}
+                className="group rounded-xl border bg-card px-5 shadow-sm transition-colors hover:border-primary/30 open:border-primary/30 motion-reduce:transition-none sm:px-6"
+              >
+                <summary
+                  className={`flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-4 text-left font-medium focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden outline-none`}
+                >
+                  <span className="flex min-w-0 items-baseline gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="text-xs font-semibold tabular-nums text-primary"
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span>{f.q}</span>
+                  </span>
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="size-4 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
+                    />
                   </span>
                 </summary>
-                <p className="mt-3 text-sm text-muted-foreground">{f.a}</p>
+                <p className="max-w-2xl pb-5 text-sm leading-7 text-muted-foreground sm:pl-8 sm:text-base">
+                  {f.a}
+                </p>
               </details>
             ))}
           </div>
@@ -511,32 +605,47 @@ export default async function TechnologyDetailPage({ params }) {
       {/* Closing call to action */}
       <Section labelledBy="cta-t">
         <Reveal>
-          <div className="relative isolate overflow-hidden rounded-3xl border bg-card p-8 sm:p-12">
+          <div className="relative isolate overflow-hidden rounded-3xl border bg-card p-8 shadow-sm sm:p-12">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute -right-16 -top-16 -z-10 size-72 rounded-full bg-primary/15 blur-3xl"
             />
+            <span className="grid size-12 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
+              <Route aria-hidden="true" className="size-6" />
+            </span>
             <h2
               id="cta-t"
-              className="max-w-xl text-balance text-[clamp(1.5rem,3vw,2.25rem)] font-semibold leading-tight tracking-tight"
+              className="mt-6 max-w-xl text-balance text-[clamp(1.75rem,3.2vw,2.5rem)] font-semibold leading-[1.1] tracking-tight"
             >
               Ready to start with {tech.title}?
             </h2>
-            <p className="mt-3 max-w-xl text-muted-foreground">
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
               Pick a course, follow the journey above, or read more on the blog
               first.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href={coursesHref}
-                className={buttonVariants({ size: "lg" })}
+                className={buttonVariants({
+                  size: "lg",
+                  className: "group/btn min-h-11",
+                })}
               >
                 Browse courses
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-4 transition-transform duration-200 group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                />
               </Link>
               <Link
                 href="/blog"
-                className={buttonVariants({ variant: "outline", size: "lg" })}
+                className={buttonVariants({
+                  variant: "outline",
+                  size: "lg",
+                  className: "min-h-11",
+                })}
               >
+                <BookOpen aria-hidden="true" className="size-4" />
                 Read the blog
               </Link>
             </div>

@@ -417,6 +417,7 @@ export function LoginForm({ next }) {
       <AnimatePresence>
         {done && (
           <motion.div
+            key="success-overlay"
             initial={reduce ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -458,28 +459,28 @@ export function LoginForm({ next }) {
             </div>
           </motion.div>
         )}
-
-        {/* Create account */}
-        <motion.div
-          variants={item}
-          className="flex flex-wrap items-center justify-center gap-1 border-t border-border pt-4 text-sm"
-        >
-          <span className="text-muted-foreground">
-            Don&apos;t have an account?
-          </span>
-
-          <Link
-            href="/register"
-            className="group inline-flex min-h-8 items-center gap-1 rounded-sm font-semibold text-primary underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Create account
-            <ArrowRight
-              aria-hidden="true"
-              className="size-3.5 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
-            />
-          </Link>
-        </motion.div>
       </AnimatePresence>
+
+      {/* Create account */}
+      <motion.div
+        variants={item}
+        className="flex flex-wrap items-center justify-center gap-1 border-t border-border pt-4 text-sm"
+      >
+        <span className="text-muted-foreground">
+          Don&apos;t have an account?
+        </span>
+
+        <Link
+          href="/register"
+          className="group inline-flex min-h-8 items-center gap-1 rounded-sm font-semibold text-primary underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Create account
+          <ArrowRight
+            aria-hidden="true"
+            className="size-3.5 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
+          />
+        </Link>
+      </motion.div>
     </motion.form>
   );
 }

@@ -1,3 +1,4 @@
+// app/student/reviews/page.jsx
 import {
   FiBookOpen,
   FiCheckCircle,
@@ -62,6 +63,43 @@ const TIPS = [
   "Avoid sharing personal information.",
 ];
 
+// Section heading with an icon tile; keeps the three sections consistent.
+function SectionHeader({ id, icon: Icon, title, description, count, tone }) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <div className="flex items-center gap-2.5">
+          <span
+            className={`grid size-9 place-items-center rounded-lg ring-1 ring-inset ${tone}`}
+          >
+            <Icon aria-hidden="true" className="size-4" />
+          </span>
+          <h2
+            id={id}
+            className="text-balance text-xl font-semibold tracking-tight sm:text-2xl"
+          >
+            {title}
+          </h2>
+        </div>
+        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      </div>
+      {count ? (
+        <span className="w-fit rounded-full bg-muted px-3 py-1 text-xs font-medium tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+const TONE_PRIMARY = "bg-primary/10 text-primary ring-primary/20";
+const TONE_VIOLET =
+  "bg-violet-500/10 text-violet-600 ring-violet-500/25 dark:text-violet-400";
+const TONE_YELLOW =
+  "bg-yellow-400/15 text-yellow-700 ring-yellow-400/35 dark:text-yellow-400";
+
 /* -------------------------------------------------------------------------- */
 /* Page                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -102,7 +140,7 @@ export default async function StudentReviewsPage() {
       <div className="relative isolate">
         <ReviewsBackdrop />
 
-        <div className="space-y-8 pb-10">
+        <div className="space-y-10 pb-10">
           <StudentPageHeader
             title="Reviews"
             description="Share your experience, help other learners, and keep track of your course feedback."
@@ -133,77 +171,71 @@ export default async function StudentReviewsPage() {
             <section
               id="courses-to-review"
               aria-labelledby="to-review"
-              className="scroll-mt-24 space-y-4"
+              className="scroll-mt-24 space-y-5"
             >
               <Reveal>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
-                        <FiEdit3 aria-hidden="true" className="size-4" />
-                      </span>
-                      <h2
-                        id="to-review"
-                        className="text-xl font-semibold tracking-tight"
-                      >
-                        Courses you can review
-                      </h2>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Your feedback helps us improve courses and helps other
-                      students choose what to learn.
-                    </p>
-                  </div>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {toReview.length}{" "}
-                    {toReview.length === 1 ? "course" : "courses"} waiting
-                  </span>
-                </div>
+                <SectionHeader
+                  id="to-review"
+                  icon={FiEdit3}
+                  tone={TONE_PRIMARY}
+                  title="Courses you can review"
+                  description="Your feedback helps us improve courses and helps other students choose what to learn."
+                  count={`${toReview.length} ${
+                    toReview.length === 1 ? "course" : "courses"
+                  } waiting`}
+                />
               </Reveal>
 
               <ul className="grid gap-4 lg:grid-cols-2">
-                {toReview.map((enrollment, i) => (
-                  <li key={enrollment.id} className="min-w-0">
-                    <Reveal delay={Math.min(i, 5) * 0.05}>
-                      <TiltCard>
-                        <Card className="group relative overflow-hidden p-5 transition-all duration-300 hover:border-primary/30 hover:shadow-xl">
-                          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex min-w-0 items-start gap-4">
-                              <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-110 motion-reduce:group-hover:scale-100">
-                                <FiBookOpen
-                                  aria-hidden="true"
-                                  className="size-5"
-                                />
-                              </div>
-                              <div className="min-w-0">
-                                <h3 className="truncate font-semibold">
-                                  {enrollment.courseTitle}
-                                </h3>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  You&apos;ve completed this course.
-                                </p>
-                                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                                  <FiStar
+                {toReview.map((enrollment, i) => {
+                  const completed = enrollment.status === "completed";
+                  return (
+                    <li key={enrollment.id} className="min-w-0">
+                      <Reveal delay={Math.min(i, 5) * 0.05}>
+                        <TiltCard>
+                          <Card className="group relative h-full overflow-hidden p-5 transition-[box-shadow,border-color] duration-300 hover:border-violet-500/30 hover:shadow-lg">
+                            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex min-w-0 items-start gap-4">
+                                <div
+                                  className={`grid size-12 shrink-0 place-items-center rounded-xl ring-1 ring-inset transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100 ${TONE_VIOLET}`}
+                                >
+                                  <FiBookOpen
                                     aria-hidden="true"
-                                    className="size-3.5 text-amber-500"
+                                    className="size-5"
                                   />
-                                  <span>
-                                    Share your experience with other learners
-                                  </span>
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="line-clamp-2 text-pretty font-semibold leading-snug tracking-tight">
+                                    {enrollment.courseTitle}
+                                  </h3>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {completed
+                                      ? "You've completed this course."
+                                      : "You're enrolled in this course."}
+                                  </p>
+                                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                                    <FiStar
+                                      aria-hidden="true"
+                                      className="size-3.5 text-yellow-500"
+                                    />
+                                    <span>
+                                      Share your experience with other learners
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            <ReviewDialog
-                              courseSlug={enrollment.courseSlug}
-                              courseTitle={enrollment.courseTitle}
-                            />
-                          </div>
-                        </Card>
-                      </TiltCard>
-                    </Reveal>
-                  </li>
-                ))}
+                              <ReviewDialog
+                                courseSlug={enrollment.courseSlug}
+                                courseTitle={enrollment.courseTitle}
+                              />
+                            </div>
+                          </Card>
+                        </TiltCard>
+                      </Reveal>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}
@@ -223,33 +255,23 @@ export default async function StudentReviewsPage() {
           <section
             id="my-reviews-list"
             aria-labelledby="my-reviews"
-            className="scroll-mt-24 space-y-4"
+            className="scroll-mt-24 space-y-5"
           >
             <Reveal>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
-                      <FiMessageSquare aria-hidden="true" className="size-4" />
-                    </span>
-                    <h2
-                      id="my-reviews"
-                      className="text-xl font-semibold tracking-tight"
-                    >
-                      Your reviews
-                    </h2>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Manage the feedback you&apos;ve shared with Apni University.
-                  </p>
-                </div>
-                {reviews.length > 0 && (
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {reviews.length}{" "}
-                    {reviews.length === 1 ? "review" : "reviews"}
-                  </span>
-                )}
-              </div>
+              <SectionHeader
+                id="my-reviews"
+                icon={FiMessageSquare}
+                tone={TONE_YELLOW}
+                title="Your reviews"
+                description="Manage the feedback you've shared with Apni University."
+                count={
+                  reviews.length > 0
+                    ? `${reviews.length} ${
+                        reviews.length === 1 ? "review" : "reviews"
+                      }`
+                    : null
+                }
+              />
             </Reveal>
 
             {reviews.length ? (
@@ -269,17 +291,22 @@ export default async function StudentReviewsPage() {
           <Reveal>
             <section aria-labelledby="review-tips">
               <Card className="overflow-hidden border-dashed">
-                <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:p-6">
+                  <div
+                    className={`grid size-10 shrink-0 place-items-center rounded-xl ring-1 ring-inset ${TONE_VIOLET}`}
+                  >
                     <FiInfo aria-hidden="true" className="size-5" />
                   </div>
                   <div>
-                    <h2 id="review-tips" className="font-semibold">
+                    <h2
+                      id="review-tips"
+                      className="text-base font-semibold tracking-tight"
+                    >
                       Tips for a helpful review
                     </h2>
-                    <ul className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                    <ul className="mt-3 grid gap-x-6 gap-y-2.5 text-sm leading-snug text-muted-foreground sm:grid-cols-2">
                       {TIPS.map((tip) => (
-                        <li key={tip} className="flex items-start gap-2">
+                        <li key={tip} className="flex items-start gap-2.5">
                           <FiCheckCircle
                             aria-hidden="true"
                             className="mt-0.5 size-4 shrink-0 text-emerald-700 dark:text-emerald-300"

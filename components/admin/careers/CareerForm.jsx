@@ -59,6 +59,43 @@ function Count({ value, min, max }) {
   );
 }
 
+// How the guide will read in search results, using the same fallbacks as the
+// live page (SEO title -> "{title} career path", SEO description -> summary).
+function SeoPreview({ title, description, slug }) {
+  return (
+    <div
+      className="rounded-lg border border-border bg-card p-4"
+      role="group"
+      aria-label="Search result preview"
+    >
+      <p className="text-xs font-medium text-muted-foreground">
+        Search result preview
+      </p>
+      <p className="mt-2 truncate text-xs text-muted-foreground">
+        /careers/{slug || "your-guide-slug"}
+      </p>
+      <p className="mt-0.5 line-clamp-2 text-base font-medium leading-snug text-primary">
+        {title || "Guide title appears here"}
+      </p>
+      <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
+        {description || "The SEO description, or the summary, appears here."}
+      </p>
+    </div>
+  );
+}
+
+// "USD 40,000 – 60,000", "From USD 40,000" or "Up to USD 60,000".
+function salaryPreview(min, max, currency) {
+  const fmt = new Intl.NumberFormat("en-US");
+  const hasMin = min !== "" && Number.isFinite(Number(min));
+  const hasMax = max !== "" && Number.isFinite(Number(max));
+  if (hasMin && hasMax)
+    return `${currency} ${fmt.format(Number(min))} – ${fmt.format(Number(max))}`;
+  if (hasMin) return `From ${currency} ${fmt.format(Number(min))}`;
+  if (hasMax) return `Up to ${currency} ${fmt.format(Number(max))}`;
+  return "";
+}
+
 export function CareerForm({ record = null, categories }) {
   const router = useRouter();
   const edit = !!record;
@@ -100,9 +137,13 @@ export function CareerForm({ record = null, categories }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [isDirty, isSubmitting, isSubmitSuccessful]);
 
-  // Ctrl/Cmd+S saves. The ref keeps the listener pointing at the latest handler.
+  // Ctrl/Cmd+S saves. The ref keeps the listener pointing at the latest handler,
+  // and a save already in progress is not started twice.
   const submitRef = useRef(null);
-  submitRef.current = form.handleSubmit(onSubmit);
+  submitRef.current = () => {
+    if (form.formState.isSubmitting) return;
+    return form.handleSubmit(onSubmit)();
+  };
   useEffect(() => {
     const onKey = (event) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
@@ -114,11 +155,14 @@ export function CareerForm({ record = null, categories }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const title = form.watch("title");
+  const slug = form.watch("slug");
   const summary = form.watch("summary");
   const seoTitle = form.watch("seoTitle");
   const seoDescription = form.watch("seoDescription");
   const salaryMin = form.watch("salaryMin");
   const salaryMax = form.watch("salaryMax");
+  const salaryCurrency = form.watch("salaryCurrency");
 
   const minNum = Number(salaryMin);
   const maxNum = Number(salaryMax);
@@ -128,6 +172,9 @@ export function CareerForm({ record = null, categories }) {
     Number.isFinite(minNum) &&
     Number.isFinite(maxNum) &&
     minNum > maxNum;
+  const salaryText = salaryOutOfOrder
+    ? ""
+    : salaryPreview(salaryMin, salaryMax, salaryCurrency);
 
   return (
     <form
@@ -138,7 +185,7 @@ export function CareerForm({ record = null, categories }) {
       {isDirty && !isSubmitting && (
         <p
           role="status"
-          className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground"
+          className="sticky top-2 z-10 rounded-md border border-primary/40 bg-card px-3 py-2 text-sm text-foreground shadow-sm"
         >
           You have unsaved changes. Press Ctrl+S (Cmd+S on Mac) to save.
         </p>
@@ -216,12 +263,26 @@ export function CareerForm({ record = null, categories }) {
         title="Roadmap"
         description={`Ordered steps, shown as a numbered path. ${steps.fields.length} of ${MAX_STEPS} steps used.`}
       >
+        {steps.fields.length === 0 && (
+          <div className="rounded-lg border border-dashed border-border p-6 text-center">
+            <p className="text-sm font-medium text-foreground">
+              No roadmap steps yet
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Add the first step a learner should take. Steps appear on the
+              public page in this order.
+            </p>
+          </div>
+        )}
         {steps.fields.map((f, i) => (
-          <div key={f.id} className="space-y-3 rounded-lg border bg-card p-4">
+          <div
+            key={f.id}
+            className="space-y-3 rounded-lg border border-border bg-card p-4"
+          >
             <div className="flex items-center gap-3">
               <span
                 aria-hidden="true"
-                className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+                className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold tabular-nums text-primary"
               >
                 {i + 1}
               </span>
@@ -371,6 +432,14 @@ export function CareerForm({ record = null, categories }) {
             The minimum is higher than the maximum. Check the two values.
           </p>
         )}
+        {salaryText && (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            Shown as:{" "}
+            <span className="font-medium tabular-nums text-foreground">
+              {salaryText}
+            </span>
+          </p>
+        )}
         <TextField
           control={form.control}
           name="salaryNote"
@@ -409,6 +478,14 @@ export function CareerForm({ record = null, categories }) {
               </span>
             </>
           }
+        />
+        <SeoPreview
+          title={
+            seoTitle?.trim() ||
+            (title?.trim() ? `${title.trim()} career path` : "")
+          }
+          description={seoDescription?.trim() || summary?.trim()}
+          slug={slug?.trim()}
         />
       </FormSection>
       <FormFooter

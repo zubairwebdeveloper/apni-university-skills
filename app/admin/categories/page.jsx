@@ -23,8 +23,18 @@ import {
   CATEGORY_SORTS,
   categoryAdminRepository,
 } from "@/repositories/admin/categoryAdminRepository";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Categories" };
+
+// Shared entrance-animation classes/delays — same pattern used on the other
+// admin pages (fade + slide-up, respects prefers-reduced-motion).
+const ENTRANCE =
+  "animate-in fade-in slide-in-from-bottom-2 duration-500 motion-reduce:animate-none";
+const delay = (ms) => ({
+  animationDelay: `${ms}ms`,
+  animationFillMode: "backwards",
+});
 
 export default async function AdminCategoriesPage({ searchParams }) {
   const user = await requirePermission(P.CATEGORIES_READ);
@@ -59,20 +69,31 @@ export default async function AdminCategoriesPage({ searchParams }) {
 
   return (
     <>
-      <AdminPageHeader
-        title="Categories"
-        description="Group courses into fields. A category page shows only its own published courses."
-        actions={
-          canCreate && (
-            <Link href="/admin/categories/create" className={buttonVariants()}>
-              New category
-            </Link>
-          )
-        }
-      />
+      <div className={ENTRANCE} style={delay(0)}>
+        <AdminPageHeader
+          title="Categories"
+          description="Group courses into fields. A category page shows only its own published courses."
+          actions={
+            canCreate && (
+              <Link
+                href="/admin/categories/create"
+                className={buttonVariants()}
+              >
+                New category
+              </Link>
+            )
+          }
+        />
+      </div>
 
       {/* Summary: a compact read-out of the current view */}
-      <dl className="mb-4 grid grid-cols-3 divide-x divide-border rounded-xl border bg-card">
+      <dl
+        className={cn(
+          "mb-4 grid grid-cols-3 divide-x divide-border rounded-xl border bg-card",
+          ENTRANCE,
+        )}
+        style={delay(60)}
+      >
         {summary.map((s) => (
           <div
             key={s.label}
@@ -81,34 +102,36 @@ export default async function AdminCategoriesPage({ searchParams }) {
             <dt className="text-xs text-muted-foreground sm:text-sm">
               {s.label}
             </dt>
-            <dd className="font-serif text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
+            <dd className="text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
               {s.value}
             </dd>
           </div>
         ))}
       </dl>
 
-      <DataTableToolbar
-        searchPlaceholder="Search categories…"
-        total={total}
-        sorts={sortOptions(CATEGORY_SORTS)}
-        filters={[
-          {
-            key: "status",
-            label: "Status",
-            allLabel: "All (not in trash)",
-            options: CONTENT_STATUS_OPTIONS,
-          },
-          {
-            key: "range",
-            label: "Created",
-            allLabel: "Any time",
-            options: RANGE_OPTIONS,
-          },
-        ]}
-      />
+      <div className={ENTRANCE} style={delay(120)}>
+        <DataTableToolbar
+          searchPlaceholder="Search categories…"
+          total={total}
+          sorts={sortOptions(CATEGORY_SORTS)}
+          filters={[
+            {
+              key: "status",
+              label: "Status",
+              allLabel: "All (not in trash)",
+              options: CONTENT_STATUS_OPTIONS,
+            },
+            {
+              key: "range",
+              label: "Created",
+              allLabel: "Any time",
+              options: RANGE_OPTIONS,
+            },
+          ]}
+        />
+      </div>
 
-      <div className="mt-4">
+      <div className={cn("mt-4", ENTRANCE)} style={delay(180)}>
         {items.length > 0 ? (
           <>
             <CategoriesTable rows={items} perms={permissionsFor(user.role)} />

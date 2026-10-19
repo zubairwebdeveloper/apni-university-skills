@@ -1,3 +1,4 @@
+// app/student/profile/page.jsx
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { AvatarUploader } from "@/components/student/AvatarUploader";
@@ -47,15 +48,26 @@ export default async function ProfilePage() {
             <ProfileHero profile={profile} />
           </Reveal>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
             <div className="min-w-0 space-y-6">
               <Reveal delay={0.05}>
-                <div id="profile-photo" className="scroll-mt-24">
+                <section
+                  id="profile-photo"
+                  aria-labelledby="profile-photo-title"
+                  className="scroll-mt-24"
+                >
                   <TiltCard>
-                    <Card className="p-6 transition-shadow hover:shadow-md">
-                      <h2 className="mb-4 text-base font-semibold">
+                    <Card className="p-5 transition-shadow hover:shadow-md sm:p-6">
+                      <h2
+                        id="profile-photo-title"
+                        className="text-lg font-semibold tracking-tight"
+                      >
                         Profile photo
                       </h2>
+                      <p className="mb-5 mt-1 text-sm text-muted-foreground">
+                        Add a clear photo so instructors and peers recognize
+                        you.
+                      </p>
                       <AvatarUploader
                         uid={user.uid}
                         photoURL={profile.photoURL}
@@ -65,29 +77,39 @@ export default async function ProfilePage() {
                       />
                     </Card>
                   </TiltCard>
-                </div>
+                </section>
               </Reveal>
 
               <Reveal delay={0.1}>
-                <div id="profile-info" className="scroll-mt-24">
+                <section
+                  id="profile-info"
+                  aria-labelledby="profile-info-title"
+                  className="scroll-mt-24"
+                >
                   {/* no tilt here: this card holds a form */}
-                  <Card className="p-6">
-                    <h2 className="mb-1 text-base font-semibold">
+                  <Card className="p-5 sm:p-6">
+                    <h2
+                      id="profile-info-title"
+                      className="text-lg font-semibold tracking-tight"
+                    >
                       Personal information
                     </h2>
-                    <p className="mb-5 text-sm text-muted-foreground">
-                      Email:{" "}
+                    <p className="mb-6 mt-1 text-sm text-muted-foreground">
+                      Signed in as{" "}
                       <span className="break-all font-medium text-foreground">
                         {profile.email}
                       </span>
                     </p>
                     <ProfileForm profile={profile} />
                   </Card>
-                </div>
+                </section>
               </Reveal>
             </div>
 
-            <aside className="min-w-0 space-y-6">
+            <aside
+              aria-label="Profile status and account"
+              className="min-w-0 space-y-6"
+            >
               <Reveal delay={0.1}>
                 <div id="profile-completion" className="scroll-mt-24">
                   <TiltCard>

@@ -5,7 +5,14 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { Controller } from "react-hook-form";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { FiImage } from "react-icons/fi";
+import {
+  FiImage,
+  FiLoader,
+  FiRefreshCw,
+  FiTrash2,
+  FiUploadCloud,
+  FiX,
+} from "react-icons/fi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +23,7 @@ import {
 } from "@/components/ui/field";
 import { auth } from "@/lib/firebase/client/auth";
 import { storage } from "@/lib/firebase/client/storage";
+import { cn } from "@/lib/utils";
 
 const TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -102,7 +110,15 @@ export function ImageField({
           upload(e.dataTransfer.files?.[0]);
         }
 
+        // Ignore dragleave events that only move between child elements (stops flicker)
+        function onDragLeave(e) {
+          if (e.currentTarget.contains(e.relatedTarget)) return;
+          setDragging(false);
+        }
+
         const broken = !!field.value && brokenUrl === field.value;
+        const hasImage = !!field.value && !broken;
+        const openPicker = () => input.current?.click();
 
         return (
           <Field data-invalid={fieldState.invalid}>
@@ -112,43 +128,71 @@ export function ImageField({
                 e.preventDefault();
                 if (!busy) setDragging(true);
               }}
-              onDragLeave={() => setDragging(false)}
+              onDragLeave={onDragLeave}
               onDrop={onDrop}
-              className={`relative overflow-hidden rounded-lg border bg-muted ${aspect} ${previewClassName} ${
-                field.value ? "" : "border-dashed"
-              } ${dragging ? "border-primary ring-2 ring-primary/40" : ""}`}
+              className={cn(
+                "relative overflow-hidden rounded-xl border bg-muted/40 motion-safe:transition-[border-color,box-shadow] motion-safe:duration-150",
+                aspect,
+                previewClassName,
+                !hasImage && "border-dashed",
+                dragging && "border-primary ring-2 ring-primary/40",
+                fieldState.invalid && "border-destructive/60",
+              )}
             >
-              {field.value && !broken ? (
+              {hasImage ? (
                 <Image
                   src={field.value}
-                  alt=""
+                  alt="Selected image preview"
                   fill
                   sizes="384px"
                   className="object-cover"
                   onError={() => setBrokenUrl(field.value)}
                 />
               ) : (
-                <div className="grid h-full place-items-center p-3 text-center text-muted-foreground">
-                  <div>
-                    <FiImage className="mx-auto size-7" aria-hidden="true" />
-                    <span className="sr-only">
-                      {broken
-                        ? "Image preview failed to load"
-                        : "No image selected"}
+                <button
+                  type="button"
+                  onClick={openPicker}
+                  disabled={busy}
+                  className="grid size-full place-items-center p-4 text-center outline-none motion-safe:transition-colors motion-safe:duration-150 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60 disabled:cursor-not-allowed"
+                >
+                  <span className="flex flex-col items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className="grid size-10 place-items-center rounded-full bg-background text-muted-foreground ring-1 ring-border"
+                    >
+                      {broken ? (
+                        <FiImage className="size-5" />
+                      ) : (
+                        <FiUploadCloud className="size-5" />
+                      )}
                     </span>
-                    <span aria-hidden="true" className="mt-1 block text-xs">
+                    <span className="block text-sm font-medium text-foreground">
                       {broken
-                        ? "Preview couldn't load. Try replacing the image."
-                        : "Drop an image here"}
+                        ? "Preview couldn't load"
+                        : "Drop an image here, or browse"}
                     </span>
-                  </div>
+                    <span className="block text-xs text-muted-foreground">
+                      {broken
+                        ? "Click to replace the image."
+                        : "Click to choose a file."}
+                    </span>
+                  </span>
+                </button>
+              )}
+
+              {dragging && !busy && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 grid place-items-center bg-background/80 text-sm font-medium text-primary"
+                >
+                  Drop to upload
                 </div>
               )}
 
               {busy && (
-                <div className="absolute inset-0 grid place-items-center bg-background/80 p-4">
+                <div className="absolute inset-0 grid place-items-center bg-background/85 p-4">
                   <div className="w-full max-w-[12rem] text-center">
-                    <p className="text-sm font-medium text-foreground">
+                    <p className="text-sm font-medium tabular-nums text-foreground">
                       Uploading… {progress}%
                     </p>
                     <div
@@ -157,10 +201,11 @@ export function ImageField({
                       aria-valuemin={0}
                       aria-valuemax={100}
                       aria-valuenow={progress}
+                      aria-valuetext={`${progress}% uploaded`}
                       className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
                     >
                       <div
-                        className="h-full bg-primary transition-[width] duration-150 motion-reduce:transition-none"
+                        className="h-full rounded-full bg-primary transition-[width] duration-150 motion-reduce:transition-none"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -168,14 +213,30 @@ export function ImageField({
                 </div>
               )}
             </div>
+
+            {/* Announces start and end of an upload without spamming every percent */}
+            <span role="status" className="sr-only">
+              {busy ? "Uploading image" : ""}
+            </span>
+
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => input.current?.click()}
+                onClick={openPicker}
                 disabled={busy}
               >
+                {busy ? (
+                  <FiLoader
+                    className="motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : field.value ? (
+                  <FiRefreshCw aria-hidden="true" />
+                ) : (
+                  <FiUploadCloud aria-hidden="true" />
+                )}
                 {busy
                   ? "Uploading…"
                   : field.value
@@ -189,6 +250,7 @@ export function ImageField({
                   size="sm"
                   onClick={() => taskRef.current?.cancel()}
                 >
+                  <FiX aria-hidden="true" />
                   Cancel
                 </Button>
               )}
@@ -197,8 +259,10 @@ export function ImageField({
                   type="button"
                   variant="ghost"
                   size="sm"
+                  className="text-destructive hover:text-destructive"
                   onClick={() => field.onChange("")}
                 >
+                  <FiTrash2 aria-hidden="true" />
                   Remove
                 </Button>
               )}

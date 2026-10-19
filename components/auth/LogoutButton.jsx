@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { FiCheck, FiLoader, FiLogOut } from "react-icons/fi";
+import { Check, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -109,7 +109,7 @@ export function LogoutButton({
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 -left-full w-1/2 skew-x-[-20deg] bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-[320%] motion-reduce:hidden"
         />
-        <FiLogOut
+        <LogOut
           aria-hidden="true"
           className="relative size-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
         />
@@ -154,9 +154,9 @@ export function LogoutButton({
                   )}
                 >
                   {done ? (
-                    <FiCheck className="size-6 [transform:translateZ(12px)]" />
+                    <Check className="size-6 [transform:translateZ(12px)]" />
                   ) : (
-                    <FiLogOut className="size-6 [transform:translateZ(12px)]" />
+                    <LogOut className="size-6 [transform:translateZ(12px)]" />
                   )}
                 </motion.div>
               </div>
@@ -232,9 +232,9 @@ export function LogoutButton({
                       className="absolute"
                     >
                       {done ? (
-                        <FiCheck aria-hidden="true" />
+                        <Check aria-hidden="true" />
                       ) : (
-                        <FiLoader aria-hidden="true" className="animate-spin" />
+                        <Loader2 aria-hidden="true" className="animate-spin" />
                       )}
                     </motion.span>
                   ) : (
@@ -246,7 +246,7 @@ export function LogoutButton({
                       transition={swap}
                       className="absolute"
                     >
-                      <FiLogOut aria-hidden="true" />
+                      <LogOut aria-hidden="true" />
                     </motion.span>
                   )}
                 </AnimatePresence>

@@ -1,7 +1,7 @@
 "use client";
 
-import { createElement, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   FiArrowDown,
   FiAward,
@@ -55,17 +55,10 @@ const SORTS = [
   { value: "low", label: "Lowest rating" },
 ];
 
-const listVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.05 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.28 } },
-};
-
 function ReviewCard({ row }) {
   const { review, updatedLabel, createdLabel } = row;
+  const StatusIcon = getStatusIcon(review.status);
+  const needsAttention = review.status === "rejected";
 
   // Cursor spotlight: CSS variables only, no re-render
   const spot = (e) => {
@@ -77,31 +70,34 @@ function ReviewCard({ row }) {
   return (
     <Card
       onMouseMove={spot}
-      className="group relative overflow-hidden p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg motion-reduce:hover:translate-y-0"
+      className="group relative overflow-hidden rounded-2xl border-border p-5 shadow-sm transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-6"
     >
       <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 motion-reduce:hidden"
         style={{
           background:
-            "radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), hsl(var(--primary) / 0.10), transparent 70%)",
+            "radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), hsl(var(--primary) / 0.08), transparent 70%)",
         }}
       />
-      <div className="absolute inset-y-0 left-0 w-1 bg-primary/20 transition-colors group-hover:bg-primary" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 w-1 bg-primary/25 transition-colors group-hover:bg-primary motion-reduce:transition-none"
+      />
 
       <div className="relative space-y-4 pl-2">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               <FiAward
                 aria-hidden="true"
-                className="size-4 shrink-0 text-primary"
+                className="mt-1.5 size-4 shrink-0 text-primary"
               />
-              <h3 className="truncate font-serif text-lg font-semibold">
+              <h3 className="break-words font-serif text-lg font-semibold leading-snug">
                 {review.courseTitle}
               </h3>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Course feedback
             </p>
           </div>
@@ -110,32 +106,49 @@ function ReviewCard({ row }) {
 
         <div className="flex flex-wrap items-center gap-3">
           <Rating value={review.rating} count={1} showCount={false} />
-          <span className="text-xs font-medium text-muted-foreground">
+          <span className="text-sm font-medium text-foreground tabular-nums">
             {review.rating}/5
           </span>
         </div>
 
         {review.title && (
-          <h4 className="text-base font-semibold">{review.title}</h4>
+          <h4 className="text-base font-semibold leading-snug">
+            {review.title}
+          </h4>
         )}
 
-        <div className="rounded-xl bg-muted/40 p-4">
-          <p className="text-sm leading-6 text-muted-foreground">
+        <div className="rounded-xl border border-border bg-muted/40 p-4">
+          <p className="break-words text-sm leading-6 text-muted-foreground">
             {review.comment}
           </p>
         </div>
 
-        <div className="flex items-start gap-2 rounded-lg border bg-background/60 p-3">
-          {createElement(getStatusIcon(review.status), {
-            "aria-hidden": "true",
-            className: "mt-0.5 size-4 shrink-0 text-muted-foreground",
-          })}
-          <p className="text-xs leading-5 text-muted-foreground">
+        <div
+          className={cn(
+            "flex items-start gap-2.5 rounded-xl border p-3",
+            needsAttention
+              ? "border-destructive/30 bg-destructive/5"
+              : "border-border bg-background",
+          )}
+        >
+          <StatusIcon
+            aria-hidden="true"
+            className={cn(
+              "mt-0.5 size-4 shrink-0",
+              needsAttention ? "text-destructive" : "text-primary",
+            )}
+          />
+          <p
+            className={cn(
+              "text-sm leading-5",
+              needsAttention ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
             {getStatusMessage(review.status)}
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>Updated {updatedLabel}</span>
             {createdLabel && <span>Created {createdLabel}</span>}
@@ -153,9 +166,29 @@ function ReviewCard({ row }) {
 }
 
 export function ReviewsList({ rows }) {
+  const reduce = useReducedMotion();
   const [status, setStatus] = useState("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("default");
+
+  const listVariants = useMemo(
+    () => ({
+      hidden: {},
+      show: { transition: { staggerChildren: reduce ? 0 : 0.05 } },
+    }),
+    [reduce],
+  );
+  const itemVariants = useMemo(
+    () => ({
+      hidden: reduce ? { opacity: 1 } : { opacity: 0, y: 14 },
+      show: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: reduce ? 0 : 0.28, ease: "easeOut" },
+      },
+    }),
+    [reduce],
+  );
 
   const statusCounts = useMemo(() => {
     const c = { all: rows.length };
@@ -205,12 +238,18 @@ export function ReviewsList({ rows }) {
     setSort(SORTS[(i + 1) % SORTS.length].value);
   };
 
+  const sortLabel = SORTS.find((s) => s.value === sort)?.label;
+
   return (
     <div className="space-y-4">
       {rows.length > 1 && (
         <div className="space-y-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div
+              role="group"
+              aria-label="Filter by status"
+              className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {chips.map((c) => (
                 <button
                   key={c.value}
@@ -218,10 +257,10 @@ export function ReviewsList({ rows }) {
                   onClick={() => setStatus(c.value)}
                   aria-pressed={status === c.value}
                   className={cn(
-                    "relative shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "relative inline-flex min-h-9 shrink-0 items-center rounded-full border px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none",
                     status === c.value
                       ? "border-primary text-primary-foreground"
-                      : "bg-muted/50 text-muted-foreground hover:border-primary/40 hover:text-primary",
+                      : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-primary",
                   )}
                 >
                   {status === c.value && (
@@ -237,7 +276,7 @@ export function ReviewsList({ rows }) {
                   )}
                   <span className="relative z-10">
                     {c.label}
-                    <span className="ml-1.5 opacity-70">
+                    <span className="ml-1.5 tabular-nums opacity-80">
                       {statusCounts[c.value] ?? 0}
                     </span>
                   </span>
@@ -246,8 +285,11 @@ export function ReviewsList({ rows }) {
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative sm:w-60">
-                <FiSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <div className="relative sm:w-64">
+                <FiSearch
+                  aria-hidden="true"
+                  className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                />
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -260,15 +302,19 @@ export function ReviewsList({ rows }) {
                 type="button"
                 variant="outline"
                 onClick={nextSort}
+                aria-label={`Sort order: ${sortLabel}. Activate to change.`}
                 className="justify-center"
               >
-                <FiArrowDown className="size-4" />
-                {SORTS.find((s) => s.value === sort)?.label}
+                <FiArrowDown aria-hidden="true" className="size-4" />
+                {sortLabel}
               </Button>
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground" aria-live="polite">
+          <p
+            className="text-sm text-muted-foreground tabular-nums"
+            aria-live="polite"
+          >
             Showing {filtered.length} of {rows.length} reviews
           </p>
         </div>
@@ -289,7 +335,7 @@ export function ReviewsList({ rows }) {
           ))}
         </motion.ul>
       ) : (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden rounded-2xl border-border shadow-sm">
           <EmptyState
             icon={FiStar}
             title="No matching reviews"

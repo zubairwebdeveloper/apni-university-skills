@@ -11,6 +11,9 @@ import { cn } from "@/lib/utils";
 
 const CLOSED_KEY = "admin:nav-closed";
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 function readClosed() {
   try {
     const raw = localStorage.getItem(CLOSED_KEY);
@@ -112,7 +115,9 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
             key={g.group}
             role="group"
             aria-labelledby={headingId}
-            className={cn(index > 0 && collapsed && "border-t pt-4")}
+            className={cn(
+              index > 0 && collapsed && "border-t border-border pt-4",
+            )}
           >
             {/* Group heading */}
             {collapsed ? (
@@ -126,19 +131,19 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                 onClick={() => toggleGroup(g.group)}
                 aria-expanded={open}
                 aria-controls={panelId}
-                className="group/head mb-1.5 flex w-full items-center gap-2 rounded-md px-3 py-1 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                  "group/head mb-1.5 flex w-full items-center gap-2 rounded-md px-3 py-1 text-left transition-colors hover:bg-muted/60 motion-reduce:transition-none",
+                  focusRing,
+                )}
               >
                 <span
                   id={headingId}
-                  className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 transition-colors group-hover/head:text-foreground"
+                  className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground transition-colors group-hover/head:text-foreground motion-reduce:transition-none"
                 >
                   {g.group}
                 </span>
 
-                <span
-                  aria-hidden="true"
-                  className="h-px flex-1 bg-gradient-to-r from-border to-transparent"
-                />
+                <span aria-hidden="true" className="h-px flex-1 bg-border" />
 
                 {/* Shown only while the group is collapsed */}
                 {!open ? (
@@ -146,10 +151,10 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                     {groupHasActive ? (
                       <span
                         aria-hidden="true"
-                        className="size-1.5 rounded-full bg-primary"
+                        className="size-1.5 rounded-full bg-yellow-400"
                       />
                     ) : null}
-                    <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium leading-4 text-muted-foreground">
+                    <span className="rounded-full border border-border bg-muted/50 px-1.5 text-[10px] font-medium leading-4 tabular-nums text-muted-foreground">
                       {g.items.length}
                     </span>
                   </span>
@@ -203,19 +208,19 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                       typeof badge === "number" && badge > 99 ? "99+" : badge;
 
                     const row = cn(
-                      "group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm font-medium outline-none",
+                      "group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm font-medium",
                       collapsed && "justify-center px-0",
                     );
 
                     const tile = (
                       <span
                         className={cn(
-                          "relative grid size-9 shrink-0 place-items-center rounded-lg transition-all duration-200 motion-reduce:transition-none",
+                          "relative grid size-9 shrink-0 place-items-center rounded-lg border transition-colors duration-200 motion-reduce:transition-none",
                           !ready
-                            ? "bg-muted/50 text-muted-foreground/60"
+                            ? "border-border/60 bg-muted/40 text-muted-foreground/60"
                             : active
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "bg-muted/60 text-muted-foreground group-hover:scale-105 group-hover:bg-primary/10 group-hover:text-primary motion-reduce:group-hover:scale-100",
+                              ? "border-violet-500/25 bg-violet-500/10 text-violet-600 dark:text-violet-300"
+                              : "border-border bg-muted/50 text-muted-foreground group-hover:border-violet-500/25 group-hover:bg-violet-500/10 group-hover:text-violet-600 dark:group-hover:text-violet-300",
                         )}
                       >
                         <Icon aria-hidden="true" className="size-4" />
@@ -240,7 +245,7 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                         <span className="truncate">{label}</span>
 
                         {isNew && ready ? (
-                          <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-emerald-600 dark:text-emerald-400">
+                          <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-emerald-700 dark:text-emerald-300">
                             New
                           </span>
                         ) : null}
@@ -254,7 +259,7 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                     const tooltip = collapsed ? (
                       <span
                         aria-hidden="true"
-                        className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 flex -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-md border bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+                        className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 flex -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
                       >
                         {label}
                         {!ready ? (
@@ -263,7 +268,7 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                           </span>
                         ) : null}
                         {ready && hasBadge ? (
-                          <span className="rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-white">
+                          <span className="rounded-full bg-destructive px-1.5 text-[10px] font-semibold tabular-nums text-white">
                             {badgeText}
                           </span>
                         ) : null}
@@ -280,17 +285,18 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                             aria-current={active ? "page" : undefined}
                             className={cn(
                               row,
-                              "transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                              "transition-colors motion-reduce:transition-none",
+                              focusRing,
                               active
-                                ? "bg-gradient-to-r from-primary/10 to-transparent text-foreground"
-                                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                                ? "bg-muted text-foreground"
+                                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                             )}
                           >
                             {/* Active accent bar */}
                             {active ? (
                               <span
                                 aria-hidden="true"
-                                className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary"
+                                className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-yellow-400"
                               />
                             ) : null}
 
@@ -298,7 +304,7 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                             {text}
 
                             {!collapsed && hasBadge ? (
-                              <span className="grid min-w-5 place-items-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                              <span className="grid min-w-5 place-items-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-white">
                                 {badgeText}
                               </span>
                             ) : null}
@@ -310,8 +316,8 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                                 className={cn(
                                   "size-4 shrink-0 transition-all duration-200 ease-out motion-reduce:transition-none",
                                   active
-                                    ? "translate-x-0 text-primary opacity-100 group-hover:translate-x-0.5"
-                                    : "-translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100",
+                                    ? "translate-x-0 text-violet-600 opacity-100 group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0 dark:text-violet-300"
+                                    : "-translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100 motion-reduce:translate-x-0",
                                 )}
                               />
                             ) : null}
@@ -330,7 +336,7 @@ export function AdminNav({ permissions, collapsed = false, onNavigate }) {
                             {text}
 
                             {!collapsed && (
-                              <span className="ml-auto rounded-full border border-dashed px-1.5 py-0.5 text-[10px] font-medium uppercase leading-none tracking-wide">
+                              <span className="ml-auto rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] font-medium uppercase leading-none tracking-wide">
                                 Soon
                               </span>
                             )}

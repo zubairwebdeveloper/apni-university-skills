@@ -8,6 +8,7 @@ import {
   LayoutGroup,
   MotionConfig,
   motion,
+  useReducedMotion,
 } from "framer-motion";
 import {
   ArrowRight,
@@ -22,7 +23,6 @@ import {
   CheckSquare,
   ChevronDown,
   HelpCircle,
-  Inbox,
   LayoutList,
   Lightbulb,
   Link2,
@@ -61,6 +61,9 @@ import {
 /* ---------------- Helpers ---------------- */
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
+
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const KIND_META = {
   announcement: {
@@ -131,12 +134,25 @@ const itemVariants = {
 /* ---------------- Building blocks ---------------- */
 // Circular progress: how much of the inbox has been read
 function ProgressRing({ read, total }) {
+  const reduce = useReducedMotion();
   const pct = total ? Math.round((read / total) * 100) : 100;
   const r = 44;
   const c = 2 * Math.PI * r;
+  const target = c * (1 - pct / 100);
   return (
-    <div className="relative size-32 shrink-0 sm:size-36">
-      <svg viewBox="0 0 100 100" className="size-full -rotate-90">
+    <div
+      className="relative size-32 shrink-0 sm:size-36"
+      role="progressbar"
+      aria-label="Notifications read"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+    >
+      <svg
+        viewBox="0 0 100 100"
+        className="size-full -rotate-90"
+        aria-hidden="true"
+      >
         <circle
           cx="50"
           cy="50"
@@ -154,14 +170,16 @@ function ProgressRing({ read, total }) {
           strokeLinecap="round"
           className="stroke-primary"
           strokeDasharray={c}
-          initial={{ strokeDashoffset: c }}
-          animate={{ strokeDashoffset: c * (1 - pct / 100) }}
-          transition={{ duration: 0.9, ease: "easeOut" }}
+          initial={{ strokeDashoffset: reduce ? target : c }}
+          animate={{ strokeDashoffset: target }}
+          transition={{ duration: reduce ? 0 : 0.9, ease: "easeOut" }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold leading-none">{pct}%</span>
-        <span className="mt-1 text-[11px] text-muted-foreground">read</span>
+        <span className="text-3xl font-bold leading-none tabular-nums">
+          {pct}%
+        </span>
+        <span className="mt-1 text-xs text-muted-foreground">read</span>
       </div>
     </div>
   );
@@ -175,7 +193,8 @@ function IconAction({ label, onClick, children, className }) {
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground motion-reduce:transition-none",
+        FOCUS_RING,
         className,
       )}
     >
@@ -209,7 +228,7 @@ function NotificationCard({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-xl border transition-all",
+        "group relative overflow-hidden rounded-xl border transition-colors motion-reduce:transition-none",
         compact ? "p-3" : "p-4 sm:p-5",
         n.read
           ? "bg-card hover:border-primary/30"
@@ -219,7 +238,7 @@ function NotificationCard({
     >
       {!n.read && (
         <span
-          aria-hidden
+          aria-hidden="true"
           className="absolute inset-y-0 left-0 w-1 bg-primary"
         />
       )}
@@ -231,7 +250,7 @@ function NotificationCard({
             onClick={() => onSelect(n.id)}
             aria-pressed={selected}
             aria-label={selected ? "Deselect" : "Select"}
-            className="mt-0.5 text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn("mt-0.5 rounded text-primary", FOCUS_RING)}
           >
             {selected ? (
               <CheckSquare className="size-6" />
@@ -241,6 +260,7 @@ function NotificationCard({
           </button>
         ) : (
           <span
+            aria-hidden="true"
             className={cn(
               "flex shrink-0 items-center justify-center rounded-lg",
               compact ? "size-8" : "size-10",
@@ -255,7 +275,7 @@ function NotificationCard({
           <div className="flex items-start justify-between gap-3">
             <h3
               className={cn(
-                "font-serif text-base",
+                "font-serif text-base leading-snug",
                 n.read ? "font-medium" : "font-semibold",
               )}
             >
@@ -264,10 +284,16 @@ function NotificationCard({
             </h3>
             <div className="flex shrink-0 items-center gap-2">
               {!n.read && (
-                <span className="size-2 rounded-full bg-primary" aria-hidden />
+                <span
+                  className="size-2 rounded-full bg-primary"
+                  aria-hidden="true"
+                />
               )}
               <time
                 title={n.dateLabel}
+                dateTime={
+                  n.createdAt ? new Date(n.createdAt).toISOString() : undefined
+                }
                 className="whitespace-nowrap text-xs text-muted-foreground"
               >
                 {timeAgo(n.createdAt, now, n.dateLabel)}
@@ -277,7 +303,7 @@ function NotificationCard({
 
           <p
             className={cn(
-              "mt-1 whitespace-pre-line text-sm text-muted-foreground",
+              "mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground",
               !expanded && (compact ? "line-clamp-1" : "line-clamp-3"),
             )}
           >
@@ -286,7 +312,7 @@ function NotificationCard({
 
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {!compact && (
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-xs">
                 {meta.label}
               </Badge>
             )}
@@ -296,12 +322,16 @@ function NotificationCard({
                 type="button"
                 onClick={toggleExpand}
                 aria-expanded={expanded}
-                className="inline-flex items-center gap-1 rounded text-xs font-medium text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                  "inline-flex items-center gap-1 rounded text-xs font-medium text-muted-foreground transition-colors hover:text-primary motion-reduce:transition-none",
+                  FOCUS_RING,
+                )}
               >
                 {expanded ? "Show less" : "Read more"}
                 <ChevronDown
+                  aria-hidden="true"
                   className={cn(
-                    "size-3.5 transition-transform",
+                    "size-3.5 transition-transform motion-reduce:transition-none",
                     expanded && "rotate-180",
                   )}
                 />
@@ -316,9 +346,9 @@ function NotificationCard({
                     onClick={() => onRead([n.id], !n.read)}
                   >
                     {n.read ? (
-                      <Mail className="size-4" />
+                      <Mail className="size-4" aria-hidden="true" />
                     ) : (
-                      <Check className="size-4" />
+                      <Check className="size-4" aria-hidden="true" />
                     )}
                   </IconAction>
                   <IconAction
@@ -326,7 +356,7 @@ function NotificationCard({
                     onClick={() => onDismiss([n.id])}
                     className="hover:text-destructive"
                   >
-                    <X className="size-4" />
+                    <X className="size-4" aria-hidden="true" />
                   </IconAction>
                 </>
               )}
@@ -340,7 +370,10 @@ function NotificationCard({
                   )}
                 >
                   Open
-                  <ArrowRight className="size-3.5 transition-transform group-hover/btn:translate-x-1" />
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="size-3.5 transition-transform group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                  />
                 </Link>
               )}
             </div>
@@ -374,10 +407,10 @@ export function NotificationsExtras() {
                 <motion.div
                   key={k.value}
                   variants={itemVariants}
-                  whileHover={{ y: -3 }}
-                  className="rounded-xl border bg-card p-5 transition-colors hover:border-primary/40"
+                  className="rounded-xl border bg-card p-5"
                 >
                   <span
+                    aria-hidden="true"
                     className={cn(
                       "mb-3 flex size-10 items-center justify-center rounded-lg",
                       meta.tone,
@@ -386,7 +419,7 @@ export function NotificationsExtras() {
                     <Icon className="size-5" />
                   </span>
                   <h3 className="font-semibold">{k.label}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     {k.description}
                   </p>
                 </motion.div>
@@ -397,7 +430,10 @@ export function NotificationsExtras() {
 
         <section>
           <div className="mb-5 flex items-center gap-2">
-            <Lightbulb className="size-5 text-amber-600 dark:text-amber-300" />
+            <Lightbulb
+              aria-hidden="true"
+              className="size-5 text-amber-600 dark:text-amber-300"
+            />
             <h2 className="text-xl font-semibold tracking-tight">
               Make the most of your inbox
             </h2>
@@ -415,12 +451,14 @@ export function NotificationsExtras() {
                 <motion.div
                   key={t.title}
                   variants={itemVariants}
-                  whileHover={{ y: -3 }}
-                  className="rounded-xl border bg-gradient-to-br from-muted/60 to-transparent p-5"
+                  className="rounded-xl bg-muted/50 p-5"
                 >
-                  <Icon className="mb-3 size-5 text-primary" />
+                  <Icon
+                    aria-hidden="true"
+                    className="mb-3 size-5 text-primary"
+                  />
                   <h3 className="font-semibold">{t.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     {t.description}
                   </p>
                 </motion.div>
@@ -431,18 +469,22 @@ export function NotificationsExtras() {
 
         <section>
           <div className="mb-3 flex items-center gap-2">
-            <HelpCircle className="size-5 text-primary" />
+            <HelpCircle aria-hidden="true" className="size-5 text-primary" />
             <h2 className="text-xl font-semibold tracking-tight">
               Frequently asked questions
             </h2>
           </div>
-          <Accordion type="single" className="rounded-xl border bg-card px-5">
+          <Accordion
+            type="single"
+            collapsible
+            className="rounded-xl border bg-card px-5"
+          >
             {NOTIFICATION_FAQ.map((f, i) => (
               <AccordionItem key={f.q} value={`faq-${i}`}>
                 <AccordionTrigger className="text-left hover:text-primary hover:no-underline">
                   {f.q}
                 </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground">
+                <AccordionContent className="leading-relaxed text-muted-foreground">
                   {f.a}
                 </AccordionContent>
               </AccordionItem>
@@ -462,6 +504,12 @@ export function NotificationsView({ items, now }) {
   const [list, setList] = useState(items);
   useEffect(() => setList(items), [items]);
 
+  // Always points at the latest list, so rollbacks use a reliable snapshot
+  const listRef = useRef(list);
+  useEffect(() => {
+    listRef.current = list;
+  }, [list]);
+
   const [tab, setTab] = useState("all");
   const [kind, setKind] = useState("all");
   const [query, setQuery] = useState("");
@@ -474,11 +522,12 @@ export function NotificationsView({ items, now }) {
   // "/" jumps to search (ignored while typing in a field)
   useEffect(() => {
     const onKey = (e) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = e.target?.tagName;
       if (
-        e.key !== "/" ||
         tag === "INPUT" ||
         tag === "TEXTAREA" ||
+        tag === "SELECT" ||
         e.target?.isContentEditable
       )
         return;
@@ -492,11 +541,8 @@ export function NotificationsView({ items, now }) {
   /* ----- actions (optimistic, rolled back on failure) ----- */
   const markRead = useCallback(
     async (ids, read) => {
-      let snapshot;
-      setList((l) => {
-        snapshot = l;
-        return l.map((n) => (ids.includes(n.id) ? { ...n, read } : n));
-      });
+      const snapshot = listRef.current;
+      setList((l) => l.map((n) => (ids.includes(n.id) ? { ...n, read } : n)));
       const res = await setNotificationsRead({ ids, read }).catch(() => null);
       if (!res?.ok) {
         setList(snapshot);
@@ -510,13 +556,9 @@ export function NotificationsView({ items, now }) {
 
   const dismiss = useCallback(
     async (ids) => {
-      let snapshot;
-      let removed = [];
-      setList((l) => {
-        snapshot = l;
-        removed = l.filter((n) => ids.includes(n.id));
-        return l.filter((n) => !ids.includes(n.id));
-      });
+      const snapshot = listRef.current;
+      const removed = snapshot.filter((n) => ids.includes(n.id));
+      setList((l) => l.filter((n) => !ids.includes(n.id)));
       setSelected(new Set());
       const res = await setNotificationsDismissed({
         ids,
@@ -623,38 +665,39 @@ export function NotificationsView({ items, now }) {
 
   const allVisibleSelected =
     filtered.length > 0 && filtered.every((n) => selected.has(n.id));
-  const filtersActive = tab !== "all" || kind !== "all" || query.trim();
+  const filtersActive =
+    tab !== "all" || kind !== "all" || Boolean(query.trim());
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="space-y-8">
         {/* Hero */}
         <motion.section
+          aria-labelledby="inbox-hero-title"
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5 sm:p-8"
+          className="rounded-2xl border bg-primary/5 p-5 sm:p-8"
         >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-primary/15 blur-3xl"
-          />
-          <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <Badge variant="secondary" className="gap-1">
                 {stats.unread > 0 ? (
-                  <BellRing className="size-3" />
+                  <BellRing aria-hidden="true" className="size-3" />
                 ) : (
-                  <Bell className="size-3" />
+                  <Bell aria-hidden="true" className="size-3" />
                 )}
                 Your inbox
               </Badge>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
+              <h2
+                id="inbox-hero-title"
+                className="mt-3 text-balance text-2xl font-bold tracking-tight sm:text-3xl"
+              >
                 {stats.unread > 0
                   ? `${stats.unread} unread notification${stats.unread > 1 ? "s" : ""}`
                   : "You're all caught up"}
               </h2>
-              <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
                 {stats.unread > 0
                   ? "Catch up on the latest announcements and updates from our team."
                   : "No new messages right now. We will let you know when there is something new."}
@@ -672,7 +715,10 @@ export function NotificationsView({ items, now }) {
               {stats.unread > 0 && tab !== "unread" && (
                 <Button onClick={() => setTab("unread")} className="group mt-5">
                   View unread
-                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none"
+                  />
                 </Button>
               )}
             </div>
@@ -695,7 +741,7 @@ export function NotificationsView({ items, now }) {
                   ].map((t) => (
                     <TabsTrigger key={t.value} value={t.value}>
                       {t.label}
-                      <span className="ml-1.5 text-xs text-muted-foreground">
+                      <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">
                         {t.count}
                       </span>
                     </TabsTrigger>
@@ -706,7 +752,10 @@ export function NotificationsView({ items, now }) {
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative sm:w-64">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Search
+                  aria-hidden="true"
+                  className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                />
                 <Input
                   ref={searchRef}
                   value={query}
@@ -726,12 +775,18 @@ export function NotificationsView({ items, now }) {
                     type="button"
                     onClick={() => setQuery("")}
                     aria-label="Clear search"
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className={cn(
+                      "absolute right-2.5 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground",
+                      FOCUS_RING,
+                    )}
                   >
-                    <X className="size-4" />
+                    <X aria-hidden="true" className="size-4" />
                   </button>
                 ) : (
-                  <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-muted px-1.5 text-[10px] text-muted-foreground sm:block">
+                  <kbd
+                    aria-hidden="true"
+                    className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border bg-muted px-1.5 text-[10px] text-muted-foreground sm:block"
+                  >
                     /
                   </kbd>
                 )}
@@ -745,7 +800,7 @@ export function NotificationsView({ items, now }) {
                     setSort((s) => (s === "newest" ? "oldest" : "newest"))
                   }
                 >
-                  <ArrowUpDown className="size-4" />
+                  <ArrowUpDown aria-hidden="true" className="size-4" />
                   {sort === "newest" ? "Newest" : "Oldest"}
                 </Button>
                 <Button
@@ -758,9 +813,9 @@ export function NotificationsView({ items, now }) {
                   title={compact ? "Comfortable view" : "Compact view"}
                 >
                   {compact ? (
-                    <LayoutList className="size-4" />
+                    <LayoutList aria-hidden="true" className="size-4" />
                   ) : (
-                    <List className="size-4" />
+                    <List aria-hidden="true" className="size-4" />
                   )}
                 </Button>
                 <Button
@@ -770,7 +825,7 @@ export function NotificationsView({ items, now }) {
                     selectMode ? exitSelect() : setSelectMode(true)
                   }
                 >
-                  <CheckSquare className="size-4" />
+                  <CheckSquare aria-hidden="true" className="size-4" />
                   {selectMode ? "Done" : "Select"}
                 </Button>
               </div>
@@ -787,7 +842,8 @@ export function NotificationsView({ items, now }) {
                   onClick={() => setKind(c.value)}
                   aria-pressed={kind === c.value}
                   className={cn(
-                    "relative shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "relative shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors motion-reduce:transition-none",
+                    FOCUS_RING,
                     kind === c.value
                       ? "border-primary text-primary-foreground"
                       : "bg-muted/50 text-muted-foreground hover:border-primary/40 hover:text-primary",
@@ -806,7 +862,7 @@ export function NotificationsView({ items, now }) {
                   )}
                   <span className="relative z-10">
                     {c.label}
-                    <span className="ml-1.5 opacity-70">
+                    <span className="ml-1.5 tabular-nums opacity-70">
                       {kindCounts[c.value] ?? 0}
                     </span>
                   </span>
@@ -823,7 +879,10 @@ export function NotificationsView({ items, now }) {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="text-sm font-medium text-primary hover:underline"
+                className={cn(
+                  "rounded text-sm font-medium text-primary hover:underline",
+                  FOCUS_RING,
+                )}
               >
                 Clear filters
               </button>
@@ -836,11 +895,11 @@ export function NotificationsView({ items, now }) {
               {groups.map((g) => (
                 <div key={g.key}>
                   <div className="mb-3 flex items-center gap-3">
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    <h2 className="text-sm font-semibold text-muted-foreground">
                       {g.label}
                     </h2>
                     <span className="h-px flex-1 bg-border" />
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs tabular-nums text-muted-foreground">
                       {g.items.length}
                     </span>
                   </div>
@@ -905,11 +964,11 @@ export function NotificationsView({ items, now }) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
-            className="fixed inset-x-3 bottom-4 z-40 mx-auto flex max-w-2xl flex-wrap items-center gap-2 rounded-2xl border bg-background/95 p-3 shadow-lg backdrop-blur"
+            className="fixed inset-x-3 bottom-4 z-40 mx-auto flex max-w-2xl flex-wrap items-center gap-2 rounded-2xl border bg-background p-3 shadow-lg"
             role="toolbar"
             aria-label="Bulk actions"
           >
-            <span className="px-1 text-sm font-medium">
+            <span className="px-1 text-sm font-medium tabular-nums">
               {selected.size} selected
             </span>
             <Button
@@ -937,7 +996,7 @@ export function NotificationsView({ items, now }) {
                   exitSelect();
                 }}
               >
-                <Check className="size-4" /> Read
+                <Check aria-hidden="true" className="size-4" /> Read
               </Button>
               <Button
                 type="button"
@@ -949,7 +1008,7 @@ export function NotificationsView({ items, now }) {
                   exitSelect();
                 }}
               >
-                <Mail className="size-4" /> Unread
+                <Mail aria-hidden="true" className="size-4" /> Unread
               </Button>
               <Button
                 type="button"
@@ -958,7 +1017,7 @@ export function NotificationsView({ items, now }) {
                 disabled={!selected.size}
                 onClick={() => dismiss([...selected])}
               >
-                <X className="size-4" /> Dismiss
+                <X aria-hidden="true" className="size-4" /> Dismiss
               </Button>
               <Button
                 type="button"
@@ -967,7 +1026,7 @@ export function NotificationsView({ items, now }) {
                 onClick={exitSelect}
                 aria-label="Cancel selection"
               >
-                <X className="size-4" />
+                <X aria-hidden="true" className="size-4" />
               </Button>
             </div>
           </motion.div>

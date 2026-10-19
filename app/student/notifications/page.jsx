@@ -1,3 +1,4 @@
+// app/student/notifications/page.jsx
 import { Bell } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { MarkReadButton } from "@/components/student/MarkReadButton";
@@ -12,8 +13,12 @@ import { requireUser } from "@/lib/auth/session";
 import { safeNext } from "@/lib/utils/url";
 import { notificationInboxRepository } from "@/repositories/notificationInboxRepository";
 import { formatDateTime } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Notifications" };
+
+const enter =
+  "animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-500 motion-reduce:animate-none";
 
 // Handles ms, ISO strings and Firestore Timestamps
 const toMs = (v) => {
@@ -28,7 +33,6 @@ const toMs = (v) => {
 export default async function StudentNotificationsPage() {
   const user = await requireUser();
   const raw = await notificationInboxRepository.listByUser(user.uid);
-  console.log("[notif debug]", { uid: user.uid, count: raw.length });
   // Only plain, serializable fields go to the client component
   const items = raw.map((n) => ({
     id: n.id,
@@ -47,38 +51,40 @@ export default async function StudentNotificationsPage() {
     null,
   );
 
+  const description = hasUnread
+    ? `You have ${unread} unread ${
+        unread === 1 ? "notification" : "notifications"
+      }. Announcements and updates from our team.`
+    : "Announcements and updates from our team.";
+
   return (
     <div className="relative isolate">
       <NotificationsBackdrop />
 
-      <StudentPageHeader
-        title="Notifications"
-        description="Announcements and updates from our team."
-      >
+      <StudentPageHeader title="Notifications" description={description}>
         {hasUnread && <MarkReadButton />}
       </StudentPageHeader>
 
       {!items.length ? (
         <>
-          <EmptyState
-            icon={Bell}
-            title="Nothing yet"
-            description="Announcements from our team will appear here."
-          />
+          <div className={enter}>
+            <EmptyState
+              icon={Bell}
+              title="Nothing yet"
+              description="Announcements from our team will appear here."
+            />
+          </div>
           <NotificationsExtras />
         </>
       ) : (
-        <>
+        <div className={cn("space-y-6", enter)}>
           <NotificationsStats
             total={items.length}
             unread={unread}
             latestLabel={latest?.dateLabel}
           />
-          <NotificationsView
-            items={items}
-            now={Math.max(0, ...items.map((item) => item.createdAt))}
-          />
-        </>
+          <NotificationsView items={items} now={latest?.createdAt ?? 0} />
+        </div>
       )}
     </div>
   );

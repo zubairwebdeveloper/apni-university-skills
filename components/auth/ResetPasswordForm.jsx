@@ -16,6 +16,17 @@ import { auth } from "@/lib/firebase/client/auth";
 import { authErrorMessage } from "@/lib/firebase/client/errors";
 import { resetSchema } from "@/lib/validations/auth";
 
+// Same codes verifyPasswordResetCode already treats as a dead link.
+// The oobCode can still expire or get consumed between the initial
+// check and the moment the person actually submits (slow typing, a
+// second tab on the same link), so confirmPasswordReset can fail for
+// the identical reason — route that case to the same "invalid" screen
+// instead of a generic inline error the person can't act on.
+const BAD_CODE = new Set([
+  "auth/expired-action-code",
+  "auth/invalid-action-code",
+]);
+
 // Soft fade/rise whenever the visible state changes.
 function Reveal({ children, className }) {
   const reduce = useReducedMotion();
@@ -85,6 +96,10 @@ export function ResetPasswordForm({ oobCode }) {
       await confirmPasswordReset(auth, oobCode, v.password);
       setState("done");
     } catch (e) {
+      if (BAD_CODE.has(e?.code)) {
+        setState("invalid");
+        return;
+      }
       setError(authErrorMessage(e));
     }
   }

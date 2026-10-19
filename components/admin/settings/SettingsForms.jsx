@@ -5,8 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
-import { AlertTriangle, Check, Loader2, RotateCcw, Save } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Clock,
+  Globe,
+  Loader2,
+  RotateCcw,
+  Save,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { TextField } from "@/components/shared/TextField";
@@ -54,6 +63,11 @@ const SESSION_PRESETS = [
 
 const SEO_TITLE_MAX = 60;
 const SEO_DESCRIPTION_MAX = 160;
+
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const pressable =
+  "transition-transform active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100";
 
 // Stored settings often come back with null/undefined for blank fields.
 // Controlled inputs and z.string() both fail on that, and with noValidate the
@@ -113,6 +127,65 @@ function formatDays(n) {
 /* Shared UI pieces                                                    */
 /* ------------------------------------------------------------------ */
 
+function FormReveal({ children, ...props }) {
+  const reduceMotion = useReducedMotion();
+  // Opacity only: a transform on the form would be an ancestor of the sticky
+  // save bar.
+  return (
+    <motion.form
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      {...props}
+    >
+      {children}
+    </motion.form>
+  );
+}
+
+function Pill({ tone = "neutral", children }) {
+  const tones = {
+    neutral: "border-border bg-muted/50 text-muted-foreground",
+    violet:
+      "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+    success:
+      "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    warn: "border-yellow-400/30 bg-yellow-400/10 text-yellow-800 dark:text-yellow-200",
+  };
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-4 tabular-nums ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function Meter({ value, max, tone = "violet", label }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  const fill =
+    tone === "warn"
+      ? "bg-yellow-400"
+      : tone === "success"
+        ? "bg-emerald-500"
+        : "bg-violet-500";
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={Math.min(value, max)}
+      className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+    >
+      <div
+        className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${fill}`}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
 function SaveBar({ dirty, submitting, onDiscard, cancelHref, updatedAt }) {
   // Formatted after mount so server and client markup match.
   const [savedLabel, setSavedLabel] = useState("");
@@ -130,7 +203,7 @@ function SaveBar({ dirty, submitting, onDiscard, cancelHref, updatedAt }) {
 
   return (
     <div
-      className="sticky bottom-4 z-20 flex flex-wrap items-center gap-3 rounded-xl border bg-background/95 px-4 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      className="sticky bottom-4 z-20 flex flex-col gap-3 rounded-xl border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:flex-row sm:flex-wrap sm:items-center"
       role="region"
       aria-label="Save settings"
     >
@@ -141,15 +214,15 @@ function SaveBar({ dirty, submitting, onDiscard, cancelHref, updatedAt }) {
         {dirty ? (
           <>
             <span
-              className="size-2 shrink-0 rounded-full bg-amber-500"
+              className="size-2 shrink-0 rounded-full bg-yellow-400"
               aria-hidden="true"
             />
-            <span className="font-medium">Unsaved changes</span>
+            <span className="font-medium text-foreground">Unsaved changes</span>
           </>
         ) : (
           <>
             <Check
-              className="size-4 shrink-0 text-emerald-600"
+              className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
               aria-hidden="true"
             />
             <span className="truncate text-muted-foreground">
@@ -159,70 +232,129 @@ function SaveBar({ dirty, submitting, onDiscard, cancelHref, updatedAt }) {
         )}
       </div>
 
-      <span className="hidden text-xs text-muted-foreground md:inline">
-        Press Ctrl/⌘ + S to save
+      <span className="hidden items-center gap-1 text-xs text-muted-foreground md:inline-flex">
+        Press
+        <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+          Ctrl/⌘ + S
+        </kbd>
+        to save
       </span>
 
-      <Button asChild variant="ghost" size="sm">
-        <Link href={cancelHref}>Cancel</Link>
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={onDiscard}
-        disabled={!dirty || submitting}
-      >
-        <RotateCcw className="size-4" aria-hidden="true" />
-        Discard changes
-      </Button>
-      <Button type="submit" size="sm" disabled={!dirty || submitting}>
-        {submitting ? (
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        ) : (
-          <Save className="size-4" aria-hidden="true" />
-        )}
-        {submitting ? "Saving…" : "Save settings"}
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className={`w-full sm:w-auto ${pressable}`}
+        >
+          <Link href={cancelHref}>Cancel</Link>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onDiscard}
+          disabled={!dirty || submitting}
+          className={`w-full sm:w-auto ${pressable}`}
+        >
+          <RotateCcw className="size-4" aria-hidden="true" />
+          Discard changes
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={!dirty || submitting}
+          className={`w-full sm:w-auto ${pressable}`}
+        >
+          {submitting ? (
+            <Loader2
+              className="size-4 animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+          ) : (
+            <Save className="size-4" aria-hidden="true" />
+          )}
+          {submitting ? "Saving…" : "Save settings"}
+        </Button>
+      </div>
     </div>
   );
 }
 
-function Counter({ value, max }) {
+function Counter({ value, max, label }) {
   const n = typeof value === "string" ? value.length : 0;
   const over = n > max;
   return (
-    <p
-      className={`-mt-2 text-right text-xs tabular-nums ${
-        over ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
-      }`}
-    >
-      {n}/{max}
-      {over ? " — may be cut off in search results" : ""}
-    </p>
+    <div className="-mt-2 space-y-1.5">
+      <Meter
+        value={n}
+        max={max}
+        tone={over ? "warn" : "violet"}
+        label={label}
+      />
+      <p
+        className={`text-right text-xs tabular-nums ${
+          over
+            ? "text-yellow-700 dark:text-yellow-300"
+            : "text-muted-foreground"
+        }`}
+      >
+        {n}/{max}
+        {over ? " — may be cut off in search results" : ""}
+      </p>
+    </div>
   );
 }
 
 function Notice({ tone = "info", children }) {
   const styles =
     tone === "warn"
-      ? "border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+      ? "border-yellow-400/30 bg-yellow-400/10 text-yellow-800 dark:text-yellow-200"
       : "border-border bg-muted/40 text-muted-foreground";
   return (
-    <div className={`flex gap-2 rounded-lg border px-3 py-2 text-sm ${styles}`}>
+    <div
+      role={tone === "warn" ? "note" : undefined}
+      className={`flex items-start gap-2.5 rounded-lg border px-3.5 py-3 text-sm leading-5 ${styles}`}
+    >
       {tone === "warn" && (
-        <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <AlertTriangle
+          className="mt-0.5 size-4 shrink-0 text-yellow-600 dark:text-yellow-400"
+          aria-hidden="true"
+        />
       )}
-      <div>{children}</div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
 
 function PreviewFrame({ title, children }) {
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{title}</p>
-      <div className="rounded-lg border bg-muted/30 p-4">{children}</div>
+    <div className="min-w-0 space-y-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
+      <div className="rounded-lg border border-border bg-muted/30 p-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function StatTile({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+      <span
+        aria-hidden="true"
+        className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-violet-500/20 bg-violet-500/10 text-violet-600 dark:text-violet-300"
+      >
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs leading-5 text-muted-foreground">{label}</p>
+        <p className="text-xl font-semibold leading-6 tabular-nums tracking-tight text-foreground">
+          {value}
+        </p>
+      </div>
     </div>
   );
 }
@@ -343,13 +475,16 @@ export function GeneralSettingsForm({ record }) {
       : null;
 
   return (
-    <form
+    <FormReveal
       onSubmit={submit}
       onKeyDown={onKeyDown}
       noValidate
       className="space-y-6"
     >
-      <FormSection title="Site">
+      <FormSection
+        title="Site"
+        description="Your site's name and identity. These appear in the header, footer and browser tab."
+      >
         <TextField control={c} name="siteName" label="Site name" />
         <TextField control={c} name="tagline" label="Tagline" />
         <TextField
@@ -388,8 +523,24 @@ export function GeneralSettingsForm({ record }) {
 
       <FormSection
         title="Social links"
-        description={`Full https:// links. Leave blank to hide. ${socialSet} of ${SOCIAL_FIELDS.length} shown on the site.`}
+        description="Full https:// links. Leave blank to hide."
       >
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/30 px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              Shown on the site
+            </p>
+            <Pill tone={socialSet > 0 ? "success" : "neutral"}>
+              {socialSet} of {SOCIAL_FIELDS.length}
+            </Pill>
+          </div>
+          <Meter
+            value={socialSet}
+            max={SOCIAL_FIELDS.length}
+            tone="success"
+            label="Social links filled in"
+          />
+        </div>
         <div className="grid gap-5 sm:grid-cols-2">
           {SOCIAL_FIELDS.map(([key, label]) => (
             <TextField
@@ -408,7 +559,11 @@ export function GeneralSettingsForm({ record }) {
         description="Used when a page doesn't define its own."
       >
         <TextField control={c} name="seoTitle" label="Default title" />
-        <Counter value={seoTitle} max={SEO_TITLE_MAX} />
+        <Counter
+          value={seoTitle}
+          max={SEO_TITLE_MAX}
+          label="Default title length"
+        />
         <TextField
           control={c}
           name="seoDescription"
@@ -416,7 +571,11 @@ export function GeneralSettingsForm({ record }) {
           component={Textarea}
           rows={2}
         />
-        <Counter value={seoDescription} max={SEO_DESCRIPTION_MAX} />
+        <Counter
+          value={seoDescription}
+          max={SEO_DESCRIPTION_MAX}
+          label="Default description length"
+        />
         <ImageField
           control={c}
           name="ogImage"
@@ -427,19 +586,27 @@ export function GeneralSettingsForm({ record }) {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <PreviewFrame title="Search result preview">
-            <p className="truncate text-xs text-muted-foreground">
-              {siteName || "yoursite.com"}
-            </p>
-            <p className="mt-0.5 line-clamp-1 text-base text-blue-700 dark:text-blue-400">
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground"
+              >
+                <Globe className="size-3.5" />
+              </span>
+              <p className="truncate text-xs text-muted-foreground">
+                {siteName || "yoursite.com"}
+              </p>
+            </div>
+            <p className="mt-1.5 line-clamp-1 text-base text-blue-700 dark:text-blue-400">
               {previewTitle}
             </p>
-            <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+            <p className="mt-0.5 line-clamp-2 text-sm leading-5 text-muted-foreground">
               {previewDescription}
             </p>
           </PreviewFrame>
 
           <PreviewFrame title="Shared link preview">
-            <div className="overflow-hidden rounded-md border bg-background">
+            <div className="overflow-hidden rounded-md border border-border bg-background">
               <div className="aspect-[1200/630] bg-muted">
                 {ogSrc ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -451,10 +618,10 @@ export function GeneralSettingsForm({ record }) {
                 )}
               </div>
               <div className="space-y-0.5 p-3">
-                <p className="line-clamp-1 text-sm font-medium">
+                <p className="line-clamp-1 text-sm font-medium text-foreground">
                   {previewTitle}
                 </p>
-                <p className="line-clamp-2 text-xs text-muted-foreground">
+                <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
                   {previewDescription}
                 </p>
               </div>
@@ -464,7 +631,7 @@ export function GeneralSettingsForm({ record }) {
       </FormSection>
 
       {footer}
-    </form>
+    </FormReveal>
   );
 }
 
@@ -497,7 +664,7 @@ export function SecuritySettingsForm({ record }) {
   };
 
   return (
-    <form
+    <FormReveal
       onSubmit={submit}
       onKeyDown={onKeyDown}
       noValidate
@@ -508,8 +675,17 @@ export function SecuritySettingsForm({ record }) {
         description="How long a login lasts before the person has to sign in again. The change applies to new logins. Existing sessions keep their length."
       >
         <div className="space-y-2">
-          <p className="text-sm font-medium">Quick presets</p>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <p
+            id="session-presets-label"
+            className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+          >
+            Quick presets
+          </p>
+          <div
+            role="group"
+            aria-labelledby="session-presets-label"
+            className="grid gap-2 sm:grid-cols-3"
+          >
             {SESSION_PRESETS.map((p) => {
               const active = student === p.student && staff === p.staff;
               return (
@@ -518,14 +694,24 @@ export function SecuritySettingsForm({ record }) {
                   type="button"
                   aria-pressed={active}
                   onClick={() => applyPreset(p)}
-                  className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  className={`group rounded-lg border p-3 text-left transition-colors ${focusRing} ${pressable} ${
                     active
-                      ? "border-primary/40 bg-primary/5"
-                      : "hover:bg-muted/60"
+                      ? "border-violet-500/50 bg-violet-500/10"
+                      : "border-border hover:border-violet-500/30 hover:bg-muted/60"
                   }`}
                 >
-                  <span className="block text-sm font-medium">{p.label}</span>
-                  <span className="block text-xs text-muted-foreground">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-foreground">
+                      {p.label}
+                    </span>
+                    {active && (
+                      <Check
+                        className="size-4 text-violet-600 dark:text-violet-300"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
                     Students / staff: {p.hint}
                   </span>
                 </button>
@@ -551,23 +737,17 @@ export function SecuritySettingsForm({ record }) {
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border bg-muted/30 px-4 py-3">
-            <p className="text-xs text-muted-foreground">
-              Students stay signed in for
-            </p>
-            <p className="text-lg font-medium tabular-nums">
-              {formatDays(student)}
-            </p>
-          </div>
-          <div className="rounded-lg border bg-muted/30 px-4 py-3">
-            <p className="text-xs text-muted-foreground">
-              Staff stay signed in for
-            </p>
-            <p className="text-lg font-medium tabular-nums">
-              {formatDays(staff)}
-            </p>
-          </div>
+        <div className="grid gap-3 sm:grid-cols-2" aria-live="polite">
+          <StatTile
+            icon={Clock}
+            label="Students stay signed in for"
+            value={formatDays(student)}
+          />
+          <StatTile
+            icon={Clock}
+            label="Staff stay signed in for"
+            value={formatDays(staff)}
+          />
         </div>
 
         {staffLonger && (
@@ -579,7 +759,7 @@ export function SecuritySettingsForm({ record }) {
       </FormSection>
 
       {footer}
-    </form>
+    </FormReveal>
   );
 }
 
@@ -608,7 +788,7 @@ export function NotificationSettingsForm({ record }) {
   };
 
   return (
-    <form
+    <FormReveal
       onSubmit={submit}
       onKeyDown={onKeyDown}
       noValidate
@@ -632,35 +812,48 @@ export function NotificationSettingsForm({ record }) {
           </Notice>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted-foreground" aria-live="polite">
-            {onCount} of {EMAIL_TOGGLES.length} email types on
-          </p>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!emailsEnabled || onCount === EMAIL_TOGGLES.length}
-              onClick={() => setAll(true)}
-            >
-              Turn all on
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!emailsEnabled || onCount === 0}
-              onClick={() => setAll(false)}
-            >
-              Turn all off
-            </Button>
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2" aria-live="polite">
+              <p className="text-sm text-muted-foreground">
+                {onCount} of {EMAIL_TOGGLES.length} email types on
+              </p>
+              {!emailsEnabled && <Pill tone="warn">Paused</Pill>}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!emailsEnabled || onCount === EMAIL_TOGGLES.length}
+                onClick={() => setAll(true)}
+                className={pressable}
+              >
+                Turn all on
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!emailsEnabled || onCount === 0}
+                onClick={() => setAll(false)}
+                className={pressable}
+              >
+                Turn all off
+              </Button>
+            </div>
           </div>
+          <Meter
+            value={onCount}
+            max={EMAIL_TOGGLES.length}
+            tone={emailsEnabled ? "violet" : "warn"}
+            label="Email types enabled"
+          />
         </div>
 
         <fieldset
           disabled={!emailsEnabled}
-          className={`m-0 min-w-0 space-y-4 border-0 p-0 transition-opacity ${
+          className={`m-0 min-w-0 space-y-4 border-0 p-0 transition-opacity motion-reduce:transition-none ${
             emailsEnabled ? "" : "opacity-50"
           }`}
         >
@@ -682,7 +875,7 @@ export function NotificationSettingsForm({ record }) {
         />
         <fieldset
           disabled={!notifyOnContact}
-          className={`m-0 min-w-0 border-0 p-0 transition-opacity ${
+          className={`m-0 min-w-0 border-0 p-0 transition-opacity motion-reduce:transition-none ${
             notifyOnContact ? "" : "opacity-50"
           }`}
         >
@@ -697,6 +890,6 @@ export function NotificationSettingsForm({ record }) {
       </FormSection>
 
       {footer}
-    </form>
+    </FormReveal>
   );
 }

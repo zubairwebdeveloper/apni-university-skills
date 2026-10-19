@@ -8,10 +8,14 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DataTable } from "@/components/admin/table/DataTable";
 import { RowActions } from "@/components/admin/table/RowActions";
 import { formatDate, formatPrice } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
 import {
   cancelEnrollment,
   reinstateEnrollment,
 } from "@/app/actions/admin/enrollments";
+
+const linkClass =
+  "rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60";
 
 function initials(name) {
   const parts = String(name ?? "")
@@ -28,23 +32,27 @@ function ProgressBar({ value = 0 }) {
   const reduce = useReducedMotion();
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-32 items-center gap-2">
       <div
         className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
-        aria-label={`Progress ${pct}%`}
+        aria-label="Course progress"
+        aria-valuetext={`${pct}% complete`}
       >
         <motion.div
-          className={`h-full rounded-full ${pct >= 100 ? "bg-emerald-500" : "bg-primary"}`}
+          className={cn(
+            "h-full rounded-full",
+            pct >= 100 ? "bg-emerald-500" : "bg-primary",
+          )}
           initial={reduce ? false : { width: 0 }}
           animate={{ width: `${pct}%` }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         />
       </div>
-      <span className="w-9 text-xs tabular-nums text-muted-foreground">
+      <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
         {pct}%
       </span>
     </div>
@@ -59,11 +67,11 @@ export function EnrollmentsTable({ rows, perms }) {
     {
       key: "student",
       header: "Student",
-      className: "min-w-52",
+      className: "min-w-56",
       cell: (r) => (
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <span
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+            className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary ring-1 ring-primary/15"
             aria-hidden="true"
           >
             {initials(r.student?.name)}
@@ -72,12 +80,15 @@ export function EnrollmentsTable({ rows, perms }) {
             {r.student?.slug && canStudents ? (
               <Link
                 href={`/admin/students/${r.student.slug}`}
-                className="font-medium hover:underline"
+                className={cn(
+                  "block truncate text-sm font-semibold leading-snug",
+                  linkClass,
+                )}
               >
                 {r.student.name}
               </Link>
             ) : (
-              <span className="font-medium">
+              <span className="block truncate text-sm font-semibold leading-snug">
                 {r.student?.name ?? "Unknown student"}
               </span>
             )}
@@ -91,17 +102,19 @@ export function EnrollmentsTable({ rows, perms }) {
     {
       key: "course",
       header: "Course",
-      className: "min-w-48",
+      className: "min-w-52",
       cell: (r) =>
         canCourses ? (
           <Link
             href={`/admin/courses/${r.courseSlug}`}
-            className="hover:underline"
+            className={cn("line-clamp-2 text-sm leading-snug", linkClass)}
           >
             {r.courseTitle}
           </Link>
         ) : (
-          r.courseTitle
+          <span className="line-clamp-2 text-sm leading-snug">
+            {r.courseTitle}
+          </span>
         ),
     },
     {
@@ -112,7 +125,7 @@ export function EnrollmentsTable({ rows, perms }) {
     {
       key: "progress",
       header: "Progress",
-      className: "w-40",
+      className: "w-44",
       cell: (r) => <ProgressBar value={r.progress ?? 0} />,
     },
     {
@@ -121,11 +134,11 @@ export function EnrollmentsTable({ rows, perms }) {
       className: "whitespace-nowrap",
       cell: (r) =>
         r.price > 0 ? (
-          <span className="font-medium tabular-nums">
+          <span className="text-sm font-semibold tabular-nums">
             {formatPrice(r.price, r.currency)}
           </span>
         ) : (
-          <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+          <span className="inline-flex rounded-md border bg-muted/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
             Free
           </span>
         ),
@@ -133,7 +146,7 @@ export function EnrollmentsTable({ rows, perms }) {
     {
       key: "enrolled",
       header: "Enrolled",
-      className: "whitespace-nowrap text-muted-foreground",
+      className: "whitespace-nowrap text-sm tabular-nums text-muted-foreground",
       cell: (r) => formatDate(r.enrolledAt),
     },
     {

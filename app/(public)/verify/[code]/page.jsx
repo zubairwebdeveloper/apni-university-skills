@@ -3,10 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   FiAlertTriangle,
+  FiArrowRight,
+  FiAward,
+  FiBook,
+  FiCalendar,
   FiCheckCircle,
+  FiClock,
   FiEye,
+  FiHash,
   FiLock,
   FiSearch,
+  FiUser,
   FiXCircle,
 } from "react-icons/fi";
 import { Container } from "@/components/layout/Container";
@@ -15,10 +22,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/public/technology/Reveal";
 import { TechScene } from "@/components/public/technology/TechScene";
-import {
-  VerifyActions,
-  VerifyAnother,
-} from "@/components/public/VerifyTools";
+import { VerifyActions, VerifyAnother } from "@/components/public/VerifyTools";
 import { rateLimit } from "@/lib/security/rateLimit";
 import { certificateRepository } from "@/repositories/certificateRepository";
 import { formatDate } from "@/lib/utils/format";
@@ -47,22 +51,60 @@ const guidance = [
 ];
 
 const labelClass =
-  "text-xs font-medium uppercase tracking-wider text-muted-foreground";
+  "text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground";
+
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+function Detail({ icon: Icon, label, children, mono = false, className = "" }) {
+  return (
+    <div
+      className={`min-w-0 rounded-xl border bg-background/60 p-4 sm:p-5 ${className}`}
+    >
+      <dt className="flex items-center gap-2">
+        <Icon aria-hidden="true" className="size-4 text-primary" />
+        <span className={labelClass}>{label}</span>
+      </dt>
+      <dd
+        className={`mt-2 text-balance break-words text-lg font-semibold leading-snug text-foreground ${
+          mono ? "break-all font-mono text-base sm:text-lg" : ""
+        }`}
+      >
+        {children}
+      </dd>
+    </div>
+  );
+}
 
 export default async function VerifyPage({ params }) {
   const { code } = await params;
   if (!/^[a-f0-9]{16}$/.test(code)) notFound();
   if (!(await rateLimit("verify", { limit: 30, windowSec: 600 })).ok)
     return (
-      <Container className="max-w-xl py-20">
-        <Card role="alert" className="items-center gap-3 p-8 text-center">
-          <FiAlertTriangle
-            className="size-8 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <p className="text-muted-foreground">
+      <Container className="max-w-xl py-16 sm:py-20">
+        <Card
+          role="alert"
+          className="items-center gap-4 p-8 text-center shadow-sm sm:p-10"
+        >
+          <span className="grid size-14 place-items-center rounded-2xl bg-muted text-muted-foreground">
+            <FiClock className="size-7" aria-hidden="true" />
+          </span>
+          <h1 className="text-balance text-2xl font-semibold leading-tight tracking-tight">
+            Too many lookups
+          </h1>
+          <p className="max-w-sm leading-7 text-muted-foreground">
             Too many lookups. Please try again in a few minutes.
           </p>
+          <Link
+            href="/"
+            className={buttonVariants({
+              variant: "outline",
+              size: "lg",
+              className: `mt-2 min-h-11 ${focusRing}`,
+            })}
+          >
+            Back to home
+          </Link>
         </Card>
       </Container>
     );
@@ -77,42 +119,52 @@ export default async function VerifyPage({ params }) {
         description="Confirm whether a certificate was issued by Apni University."
         breadcrumbs={[{ label: "Home", href: "/" }, { label: "Verify" }]}
       />
-      <Container className="max-w-3xl space-y-6 py-10">
+      <Container className="max-w-3xl space-y-8 py-10 sm:py-14">
         <Reveal>
           <Card
-            className="relative gap-6 overflow-hidden p-6 sm:p-8 print:shadow-none"
+            className="relative gap-7 overflow-hidden p-6 shadow-md sm:p-9 print:shadow-none"
             role="status"
           >
             <span
               aria-hidden="true"
-              className={`absolute inset-x-0 top-0 h-1 ${
+              className={`absolute inset-x-0 top-0 h-1.5 ${
                 valid
                   ? "bg-gradient-to-r from-primary to-highlight"
                   : "bg-destructive"
               }`}
             />
 
-            <div className="flex items-start gap-4">
+            {/* Result banner */}
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
               <span
-                className={`grid size-14 shrink-0 place-items-center rounded-2xl ${
+                className={`grid size-16 shrink-0 place-items-center rounded-2xl ${
                   valid
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                     : "bg-destructive/10 text-destructive"
                 }`}
               >
                 {valid ? (
-                  <FiCheckCircle className="size-7" aria-hidden="true" />
+                  <FiCheckCircle className="size-8" aria-hidden="true" />
                 ) : (
-                  <FiXCircle className="size-7" aria-hidden="true" />
+                  <FiXCircle className="size-8" aria-hidden="true" />
                 )}
               </span>
-              <div>
-                <h2 className="text-balance text-[clamp(1.25rem,2.5vw,1.75rem)] font-semibold leading-tight tracking-tight">
+              <div className="min-w-0">
+                <p
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
+                    valid
+                      ? "border-primary/30 bg-primary/10 text-primary"
+                      : "border-destructive/30 bg-destructive/10 text-destructive"
+                  }`}
+                >
+                  {valid ? "Verified" : "Revoked"}
+                </p>
+                <h2 className="mt-3 text-balance text-[clamp(1.5rem,3vw,2.125rem)] font-semibold leading-[1.1] tracking-tight">
                   {valid
                     ? "This certificate is valid"
                     : "This certificate has been revoked"}
                 </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-2 text-base leading-7 text-muted-foreground">
                   {valid
                     ? "The details below match our records."
                     : "This certificate is no longer valid."}
@@ -120,6 +172,7 @@ export default async function VerifyPage({ params }) {
               </div>
             </div>
 
+            {/* Record details */}
             <div
               className={
                 valid
@@ -127,40 +180,37 @@ export default async function VerifyPage({ params }) {
                   : ""
               }
             >
-              <dl className="grid gap-5 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className={labelClass}>Certificate number</dt>
-                  <dd className="mt-1 break-all font-mono text-base font-medium">
-                    {c.certificateNumber}
-                  </dd>
-                </div>
+              <dl className="grid min-w-0 gap-3 sm:grid-cols-2 sm:gap-4">
+                <Detail
+                  icon={FiHash}
+                  label="Certificate number"
+                  mono
+                  className="sm:col-span-2"
+                >
+                  {c.certificateNumber}
+                </Detail>
                 {valid && (
                   <>
-                    <div>
-                      <dt className={labelClass}>Awarded to</dt>
-                      <dd className="mt-1 text-base font-medium">
-                        {c.studentName}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className={labelClass}>Course</dt>
-                      <dd className="mt-1 text-base font-medium">
-                        {c.courseTitle}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className={labelClass}>Issued</dt>
-                      <dd className="mt-1 text-base font-medium">
-                        {formatDate(c.issuedAt)}
-                      </dd>
-                    </div>
+                    <Detail icon={FiUser} label="Awarded to">
+                      {c.studentName}
+                    </Detail>
+                    <Detail icon={FiCalendar} label="Issued">
+                      {formatDate(c.issuedAt)}
+                    </Detail>
+                    <Detail
+                      icon={FiBook}
+                      label="Course"
+                      className="sm:col-span-2"
+                    >
+                      {c.courseTitle}
+                    </Detail>
                   </>
                 )}
               </dl>
 
               {/* Restrained 3D accent, valid results only, large screens only */}
               {valid && (
-                <div className="relative hidden h-40 md:block print:hidden">
+                <div className="relative hidden h-44 md:block print:hidden">
                   <TechScene
                     minWidth={768}
                     scrollLinked={false}
@@ -170,14 +220,32 @@ export default async function VerifyPage({ params }) {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+            {valid && (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <FiAward
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-primary"
+                />
+                Issued by Apni University.
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-5">
               <VerifyActions certificateNumber={c.certificateNumber} />
               {!valid && (
                 <Link
                   href="/contact"
-                  className={`${buttonVariants({ variant: "outline", size: "sm" })} print:hidden`}
+                  className={`${buttonVariants({
+                    variant: "outline",
+                    size: "default",
+                    className: `group/btn min-h-11 ${focusRing}`,
+                  })} print:hidden`}
                 >
                   Think this is a mistake? Contact us
+                  <FiArrowRight
+                    aria-hidden="true"
+                    className="transition-transform duration-200 group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                  />
                 </Link>
               )}
             </div>
@@ -185,22 +253,32 @@ export default async function VerifyPage({ params }) {
         </Reveal>
 
         <Reveal delay={0.1}>
-          <ul className="grid gap-4 sm:grid-cols-3">
-            {guidance.map(({ icon: Icon, title, text }) => (
-              <li
-                key={title}
-                className="rounded-2xl border bg-card p-5 print:hidden"
-              >
-                <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <Icon className="size-5" aria-hidden="true" />
-                </span>
-                <h3 className="mt-3 font-sans text-sm font-semibold">
-                  {title}
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">{text}</p>
-              </li>
-            ))}
-          </ul>
+          <section aria-labelledby="verify-guidance" className="print:hidden">
+            <h2
+              id="verify-guidance"
+              className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-primary"
+            >
+              How to read this result
+            </h2>
+            <ul className="grid gap-4 sm:grid-cols-3">
+              {guidance.map(({ icon: Icon, title, text }) => (
+                <li
+                  key={title}
+                  className="min-w-0 rounded-2xl border bg-card p-5 shadow-sm transition-colors hover:border-primary/40 motion-reduce:transition-none"
+                >
+                  <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <Icon className="size-5" aria-hidden="true" />
+                  </span>
+                  <h3 className="mt-4 font-sans text-base font-semibold leading-snug">
+                    {title}
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+                    {text}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
         </Reveal>
 
         <Reveal delay={0.15}>

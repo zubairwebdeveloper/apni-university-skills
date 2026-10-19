@@ -1,16 +1,6 @@
-// components/layout/CommandPalette.jsx
-// Quick search (Ctrl/⌘ + K), keyboard shortcuts, recent pages, and a one-time tip.
-// Needs: npx shadcn@latest add command dialog
 "use client";
 
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
@@ -19,6 +9,8 @@ import {
   Bell,
   BookOpen,
   Check,
+  ChevronRight,
+  Command as CommandIcon,
   FileText,
   History,
   Keyboard,
@@ -45,6 +37,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+
 import {
   Dialog,
   DialogContent,
@@ -52,6 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
 import { useAuth } from "@/components/auth/AuthProvider";
 import { primaryNav, moreNav } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -60,20 +54,50 @@ const OPEN_EVENT = "open-command-palette";
 
 const RECENT_KEY = "apni:recent-pages";
 const TIP_KEY = "apni:shortcut-tip-seen";
-const SINGLE_KEY = "apni:single-key-shortcuts"; // "off" turns the letter shortcuts off
+const SINGLE_KEY = "apni:single-key-shortcuts";
 
-// Same destinations as the account menu in AuthNav.
+const BRAND_YELLOW = "#FACC15";
+const BRAND_PURPLE = "#8B5CF6";
+
 const ACCOUNT_ITEMS = [
-  { href: "/student", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/student/profile", label: "Profile", icon: User },
-  { href: "/student/courses", label: "My Courses", icon: BookOpen },
-  { href: "/student/notifications", label: "Notifications", icon: Bell },
-  { href: "/student/settings", label: "Settings", icon: Settings },
+  {
+    href: "/student",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    href: "/student/profile",
+    label: "Profile",
+    icon: User,
+  },
+  {
+    href: "/student/courses",
+    label: "My Courses",
+    icon: BookOpen,
+  },
+  {
+    href: "/student/notifications",
+    label: "Notifications",
+    icon: Bell,
+  },
+  {
+    href: "/student/settings",
+    label: "Settings",
+    icon: Settings,
+  },
 ];
 
 const GUEST_ITEMS = [
-  { href: "/login", label: "Log in", icon: LogIn },
-  { href: "/register", label: "Get started free", icon: Sparkles },
+  {
+    href: "/login",
+    label: "Log in",
+    icon: LogIn,
+  },
+  {
+    href: "/register",
+    label: "Get started free",
+    icon: Sparkles,
+  },
 ];
 
 const THEMES = [
@@ -82,7 +106,6 @@ const THEMES = [
   { value: "system", label: "System theme", icon: Laptop },
 ];
 
-// "G then X" shortcuts. `when` limits an entry to signed-in or signed-out visitors.
 const NAV_SHORTCUTS = [
   { keys: ["g", "h"], label: "Go to home", href: "/" },
   { keys: ["g", "c"], label: "Go to courses", href: "/courses" },
@@ -98,59 +121,76 @@ const NAV_SHORTCUTS = [
     href: "/student/profile",
     when: "auth",
   },
-  { keys: ["g", "l"], label: "Go to log in", href: "/login", when: "guest" },
+  {
+    keys: ["g", "l"],
+    label: "Go to log in",
+    href: "/login",
+    when: "guest",
+  },
 ];
 
-const itemClass = "cursor-pointer gap-2.5";
-const iconClass = "size-4 text-muted-foreground";
+const itemClass = cn(
+  "group relative cursor-pointer gap-3 rounded-xl px-3 py-2.5",
+  "transition-colors duration-150",
+  "data-[selected=true]:bg-accent",
+);
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
+const iconClass = cn(
+  "size-4 shrink-0 text-muted-foreground",
+  "transition-colors group-data-[selected=true]:text-foreground",
+);
 
-function useIsMac() {
-  return useSyncExternalStore(
-    () => () => {},
-    () => /Mac|iPhone|iPad/i.test(navigator.userAgent),
-    () => false,
-  );
-}
+function isTyping(element) {
+  if (!element || !element.tagName) return false;
 
-function isTyping(el) {
-  if (!el || !el.tagName) return false;
-  const tag = el.tagName;
+  const tag = element.tagName;
+
   return (
     tag === "INPUT" ||
     tag === "TEXTAREA" ||
     tag === "SELECT" ||
-    el.isContentEditable ||
-    el.getAttribute?.("role") === "textbox"
+    element.isContentEditable ||
+    element.getAttribute?.("role") === "textbox"
   );
 }
 
-// Only same-site paths are ever stored or followed.
-const safePath = (v) =>
-  typeof v === "string" && v.startsWith("/") && !v.startsWith("//");
+function safePath(value) {
+  return (
+    typeof value === "string" &&
+    value.startsWith("/") &&
+    !value.startsWith("//") &&
+    !value.includes("\\")
+  );
+}
 
 function readRecent() {
   try {
-    const v = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
-    return Array.isArray(v)
-      ? v
-          .filter((x) => x && safePath(x.href) && typeof x.label === "string")
-          .slice(0, 5)
-      : [];
+    const value = JSON.parse(window.localStorage.getItem(RECENT_KEY) || "[]");
+
+    if (!Array.isArray(value)) return [];
+
+    return value
+      .filter(
+        (item) => item && safePath(item.href) && typeof item.label === "string",
+      )
+      .slice(0, 5);
   } catch {
     return [];
   }
 }
 
 function pushRecent(item) {
+  if (!safePath(item.href)) return;
+
   try {
-    const next = [item, ...readRecent().filter((r) => r.href !== item.href)];
-    localStorage.setItem(RECENT_KEY, JSON.stringify(next.slice(0, 5)));
+    const next = [
+      item,
+      ...readRecent().filter((recent) => recent.href !== item.href),
+    ];
+
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(next.slice(0, 5)));
   } catch {
-    /* storage can be blocked: ignore */
+    // Recent pages are an enhancement; storage is optional.
   }
 }
 
@@ -158,7 +198,10 @@ function Kbd({ children, className }) {
   return (
     <kbd
       className={cn(
-        "inline-flex min-w-5 items-center justify-center rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[11px] font-medium uppercase text-muted-foreground",
+        "inline-flex min-h-5 min-w-5 items-center justify-center",
+        "rounded-md border border-border/80 bg-muted px-1.5 py-0.5",
+        "font-sans text-[10px] font-semibold text-muted-foreground",
+        "shadow-[0_1px_0_rgba(0,0,0,0.05)]",
         className,
       )}
     >
@@ -167,16 +210,15 @@ function Kbd({ children, className }) {
   );
 }
 
-// ["g","h"] with joiner "then" -> G then H;  ["Ctrl","K"] with "+" -> Ctrl + K
 function Keys({ keys, joiner = "then" }) {
   return (
     <span className="inline-flex items-center gap-1">
-      {keys.map((k, i) => (
-        <Fragment key={`${k}-${i}`}>
-          {i > 0 && (
+      {keys.map((key, index) => (
+        <Fragment key={`${key}-${index}`}>
+          {index > 0 && (
             <span className="text-[10px] text-muted-foreground">{joiner}</span>
           )}
-          <Kbd>{k}</Kbd>
+          <Kbd>{key}</Kbd>
         </Fragment>
       ))}
     </span>
@@ -186,423 +228,604 @@ function Keys({ keys, joiner = "then" }) {
 function ShortcutSection({ title, children }) {
   return (
     <section>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
         {title}
       </h3>
-      <ul className="space-y-2">{children}</ul>
+      <ul className="space-y-3">{children}</ul>
     </section>
   );
 }
 
 function ShortcutRow({ label, children }) {
   return (
-    <li className="flex items-center justify-between gap-4 text-sm text-foreground">
-      <span>{label}</span>
+    <li className="flex items-center justify-between gap-4 text-sm">
+      <span className="text-foreground/85">{label}</span>
       {children}
     </li>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Palette                                                             */
-/* ------------------------------------------------------------------ */
+function SectionLabel({ children }) {
+  return (
+    <div className="flex items-center gap-2 px-3 pb-2 pt-3">
+      <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
+        {children}
+      </span>
+      <span className="h-px flex-1 bg-border/60" />
+    </div>
+  );
+}
+
+function PremiumCommandItem({ children, ...props }) {
+  return (
+    <CommandItem {...props} className={cn(itemClass, props.className)}>
+      {children}
+    </CommandItem>
+  );
+}
 
 export function CommandPalette() {
   const router = useRouter();
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
-  const mac = useIsMac();
-  const mod = mac ? "⌘" : "Ctrl";
 
+  const [isMac, setIsMac] = useState(false);
   const [open, setOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState(false);
   const [tip, setTip] = useState(false);
   const [singleKey, setSingleKey] = useState(true);
-  const gAt = useRef(0); // when "g" was pressed, for the "G then X" shortcuts
 
-  const visibleNav = NAV_SHORTCUTS.filter(
-    (s) => !s.when || (s.when === "auth") === Boolean(user),
+  const gAt = useRef(0);
+
+  const modifier = isMac ? "⌘" : "Ctrl";
+  const shortcutLabel = "Alt + K";
+
+  const visibleNav = NAV_SHORTCUTS.filter((shortcut) => {
+    if (!shortcut.when) return true;
+    return shortcut.when === "auth" ? Boolean(user) : !user;
+  });
+
+  const pages = [...primaryNav, ...moreNav].filter(
+    (item) => item && safePath(item.href),
   );
-  const hintFor = (href) => visibleNav.find((s) => s.href === href)?.keys;
+
+  const accountItems = user ? ACCOUNT_ITEMS : GUEST_ITEMS;
+
+  const hintFor = useCallback(
+    (href) => visibleNav.find((item) => item.href === href)?.keys,
+    [visibleNav],
+  );
 
   const markTipSeen = useCallback(() => {
     setTip(false);
+
     try {
-      localStorage.setItem(TIP_KEY, "1");
+      window.localStorage.setItem(TIP_KEY, "1");
     } catch {
-      /* ignore */
+      // Storage is optional.
     }
   }, []);
 
   const openPalette = useCallback(() => {
     setQuery("");
     setOpen(true);
-    markTipSeen(); // they found it, no need to show the tip
+    markTipSeen();
   }, [markTipSeen]);
 
-  function handleOpenChange(next) {
-    setOpen(next);
-    if (!next) setQuery("");
-  }
+  const handleOpenChange = useCallback((nextOpen) => {
+    setOpen(nextOpen);
 
-  // Load the saved "single-key shortcuts" choice
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(SINGLE_KEY) === "off") setSingleKey(false);
-    } catch {
-      /* ignore */
+    if (!nextOpen) {
+      setQuery("");
+      setCopied(false);
     }
   }, []);
 
-  function changeSingleKey(on) {
-    setSingleKey(on);
-    try {
-      localStorage.setItem(SINGLE_KEY, on ? "on" : "off");
-    } catch {
-      /* ignore */
-    }
-  }
-
-  // Keyboard: Ctrl/⌘ + K always works; "?" and "G then X" respect the setting above.
+  // Detect the platform after mount to keep server and client output consistent.
   useEffect(() => {
-    const onKey = (e) => {
-      // Some events (e.g. browser autofill) arrive without a `key`, so guard it.
-      if (typeof e.key !== "string") return;
+    setIsMac(/Mac|iPhone|iPad/i.test(navigator.userAgent));
+  }, []);
 
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(SINGLE_KEY) === "off") {
+        setSingleKey(false);
+      }
+    } catch {
+      // Keep the default if storage is unavailable.
+    }
+  }, []);
+
+  const changeSingleKey = useCallback((enabled) => {
+    setSingleKey(enabled);
+
+    try {
+      window.localStorage.setItem(SINGLE_KEY, enabled ? "on" : "off");
+    } catch {
+      // The setting remains active for the current session.
+    }
+  }, []);
+
+  // Alt + K opens search. "?" and G sequences are optional shortcuts.
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (typeof event.key !== "string") return;
+
+      if (
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        event.key.toLowerCase() === "k"
+      ) {
+        event.preventDefault();
         setQuery("");
-        setOpen((v) => !v);
+        setOpen((current) => !current);
         markTipSeen();
         return;
       }
 
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (!singleKey || open || helpOpen || isTyping(e.target)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+        return;
+      }
 
-      if (e.key === "?") {
-        e.preventDefault();
+      if (!singleKey || open || helpOpen || isTyping(event.target)) {
+        gAt.current = 0;
+        return;
+      }
+
+      if (event.key === "?") {
+        event.preventDefault();
         setHelpOpen(true);
         markTipSeen();
+        gAt.current = 0;
         return;
       }
 
-      const key = e.key.toLowerCase();
+      const key = event.key.toLowerCase();
 
       if (gAt.current && Date.now() - gAt.current < 1200) {
         gAt.current = 0;
-        const match = visibleNav.find((s) => s.keys[1] === key);
+
+        const match = visibleNav.find((shortcut) => shortcut.keys[1] === key);
+
         if (match) {
-          e.preventDefault();
+          event.preventDefault();
+          pushRecent({
+            href: match.href,
+            label: match.label,
+          });
           router.push(match.href);
         }
+
         return;
       }
 
-      if (key === "g") gAt.current = Date.now();
+      gAt.current = key === "g" ? Date.now() : 0;
     };
 
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKeyDown);
+
     window.addEventListener(OPEN_EVENT, openPalette);
+
     return () => {
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener(OPEN_EVENT, openPalette);
     };
-  }, [router, singleKey, open, helpOpen, visibleNav, openPalette, markTipSeen]);
+  }, [singleKey, open, helpOpen, visibleNav, router, openPalette, markTipSeen]);
 
-  // One-time tip for people with a keyboard and mouse. Hidden on touch devices.
+  // Show the discovery tip once on devices with a mouse or trackpad.
   useEffect(() => {
-    let seen = false;
+    let alreadySeen = false;
+
     try {
-      seen = localStorage.getItem(TIP_KEY) === "1";
+      alreadySeen = window.localStorage.getItem(TIP_KEY) === "1";
     } catch {
-      /* ignore */
+      // Continue without persistence.
     }
-    const fine = window.matchMedia(
+
+    const finePointer = window.matchMedia(
       "(hover: hover) and (pointer: fine)",
     ).matches;
-    if (seen || !fine) return;
 
-    const show = setTimeout(() => setTip(true), 3000);
-    const hide = setTimeout(() => setTip(false), 15000);
+    if (alreadySeen || !finePointer) return undefined;
+
+    const showTimer = window.setTimeout(() => setTip(true), 3500);
+
+    const hideTimer = window.setTimeout(() => setTip(false), 16000);
+
     return () => {
-      clearTimeout(show);
-      clearTimeout(hide);
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
     };
   }, []);
 
-  // "Link copied" resets after a moment
   useEffect(() => {
-    if (!copied) return;
-    const t = setTimeout(() => setCopied(false), 1600);
-    return () => clearTimeout(t);
+    if (!copied) return undefined;
+
+    const timeout = window.setTimeout(() => setCopied(false), 1800);
+
+    return () => window.clearTimeout(timeout);
   }, [copied]);
 
-  const run = useCallback((fn) => {
+  const run = useCallback((callback) => {
     setOpen(false);
     setQuery("");
-    fn();
+    callback();
   }, []);
 
-  const go = (href, label) =>
-    run(() => {
-      pushRecent({ href, label });
-      router.push(href);
-    });
+  const go = useCallback(
+    (href, label) => {
+      if (!safePath(href)) return;
 
-  async function copyLink() {
+      run(() => {
+        pushRecent({ href, label });
+        router.push(href);
+      });
+    },
+    [router, run],
+  );
+
+  const copyLink = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
     } catch {
-      /* clipboard can be blocked (insecure context): ignore */
+      setCopied(false);
     }
-  }
+  }, []);
 
-  function scrollToTop() {
-    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
-  }
+  const scrollToTop = useCallback(() => {
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
 
-  const pages = [...primaryNav, ...moreNav];
-  const accountItems = user ? ACCOUNT_ITEMS : GUEST_ITEMS;
+    window.scrollTo({
+      top: 0,
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  }, []);
+
   const recent = open && !query ? readRecent() : [];
 
   return (
     <>
       <CommandDialog open={open} onOpenChange={handleOpenChange}>
-        {/* This version of CommandDialog does not wrap its children in <Command>,
-            and CommandInput / CommandList need that context. */}
-        <Command>
-          <CommandInput
-            placeholder="Search pages and actions…"
-            value={query}
-            onValueChange={setQuery}
-          />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+        <Command
+          className={cn(
+            "overflow-hidden rounded-2xl bg-popover text-popover-foreground",
+            "[&_[cmdk-group-heading]]:px-0",
+            "[&_[cmdk-group-heading]]:font-normal",
+          )}
+        >
+          {/* Search header */}
+          <div className="relative border-b border-border/70">
+            <div
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 w-[3px]"
+              style={{
+                background: `linear-gradient(to bottom, ${BRAND_YELLOW}, ${BRAND_PURPLE})`,
+              }}
+            />
+
+            <div className="flex items-center gap-3 px-4">
+              <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-border/70 bg-muted/70">
+                <Search className="size-4 text-foreground/80" />
+              </div>
+
+              <CommandInput
+                placeholder="Search pages, courses and actions..."
+                value={query}
+                onValueChange={setQuery}
+                className="h-[58px] border-0 text-sm shadow-none focus-visible:ring-0"
+              />
+
+              <Kbd className="hidden sm:inline-flex">Esc</Kbd>
+            </div>
+          </div>
+
+          <CommandList className="max-h-[min(65vh,480px)] p-2">
+            <CommandEmpty>
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <div className="grid size-12 place-items-center rounded-2xl border border-border bg-muted/60">
+                  <Search className="size-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-semibold">No results found</p>
+                <p className="max-w-[240px] text-xs leading-relaxed text-muted-foreground">
+                  Try another keyword or search for a page or action.
+                </p>
+              </div>
+            </CommandEmpty>
 
             {recent.length > 0 && (
               <>
-                <CommandGroup heading="Recent">
-                  {recent.map((r) => (
-                    <CommandItem
-                      key={r.href}
-                      value={`recent ${r.label}`}
-                      onSelect={() => go(r.href, r.label)}
-                      className={itemClass}
+                <CommandGroup>
+                  <SectionLabel>Recently visited</SectionLabel>
+
+                  {recent.map((item) => (
+                    <PremiumCommandItem
+                      key={item.href}
+                      value={`recent ${item.label}`}
+                      onSelect={() => go(item.href, item.label)}
                     >
-                      <History aria-hidden="true" className={iconClass} />
-                      {r.label}
-                    </CommandItem>
+                      <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/80">
+                        <History className={iconClass} />
+                      </div>
+
+                      <span className="min-w-0 flex-1 truncate">
+                        {item.label}
+                      </span>
+
+                      <ChevronRight className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-data-[selected=true]:opacity-100" />
+                    </PremiumCommandItem>
                   ))}
                 </CommandGroup>
-                <CommandSeparator />
+
+                <CommandSeparator className="my-2" />
               </>
             )}
 
-            <CommandGroup heading="Pages">
-              {pages.map((l) => {
-                const Icon = l.icon ?? FileText;
-                const hint = hintFor(l.href);
+            <CommandGroup>
+              <SectionLabel>Explore pages</SectionLabel>
+
+              {pages.map((item) => {
+                const Icon = item.icon ?? FileText;
+                const hint = hintFor(item.href);
+
                 return (
-                  <CommandItem
-                    key={l.href}
-                    value={`${l.label} ${l.description ?? ""}`}
-                    onSelect={() => go(l.href, l.label)}
-                    className={itemClass}
+                  <PremiumCommandItem
+                    key={item.href}
+                    value={`${item.label} ${item.description ?? ""}`}
+                    onSelect={() => go(item.href, item.label)}
                   >
-                    <Icon aria-hidden="true" className={iconClass} />
-                    <span className="flex-1">{l.label}</span>
-                    {l.description ? (
-                      <span className="hidden truncate text-xs text-muted-foreground sm:block">
-                        {l.description}
+                    <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/80 transition-colors group-data-[selected=true]:bg-background">
+                      <Icon className={iconClass} />
+                    </div>
+
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                      {item.label}
+                    </span>
+
+                    {item.description && (
+                      <span className="hidden max-w-[180px] truncate text-xs text-muted-foreground md:block">
+                        {item.description}
                       </span>
-                    ) : null}
-                    {hint && singleKey ? (
+                    )}
+
+                    {hint && singleKey && (
                       <span className="hidden sm:inline-flex">
                         <Keys keys={hint} />
                       </span>
-                    ) : null}
-                  </CommandItem>
+                    )}
+
+                    <ChevronRight className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-data-[selected=true]:opacity-100" />
+                  </PremiumCommandItem>
                 );
               })}
             </CommandGroup>
 
-            <CommandSeparator />
+            <CommandSeparator className="my-2" />
 
-            <CommandGroup heading={user ? "Your account" : "Account"}>
+            <CommandGroup>
+              <SectionLabel>
+                {user ? "Your account" : "Get started"}
+              </SectionLabel>
+
               {accountItems.map(({ href, label, icon: Icon }) => {
                 const hint = hintFor(href);
+
                 return (
-                  <CommandItem
+                  <PremiumCommandItem
                     key={href}
                     value={label}
                     onSelect={() => go(href, label)}
-                    className={itemClass}
                   >
-                    <Icon aria-hidden="true" className={iconClass} />
-                    <span className="flex-1">{label}</span>
-                    {hint && singleKey ? (
+                    <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/80">
+                      <Icon className={iconClass} />
+                    </div>
+
+                    <span className="flex-1 text-[13px] font-medium">
+                      {label}
+                    </span>
+
+                    {hint && singleKey && (
                       <span className="hidden sm:inline-flex">
                         <Keys keys={hint} />
                       </span>
-                    ) : null}
-                  </CommandItem>
+                    )}
+
+                    <ChevronRight className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-data-[selected=true]:opacity-100" />
+                  </PremiumCommandItem>
                 );
               })}
             </CommandGroup>
 
-            <CommandSeparator />
+            <CommandSeparator className="my-2" />
 
-            <CommandGroup heading="Actions">
-              <CommandItem
-                value="Copy page link"
-                onSelect={copyLink}
-                className={itemClass}
-              >
-                {copied ? (
-                  <Check
-                    aria-hidden="true"
-                    className="size-4 text-emerald-700 dark:text-emerald-400"
-                  />
-                ) : (
-                  <Link2 aria-hidden="true" className={iconClass} />
-                )}
-                <span className="flex-1">
+            <CommandGroup>
+              <SectionLabel>Quick actions</SectionLabel>
+
+              <PremiumCommandItem value="Copy page link" onSelect={copyLink}>
+                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/80">
+                  {copied ? (
+                    <Check className="size-4 text-emerald-500" />
+                  ) : (
+                    <Link2 className={iconClass} />
+                  )}
+                </div>
+
+                <span className="flex-1 text-[13px] font-medium">
                   {copied ? "Link copied" : "Copy page link"}
                 </span>
+
                 <span role="status" className="sr-only">
                   {copied ? "Page link copied to clipboard" : ""}
                 </span>
-              </CommandItem>
-              <CommandItem
+              </PremiumCommandItem>
+
+              <PremiumCommandItem
                 value="Scroll to top"
                 onSelect={() => run(scrollToTop)}
-                className={itemClass}
               >
-                <ArrowUp aria-hidden="true" className={iconClass} />
-                Scroll to top
-              </CommandItem>
-              <CommandItem
-                value="Go back"
+                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/80">
+                  <ArrowUp className={iconClass} />
+                </div>
+
+                <span className="flex-1 text-[13px] font-medium">
+                  Scroll to top
+                </span>
+              </PremiumCommandItem>
+
+              <PremiumCommandItem
+                value="Go back previous page"
                 onSelect={() => run(() => router.back())}
-                className={itemClass}
               >
-                <ArrowLeft aria-hidden="true" className={iconClass} />
-                Go back
-              </CommandItem>
-              <CommandItem
+                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/80">
+                  <ArrowLeft className={iconClass} />
+                </div>
+
+                <span className="flex-1 text-[13px] font-medium">Go back</span>
+              </PremiumCommandItem>
+
+              <PremiumCommandItem
                 value="Keyboard shortcuts help"
                 onSelect={() => run(() => setHelpOpen(true))}
-                className={itemClass}
               >
-                <Keyboard aria-hidden="true" className={iconClass} />
-                <span className="flex-1">Keyboard shortcuts</span>
-                {singleKey ? (
-                  <span className="hidden sm:inline-flex">
-                    <Kbd>?</Kbd>
-                  </span>
-                ) : null}
-              </CommandItem>
+                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/80">
+                  <Keyboard className={iconClass} />
+                </div>
+
+                <span className="flex-1 text-[13px] font-medium">
+                  Keyboard shortcuts
+                </span>
+
+                {singleKey && <Kbd>?</Kbd>}
+              </PremiumCommandItem>
             </CommandGroup>
 
-            <CommandSeparator />
+            <CommandSeparator className="my-2" />
 
-            <CommandGroup heading="Appearance">
-              {THEMES.map(({ value, label, icon: Icon }) => (
-                <CommandItem
-                  key={value}
-                  value={label}
-                  onSelect={() => run(() => setTheme(value))}
-                  className={itemClass}
-                >
-                  <Icon aria-hidden="true" className={iconClass} />
-                  <span className="flex-1">{label}</span>
-                  {theme === value ? (
-                    <Check
-                      aria-label="Current theme"
-                      className="size-4 text-primary"
-                    />
-                  ) : null}
-                </CommandItem>
-              ))}
+            <CommandGroup>
+              <SectionLabel>Appearance</SectionLabel>
+
+              {THEMES.map(({ value, label, icon: Icon }) => {
+                const active = theme === value;
+
+                return (
+                  <PremiumCommandItem
+                    key={value}
+                    value={label}
+                    onSelect={() => run(() => setTheme(value))}
+                  >
+                    <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/80">
+                      <Icon className={iconClass} />
+                    </div>
+
+                    <span className="flex-1 text-[13px] font-medium">
+                      {label}
+                    </span>
+
+                    {active && (
+                      <Check
+                        aria-label="Current theme"
+                        className="size-4 text-primary"
+                      />
+                    )}
+                  </PremiumCommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
 
-          {/* Hints for the palette itself */}
-          <div
-            aria-hidden="true"
-            className="hidden items-center justify-between gap-3 border-t border-border px-3 py-2 text-xs text-muted-foreground sm:flex"
-          >
-            <span className="inline-flex items-center gap-3">
-              <span className="inline-flex items-center gap-1">
+          {/* Keyboard hints footer */}
+          <div className="hidden items-center justify-between gap-3 border-t border-border/70 bg-muted/20 px-4 py-3 text-[10px] text-muted-foreground sm:flex">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1.5">
                 <Kbd>↑</Kbd>
-                <Kbd>↓</Kbd> Navigate
+                <Kbd>↓</Kbd>
+                Navigate
               </span>
-              <span className="inline-flex items-center gap-1">
-                <Kbd>↵</Kbd> Select
+
+              <span className="flex items-center gap-1.5">
+                <Kbd>↵</Kbd>
+                Select
               </span>
-              <span className="inline-flex items-center gap-1">
-                <Kbd>Esc</Kbd> Close
+
+              <span className="flex items-center gap-1.5">
+                <Kbd>Esc</Kbd>
+                Close
               </span>
+            </div>
+
+            <span className="flex items-center gap-1.5">
+              <Kbd>?</Kbd>
+              Shortcuts
             </span>
-            {singleKey ? (
-              <span className="inline-flex items-center gap-1">
-                <Kbd>?</Kbd> All shortcuts
-              </span>
-            ) : null}
           </div>
         </Command>
       </CommandDialog>
 
-      {/* Keyboard shortcuts help */}
+      {/* Keyboard shortcut help dialog */}
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Keyboard shortcuts</DialogTitle>
+            <div className="mb-2 grid size-11 place-items-center rounded-2xl border border-border bg-muted/70">
+              <Keyboard className="size-5 text-foreground" />
+            </div>
+
+            <DialogTitle className="text-xl font-bold tracking-tight">
+              Keyboard shortcuts
+            </DialogTitle>
+
             <DialogDescription>
-              Move around faster without the mouse.
+              Navigate Apni University faster without leaving your keyboard.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5">
-            <ShortcutSection title="General">
-              <ShortcutRow label="Open search and actions">
-                <Keys keys={[mod, "K"]} joiner="+" />
+          <div className="space-y-6 py-3">
+            <ShortcutSection title="Search and navigation">
+              <ShortcutRow label="Open search">
+                <Keys keys={["Alt", "K"]} joiner="+" />
               </ShortcutRow>
-              <ShortcutRow label="Show this list">
+
+              <ShortcutRow label="Show shortcut guide">
                 <Kbd>?</Kbd>
               </ShortcutRow>
-              <ShortcutRow label="Close any dialog">
+
+              <ShortcutRow label="Close dialog">
                 <Kbd>Esc</Kbd>
               </ShortcutRow>
             </ShortcutSection>
 
-            <ShortcutSection title="Go to">
-              {visibleNav.map((s) => (
-                <ShortcutRow key={s.href} label={s.label}>
-                  <Keys keys={s.keys} />
+            <div className="h-px bg-border/70" />
+
+            <ShortcutSection title="Quick navigation">
+              {visibleNav.map((shortcut) => (
+                <ShortcutRow key={shortcut.href} label={shortcut.label}>
+                  <Keys keys={shortcut.keys} />
                 </ShortcutRow>
               ))}
             </ShortcutSection>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+            <div className="h-px bg-border/70" />
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/80 bg-muted/30 p-3.5 transition-colors hover:bg-muted/50">
               <input
                 type="checkbox"
                 checked={singleKey}
-                onChange={(e) => changeSingleKey(e.target.checked)}
-                className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+                onChange={(event) => changeSingleKey(event.target.checked)}
+                className="mt-0.5 size-4 shrink-0 accent-[#8B5CF6]"
               />
-              <span>
-                <span className="font-medium text-foreground">
-                  Single-key shortcuts
+
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">
+                  Enable single-key shortcuts
                 </span>
-                <span className="block text-xs text-muted-foreground">
-                  Turns <Kbd className="mx-0.5">?</Kbd> and the G shortcuts on
-                  or off. {mod} + K always works.
+
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                  Enables the question-mark shortcut and two-key G navigation
+                  sequences. Alt + K always works.
                 </span>
               </span>
             </label>
@@ -610,56 +833,101 @@ export function CommandPalette() {
         </DialogContent>
       </Dialog>
 
-      {/* One-time tip so people discover the shortcut */}
-      {tip && !open ? (
+      {/* One-time keyboard shortcut tip */}
+      {tip && !open && !helpOpen && (
         <div
           role="status"
-          className="fixed bottom-4 right-4 z-40 hidden max-w-xs items-start gap-3 rounded-xl border border-border bg-popover p-3 pr-2 text-sm text-popover-foreground shadow-lg shadow-foreground/10 md:flex"
+          className={cn(
+            "fixed bottom-5 right-5 z-[60] hidden w-full max-w-sm",
+            "items-start gap-3 rounded-2xl border border-border",
+            "bg-popover p-4 text-popover-foreground",
+            "shadow-2xl shadow-black/10 md:flex",
+          )}
         >
-          <Search
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-primary"
-          />
-          <p className="leading-snug">
-            Tip: press <Keys keys={[mod, "K"]} joiner="+" /> to search anywhere,
-            or <Kbd>?</Kbd> to see all shortcuts.
-          </p>
+          <div className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-muted/60">
+            <span
+              aria-hidden="true"
+              className="absolute inset-x-0 top-0 h-[2px]"
+              style={{
+                background: `linear-gradient(to right, ${BRAND_YELLOW}, ${BRAND_PURPLE})`,
+              }}
+            />
+            <CommandIcon className="size-4" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Work smarter with search</p>
+
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Press <Kbd className="mx-0.5">Alt</Kbd>
+              <span className="text-muted-foreground">+</span>
+              <Kbd className="mx-0.5">K</Kbd>
+              to jump to pages and actions instantly.
+            </p>
+
+            <button
+              type="button"
+              onClick={openPalette}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-foreground underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"
+            >
+              Try it now
+              <ChevronRight className="size-3.5" />
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={markTipSeen}
-            aria-label="Dismiss tip"
-            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Dismiss keyboard shortcut tip"
+            className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <X aria-hidden="true" className="size-4" />
+            <X className="size-4" />
           </button>
         </div>
-      ) : null}
+      )}
     </>
   );
 }
 
-// A search-style button for the Navbar that opens the palette.
+/**
+ * Navbar search trigger.
+ *
+ * Use:
+ * <CommandTrigger />
+ *
+ * The palette opens with Alt + K or this button.
+ */
 export function CommandTrigger({ className }) {
-  const mac = useIsMac();
-
   return (
     <button
       type="button"
-      onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
+      onClick={() => {
+        window.dispatchEvent(new Event(OPEN_EVENT));
+      }}
       aria-label="Search pages and actions"
       className={cn(
-        "group inline-flex h-9 items-center gap-2 rounded-full border border-border bg-background px-3 text-sm text-muted-foreground outline-none transition-[background-color,border-color,color,box-shadow] duration-200",
-        "hover:border-primary/40 hover:bg-accent hover:text-foreground hover:shadow-sm active:scale-95",
-        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "group inline-flex h-9 items-center gap-2 rounded-xl",
+        "border border-border/80 bg-background px-3",
+        "text-sm text-muted-foreground",
+        "outline-none transition-all duration-200",
+        "hover:border-[#8B5CF6]/50 hover:bg-accent hover:text-foreground",
+        "focus-visible:ring-2 focus-visible:ring-[#8B5CF6]",
+        "active:scale-[0.98]",
         "motion-reduce:transition-none motion-reduce:active:scale-100",
         className,
       )}
     >
-      <Search aria-hidden="true" className="size-4" />
+      <Search className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
+
       <span className="hidden xl:inline">Search</span>
-      <kbd className="hidden rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground xl:inline">
-        {mac ? "⌘" : "Ctrl"} K
-      </kbd>
+
+      <span className="hidden items-center gap-1 rounded-md border border-border bg-muted/70 px-1.5 py-1 text-[10px] font-medium text-muted-foreground sm:inline-flex">
+        <span>Alt</span>
+        <span className="opacity-50">+</span>
+        <span>K</span>
+      </span>
     </button>
   );
 }
+
+export default CommandPalette;

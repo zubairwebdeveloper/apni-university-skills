@@ -1,27 +1,80 @@
-import { FiZap } from "react-icons/fi";
+"use client";
+
+import { motion, useReducedMotion } from "framer-motion";
+import { FiCheck, FiZap } from "react-icons/fi";
 import { Card } from "@/components/ui/card";
 
 const tips = [
-  "Ek clear photo lagayein, is se reviews zyada trustworthy lagte hain.",
-  "Headline mein apna goal likhein, jaise “Learning Next.js & Firebase”.",
-  "Bio chhoti rakhein: 2-3 lines kaafi hain.",
-  "Public name mein real naam use karein, kyun ke yeh reviews par dikhta hai.",
+  "Add a clear photo. It makes your reviews feel more trustworthy.",
+  "Use your headline to state your goal, like “Learning Next.js & Firebase”.",
+  "Keep your bio short. Two or three lines are enough.",
+  "Use your real name as your public name, since it appears on reviews.",
 ];
 
 export function ProfileTips() {
+  const reduce = useReducedMotion();
+
+  const container = {
+    hidden: {},
+    show: { transition: { staggerChildren: reduce ? 0 : 0.06 } },
+  };
+
+  const item = {
+    hidden: reduce ? { opacity: 1 } : { opacity: 0, y: 8 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: reduce ? 0 : 0.25, ease: "easeOut" },
+    },
+  };
+
   return (
-    <Card className="bg-gradient-to-br from-primary/5 to-transparent p-5">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <FiZap className="text-primary" /> Profile tips
-      </h3>
-      <ul className="space-y-2 text-sm text-muted-foreground">
+    <Card
+      aria-labelledby="profile-tips-title"
+      className="rounded-2xl border-border p-5 shadow-sm sm:p-6"
+    >
+      <div className="mb-5 flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"
+        >
+          <FiZap className="size-5" />
+        </span>
+        <div className="space-y-1">
+          <h3
+            id="profile-tips-title"
+            className="text-base font-semibold leading-none tracking-tight"
+          >
+            Profile tips
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Small changes that make your profile stand out.
+          </p>
+        </div>
+      </div>
+
+      <motion.ul
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="divide-y divide-border"
+      >
         {tips.map((t) => (
-          <li key={t} className="flex gap-2">
-            <span className="text-primary">•</span>
-            {t}
-          </li>
+          <motion.li
+            key={t}
+            variants={item}
+            className="flex gap-3 py-3 text-sm leading-relaxed text-muted-foreground first:pt-0 last:pb-0"
+          >
+            <span
+              aria-hidden="true"
+              className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"
+            >
+              <FiCheck className="size-3" />
+            </span>
+            <span className="min-w-0">{t}</span>
+          </motion.li>
         ))}
-      </ul>
+      </motion.ul>
     </Card>
   );
 }

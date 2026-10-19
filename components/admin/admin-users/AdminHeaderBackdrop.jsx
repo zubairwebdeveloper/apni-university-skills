@@ -15,7 +15,8 @@
 const DEFAULT_LIGHT = { a: "37 99 235", b: "245 184 46" }; // blue-600 / brand yellow
 const DEFAULT_DARK = { a: "79 140 255", b: "255 200 87" }; // lighter blue / warmer yellow for dark surfaces
 
-// A loose "knowledge graph" — percentages within a 400x200 viewBox.
+// A loose "knowledge graph". x and y are percentages of the backdrop box,
+// r is the node radius in px.
 const NODES = [
   { id: 0, x: 18, y: 38, r: 3.2, accent: false },
   { id: 1, x: 34, y: 20, r: 2.4, accent: false },
@@ -119,42 +120,52 @@ function NodeNetwork({ count }) {
   const edges = EDGES.filter(([a, b]) => ids.has(a) && ids.has(b));
 
   return (
-    <svg
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      className="absolute inset-0 size-full opacity-[0.55]"
-    >
-      {edges.map(([a, b], i) => {
-        const na = NODES[a];
-        const nb = NODES[b];
+    <div className="absolute inset-0 opacity-[0.55]">
+      {/* Lines stretch with the header; non-scaling-stroke keeps them 1px thin */}
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className="absolute inset-0 size-full"
+      >
+        {edges.map(([a, b]) => {
+          const na = NODES[a];
+          const nb = NODES[b];
+          return (
+            <line
+              key={`${a}-${b}`}
+              x1={na.x}
+              y1={na.y}
+              x2={nb.x}
+              y2={nb.y}
+              vectorEffect="non-scaling-stroke"
+              style={{ stroke: "rgb(var(--ea-a) / 0.3)", strokeWidth: 1 }}
+            />
+          );
+        })}
+      </svg>
+
+      {/* Nodes are HTML dots, so they stay round at any header size */}
+      {nodes.map((n) => {
+        const colorVar = n.accent ? "--ea-b" : "--ea-a";
         return (
-          <line
-            key={i}
-            x1={na.x}
-            y1={na.y}
-            x2={nb.x}
-            y2={nb.y}
-            stroke="rgb(var(--ea-a) / 0.3)"
-            strokeWidth="0.25"
+          <span
+            key={n.id}
+            className="ea-pulse absolute rounded-full"
+            style={{
+              left: `${n.x}%`,
+              top: `${n.y}%`,
+              width: n.r * 2,
+              height: n.r * 2,
+              marginLeft: -n.r,
+              marginTop: -n.r,
+              backgroundColor: `rgb(var(${colorVar}))`,
+              boxShadow: `0 0 ${n.r * 3}px rgb(var(${colorVar}) / 0.5)`,
+              animationDelay: `${(n.id % 5) * 0.6}s`,
+            }}
           />
         );
       })}
-      {nodes.map((n) => (
-        <circle
-          key={n.id}
-          cx={n.x}
-          cy={n.y}
-          r={n.r / 10}
-          className="ea-pulse"
-          style={{
-            fill: `rgb(var(${n.accent ? "--ea-b" : "--ea-a"}))`,
-            transformOrigin: `${n.x}px ${n.y}px`,
-            transformBox: "fill-box",
-            animationDelay: `${(n.id % 5) * 0.6}s`,
-          }}
-        />
-      ))}
-    </svg>
+    </div>
   );
 }
 
@@ -164,7 +175,7 @@ export function AdminHeaderBackdrop({ density = "normal" }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden print:hidden"
     >
       <style>{`
         :root {

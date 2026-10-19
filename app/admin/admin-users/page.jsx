@@ -63,7 +63,7 @@ export default async function AdminUsersPage() {
   await requirePermission(P.ADMIN_ACCESS);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 [--ea-a:5_150_105] [--ea-b:37_99_235] dark:[--ea-a:52_211_153] dark:[--ea-b:79_140_255] sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
       {/* Header card */}
       <header className="relative isolate overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500 motion-reduce:animate-none sm:p-8">
         <AdminHeaderBackdrop />
@@ -72,7 +72,7 @@ export default async function AdminUsersPage() {
           <div className="flex min-w-0 items-center gap-4">
             <span
               aria-hidden="true"
-              className="grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[rgb(var(--ea-a))] to-[rgb(var(--ea-b))] text-white shadow-lg shadow-[rgb(var(--ea-a)/0.25)] dark:text-[#080B12]"
+              className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25"
             >
               <Users className="size-6" />
             </span>
@@ -81,7 +81,7 @@ export default async function AdminUsersPage() {
                 Admin users
               </h1>
               <p className="text-sm text-muted-foreground sm:text-base">
-                Jin emails ko dashboard ka access hai.
+                The people who can sign in to this dashboard.
               </p>
             </div>
           </div>
@@ -90,7 +90,7 @@ export default async function AdminUsersPage() {
             href="/admin/admin-users/create"
             className={buttonVariants({
               className:
-                "group relative overflow-hidden border-0 bg-gradient-to-r from-[rgb(var(--ea-a))] to-[rgb(var(--ea-b))] text-white shadow-lg shadow-[rgb(var(--ea-a)/0.25)] transition-all hover:brightness-110 active:scale-95 dark:text-[#080B12] motion-reduce:active:scale-100 sm:shrink-0",
+                "group relative overflow-hidden border-0 bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-95 motion-reduce:active:scale-100 sm:shrink-0",
             })}
           >
             <span
@@ -111,7 +111,7 @@ export default async function AdminUsersPage() {
         {tips.map(({ icon: Icon, title, text, href, cta }) => {
           const body = (
             <>
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[rgb(var(--ea-a)/0.12)] text-[rgb(var(--ea-a))] ring-1 ring-[rgb(var(--ea-a)/0.25)] transition-colors duration-300 group-hover:bg-[rgb(var(--ea-a))] group-hover:text-white dark:group-hover:text-[#080B12] motion-reduce:transition-none">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary ring-1 ring-primary/25 transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none">
                 <Icon aria-hidden="true" className="size-4" />
               </span>
               <span className="min-w-0">
@@ -120,7 +120,7 @@ export default async function AdminUsersPage() {
                   {text}
                 </span>
                 {cta && (
-                  <span className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-[rgb(var(--ea-a))]">
+                  <span className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-primary">
                     {cta}
                     <ArrowRight
                       aria-hidden="true"
@@ -138,7 +138,7 @@ export default async function AdminUsersPage() {
               {href ? (
                 <Link
                   href={href}
-                  className={`${base} hover:-translate-y-0.5 hover:border-[rgb(var(--ea-a)/0.5)] hover:shadow-lg hover:shadow-[rgb(var(--ea-a)/0.10)] motion-reduce:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ea-a))]`}
+                  className={`${base} hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 motion-reduce:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary`}
                 >
                   {body}
                 </Link>

@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,18 +38,41 @@ export function CopyTextButton({
       type="button"
       onClick={handleCopy}
       className={cn(
-        "inline-flex items-center gap-1.5 text-xs transition-colors",
-        copied
-          ? "text-emerald-600 dark:text-emerald-400"
-          : "text-muted-foreground hover:text-foreground",
+        "group inline-flex items-center gap-1.5 rounded-md text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        copied ? "text-primary" : "text-muted-foreground hover:text-foreground",
         className,
       )}
     >
-      {copied ? (
-        <Check aria-hidden="true" className="size-3.5" />
-      ) : (
-        <Copy aria-hidden="true" className="size-3.5" />
-      )}
+      <span className="relative inline-grid size-3.5 place-items-center">
+        <AnimatePresence initial={false} mode="wait">
+          {copied ? (
+            <motion.span
+              key="check"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.6 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 grid place-items-center"
+            >
+              <Check aria-hidden="true" className="size-3.5" />
+            </motion.span>
+          ) : (
+            <motion.span
+              key="copy"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.6 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 grid place-items-center"
+            >
+              <Copy
+                aria-hidden="true"
+                className="size-3.5 transition-transform duration-150 group-hover:scale-110"
+              />
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </span>
       {copied ? "Copied" : label}
     </button>
   );

@@ -1,12 +1,13 @@
 // components/public/CTASection.jsx  (put it where your current CTASection lives)
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AnimatePresence,
   animate,
   motion,
+  useAnimationFrame,
   useInView,
   useMotionTemplate,
   useMotionValue,
@@ -22,6 +23,8 @@ import {
   FiGrid,
   FiHeart,
   FiLayers,
+  FiPause,
+  FiPlay,
   FiPlayCircle,
   FiTool,
   FiTrendingUp,
@@ -29,11 +32,15 @@ import {
   FiZap,
 } from "react-icons/fi";
 
-import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/motion/Reveal";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { cn } from "@/lib/utils";
+
+const EASE = [0.22, 1, 0.36, 1];
+
+const FOCUS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--cta-a))] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /* ------------------------------------------------------------------ */
 /* Content (edit to match your platform)                               */
@@ -145,6 +152,20 @@ const STEP_MS = 4500;
 /* Small pieces                                                        */
 /* ------------------------------------------------------------------ */
 
+// A divided sub-section inside the card, with an optional small label.
+function Block({ label, children }) {
+  return (
+    <div className="relative mx-auto mt-12 max-w-3xl border-t pt-8">
+      {label && (
+        <p className="mb-5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+      )}
+      {children}
+    </div>
+  );
+}
+
 // Number that counts up once it scrolls into view
 function CountUp({ to, suffix = "", decimals = 0 }) {
   const ref = useRef(null);
@@ -152,17 +173,21 @@ function CountUp({ to, suffix = "", decimals = 0 }) {
   const reduce = useReducedMotion();
 
   useEffect(() => {
-    if (!inView || !ref.current) return;
+    const node = ref.current;
+    if (!node) return;
     const fmt = (v) =>
       v.toLocaleString("en-US", {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
       }) + suffix;
 
+    // Reduced motion: show the final number straight away, in view or not.
     if (reduce) {
-      ref.current.textContent = fmt(to);
+      node.textContent = fmt(to);
       return;
     }
+    if (!inView) return;
+
     const controls = animate(0, to, {
       duration: 1.8,
       ease: "easeOut",
@@ -184,7 +209,7 @@ function Stars({ value = 5 }) {
 
   return (
     <span
-      className="flex items-center gap-0.5 text-pink-500"
+      className="flex items-center gap-0.5 text-[rgb(var(--cta-a))]"
       aria-hidden="true"
     >
       {Array.from({ length: 5 }).map((_, i) => {
@@ -220,7 +245,7 @@ function Stars({ value = 5 }) {
   );
 }
 
-// Wraps a button so it leans slightly towards a mouse cursor (not touch)
+// Wraps a button so it leans slightly towards a mouse cursor (never touch or pen)
 function Magnetic({ children, className }) {
   const reduce = useReducedMotion();
   const ref = useRef(null);
@@ -234,13 +259,13 @@ function Magnetic({ children, className }) {
       ref={ref}
       style={{ x: sx, y: sy }}
       className={className}
-      onMouseMove={(e) => {
-        if (reduce || !ref.current) return;
+      onPointerMove={(e) => {
+        if (reduce || e.pointerType !== "mouse" || !ref.current) return;
         const r = ref.current.getBoundingClientRect();
         x.set((e.clientX - (r.left + r.width / 2)) * 0.18);
         y.set((e.clientY - (r.top + r.height / 2)) * 0.25);
       }}
-      onMouseLeave={() => {
+      onPointerLeave={() => {
         x.set(0);
         y.set(0);
       }}
@@ -259,7 +284,7 @@ function AnimatedTitle({ id, text }) {
   return (
     <h2
       id={id}
-      className="relative mx-auto max-w-2xl text-balance text-[clamp(2rem,4vw,3.25rem)] font-semibold leading-tight tracking-tight"
+      className="relative mx-auto max-w-2xl text-balance text-[clamp(2rem,4vw,3.25rem)] font-semibold leading-[1.1] tracking-tight"
     >
       {words.map((w, i) => (
         <motion.span
@@ -271,7 +296,7 @@ function AnimatedTitle({ id, text }) {
           transition={{
             duration: 0.5,
             delay: 0.08 + i * 0.06,
-            ease: [0.22, 1, 0.36, 1],
+            ease: EASE,
           }}
         >
           {w}
@@ -281,17 +306,45 @@ function AnimatedTitle({ id, text }) {
   );
 }
 
-// Scrolling strip of technology topics (static + wrapped for reduced motion)
+function TopicChip({ children }) {
+  return (
+    <li className="shrink-0 pr-2">
+      <span className="block whitespace-nowrap rounded-full border bg-background px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-[rgb(var(--cta-a)/0.5)] hover:text-foreground">
+        {children}
+      </span>
+    </li>
+  );
+}
+
+// Scrolling strip of technology topics. It pauses on hover, and is a static
+// wrapped list for reduced motion. The position is driven manually so the
+// loop is seamless and a pause never causes a jump.
 function TopicStrip({ topics, live, reduce }) {
+  const x = useMotionValue(0);
+  const firstRef = useRef(null);
+  const paused = useRef(false);
+
+  useAnimationFrame((_, delta) => {
+    if (!live || paused.current) return;
+    const width = firstRef.current?.offsetWidth;
+    if (!width) return;
+    let next = x.get() - (width / 32) * (delta / 1000); // one loop per 32s
+    if (next <= -width) next += width;
+    x.set(next);
+  });
+
   if (!topics.length) return null;
 
   if (reduce) {
     return (
-      <ul className="relative mx-auto mt-10 flex max-w-3xl flex-wrap justify-center gap-2">
+      <ul
+        aria-label="Technologies you can learn"
+        className="relative flex flex-wrap justify-center gap-2"
+      >
         {topics.map((t) => (
           <li
             key={t}
-            className="rounded-full border border-border bg-background/70 px-3 py-1 text-xs text-muted-foreground"
+            className="rounded-full border bg-background px-3.5 py-1.5 text-xs text-muted-foreground"
           >
             {t}
           </li>
@@ -300,54 +353,78 @@ function TopicStrip({ topics, live, reduce }) {
     );
   }
 
-  const loop = [...topics, ...topics];
   return (
     <div
-      className="relative mx-auto mt-10 max-w-3xl overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_15%,black_85%,transparent)] [-webkit-mask-image:linear-gradient(90deg,transparent,black_15%,black_85%,transparent)]"
-      aria-label="Technologies you can learn"
+      onPointerEnter={() => {
+        paused.current = true;
+      }}
+      onPointerLeave={() => {
+        paused.current = false;
+      }}
+      className="relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_15%,black_85%,transparent)] [-webkit-mask-image:linear-gradient(90deg,transparent,black_15%,black_85%,transparent)]"
     >
-      <motion.ul
-        className="flex w-max gap-2 will-change-transform"
-        animate={live ? { x: ["0%", "-50%"] } : undefined}
-        transition={{ duration: 32, repeat: Infinity, ease: "linear" }}
-      >
-        {loop.map((t, i) => (
-          <li
-            key={`${t}-${i}`}
-            aria-hidden={i >= topics.length ? "true" : undefined}
-            className="whitespace-nowrap rounded-full border border-border bg-background/70 px-3.5 py-1.5 text-xs text-muted-foreground backdrop-blur-sm"
-          >
-            {t}
-          </li>
-        ))}
-      </motion.ul>
+      <motion.div className="flex w-max will-change-transform" style={{ x }}>
+        <ul
+          ref={firstRef}
+          aria-label="Technologies you can learn"
+          className="flex shrink-0"
+        >
+          {topics.map((t) => (
+            <TopicChip key={t}>{t}</TopicChip>
+          ))}
+        </ul>
+        {/* Duplicate for the seamless loop, hidden from assistive tech */}
+        <ul aria-hidden="true" className="flex shrink-0">
+          {topics.map((t) => (
+            <TopicChip key={`${t}-copy`}>{t}</TopicChip>
+          ))}
+        </ul>
+      </motion.div>
     </div>
   );
 }
 
-// Interactive steps: click a step to read more; auto-advances while visible
+// Interactive steps: click a step to read more. Auto-advances while visible,
+// pauses on hover and focus, and has an explicit pause button.
 function StepTabs({ steps, live, reduce }) {
+  const uid = useId();
   const [active, setActive] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [hoverPaused, setHoverPaused] = useState(false);
+  const [manualPause, setManualPause] = useState(false);
+
+  const auto = live && !hoverPaused && !manualPause;
 
   useEffect(() => {
-    if (!live || paused) return;
+    if (!auto) return;
     const t = setTimeout(
       () => setActive((a) => (a + 1) % steps.length),
       STEP_MS,
     );
     return () => clearTimeout(t);
-  }, [active, live, paused, steps.length]);
+  }, [active, auto, steps.length]);
 
-  const auto = live && !paused;
+  function onKeyDown(e) {
+    const n = steps.length;
+    let next;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown")
+      next = (active + 1) % n;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp")
+      next = (active - 1 + n) % n;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = n - 1;
+    else return;
+    e.preventDefault();
+    setActive(next);
+    document.getElementById(`${uid}-tab-${next}`)?.focus();
+  }
 
   return (
     <div
-      className="relative mx-auto mt-10 max-w-3xl"
-      onPointerEnter={() => setPaused(true)}
-      onPointerLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
+      className="relative mx-auto max-w-3xl"
+      onPointerEnter={() => setHoverPaused(true)}
+      onPointerLeave={() => setHoverPaused(false)}
+      onFocus={() => setHoverPaused(true)}
+      onBlur={() => setHoverPaused(false)}
     >
       <div
         role="tablist"
@@ -361,19 +438,15 @@ function StepTabs({ steps, live, reduce }) {
               key={t}
               type="button"
               role="tab"
-              id={`cta-step-${i}`}
+              id={`${uid}-tab-${i}`}
               aria-selected={on}
-              aria-controls="cta-step-panel"
+              aria-controls={`${uid}-panel`}
               tabIndex={on ? 0 : -1}
               onClick={() => setActive(i)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowRight")
-                  setActive((active + 1) % steps.length);
-                if (e.key === "ArrowLeft")
-                  setActive((active - 1 + steps.length) % steps.length);
-              }}
+              onKeyDown={onKeyDown}
               className={cn(
-                "relative cursor-pointer overflow-hidden rounded-2xl border bg-background/80 p-4 text-left backdrop-blur-sm transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--cta-a))] motion-reduce:transition-none",
+                "relative cursor-pointer overflow-hidden rounded-2xl border bg-background p-4 text-left transition-[border-color,box-shadow] duration-300 motion-reduce:transition-none",
+                FOCUS,
                 on
                   ? "border-[rgb(var(--cta-a)/0.6)] shadow-lg shadow-[rgb(var(--cta-a)/0.12)]"
                   : "border-border hover:border-[rgb(var(--cta-b)/0.45)]",
@@ -384,7 +457,7 @@ function StepTabs({ steps, live, reduce }) {
                   className={cn(
                     "grid size-9 shrink-0 place-items-center rounded-xl ring-1 transition-colors duration-300 motion-reduce:transition-none",
                     on
-                      ? "bg-[rgb(var(--cta-a))] text-white ring-transparent"
+                      ? "bg-[rgb(var(--cta-a))] text-[rgb(var(--cta-on))] ring-transparent"
                       : "bg-[rgb(var(--cta-a)/0.12)] text-[rgb(var(--cta-a))] ring-[rgb(var(--cta-a)/0.2)]",
                   )}
                 >
@@ -397,7 +470,7 @@ function StepTabs({ steps, live, reduce }) {
                   <span className="block text-sm font-semibold">{t}</span>
                 </span>
               </span>
-              <span className="mt-2 block text-sm text-muted-foreground">
+              <span className="mt-2 block text-sm leading-relaxed text-muted-foreground">
                 {d}
               </span>
 
@@ -424,12 +497,13 @@ function StepTabs({ steps, live, reduce }) {
         })}
       </div>
 
+      {/* Announced politely only when it is not auto-advancing */}
       <div
-        id="cta-step-panel"
+        id={`${uid}-panel`}
         role="tabpanel"
-        aria-labelledby={`cta-step-${active}`}
-        aria-live="polite"
-        className="mt-3 min-h-[3.25rem] rounded-xl border border-dashed border-border bg-background/60 px-4 py-3 text-sm text-foreground/85 backdrop-blur-sm"
+        aria-labelledby={`${uid}-tab-${active}`}
+        aria-live={auto ? "off" : "polite"}
+        className="mt-3 min-h-[3.25rem] rounded-xl border border-dashed bg-background px-4 py-3 text-left text-sm leading-relaxed text-foreground/85"
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.p
@@ -443,16 +517,37 @@ function StepTabs({ steps, live, reduce }) {
           </motion.p>
         </AnimatePresence>
       </div>
+
+      {!reduce && (
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setManualPause((p) => !p)}
+            aria-pressed={manualPause}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground",
+              FOCUS,
+            )}
+          >
+            {manualPause ? (
+              <FiPlay aria-hidden="true" className="size-3" />
+            ) : (
+              <FiPause aria-hidden="true" className="size-3" />
+            )}
+            {manualPause ? "Resume steps" : "Pause steps"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-// Small glass chip that floats gently beside the card content (wide screens)
+// Small chip that floats gently beside the card content (wide screens)
 function FloatChip({ icon: Icon, children, className, delay = 0, live }) {
   return (
     <motion.div
       className={cn(
-        "absolute hidden items-center gap-2 rounded-xl border border-border bg-background/75 px-3 py-2 text-xs font-medium shadow-lg shadow-black/[0.05] backdrop-blur-md xl:flex",
+        "absolute hidden items-center gap-2 rounded-xl border bg-background px-3 py-2 text-xs font-medium shadow-lg shadow-black/[0.05] xl:flex",
         className,
       )}
       animate={live ? { y: [0, -8, 0] } : undefined}
@@ -545,15 +640,6 @@ function OrbitRing({ size, live, duration, reverse, dotClass, className }) {
   );
 }
 
-const PARTICLES = [
-  { x: "12%", y: "22%", s: 5, d: 7 },
-  { x: "28%", y: "70%", s: 4, d: 9 },
-  { x: "44%", y: "12%", s: 3, d: 8 },
-  { x: "63%", y: "78%", s: 5, d: 10 },
-  { x: "78%", y: "26%", s: 4, d: 7.5 },
-  { x: "90%", y: "62%", s: 3, d: 9.5 },
-];
-
 function Backdrop({ live, px, py }) {
   // gentle parallax of the whole 3D stage following the cursor
   const rotY = useTransform(px, [-0.5, 0.5], [-7, 7]);
@@ -569,13 +655,13 @@ function Backdrop({ live, px, py }) {
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(135deg, rgb(var(--cta-a) / 0.10), transparent 45%, rgb(var(--cta-b) / 0.10))",
+            "linear-gradient(135deg, rgb(var(--cta-a) / 0.08), transparent 45%, rgb(var(--cta-b) / 0.08))",
         }}
       />
 
       {/* Dot grid texture, fades out towards the bottom */}
       <div
-        className="absolute inset-0 opacity-[0.35] [mask-image:linear-gradient(to_bottom,black_30%,transparent_85%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_85%)]"
+        className="absolute inset-0 opacity-[0.3] [mask-image:linear-gradient(to_bottom,black_30%,transparent_85%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_85%)]"
         style={{
           backgroundImage:
             "radial-gradient(rgb(var(--cta-a) / 0.35) 1px, transparent 1px)",
@@ -588,7 +674,7 @@ function Backdrop({ live, px, py }) {
         className="absolute -left-1/4 -top-1/2 h-[130%] w-3/4 will-change-transform"
         style={{
           background:
-            "radial-gradient(closest-side, rgb(var(--cta-a) / 0.22), transparent)",
+            "radial-gradient(closest-side, rgb(var(--cta-a) / 0.2), transparent)",
         }}
         animate={
           live
@@ -601,7 +687,7 @@ function Backdrop({ live, px, py }) {
         className="absolute -bottom-1/2 -right-1/4 h-[130%] w-3/4 will-change-transform"
         style={{
           background:
-            "radial-gradient(closest-side, rgb(var(--cta-b) / 0.22), transparent)",
+            "radial-gradient(closest-side, rgb(var(--cta-b) / 0.2), transparent)",
         }}
         animate={
           live
@@ -627,7 +713,7 @@ function Backdrop({ live, px, py }) {
             style={{ perspective: 480 }}
           >
             <div
-              className="absolute inset-x-[-60%] -top-[40%] h-[220%] origin-center opacity-[0.35]"
+              className="absolute inset-x-[-60%] -top-[40%] h-[220%] origin-center opacity-[0.3]"
               style={{ transform: "rotateX(64deg)" }}
             >
               <motion.div
@@ -677,42 +763,14 @@ function Backdrop({ live, px, py }) {
           </div>
         </motion.div>
       </div>
-
-      {/* Drifting particles */}
-      {PARTICLES.map((p, i) => (
-        <motion.span
-          key={i}
-          className="absolute rounded-full bg-[rgb(var(--cta-a))] will-change-transform"
-          style={{
-            left: p.x,
-            top: p.y,
-            width: p.s,
-            height: p.s,
-            opacity: 0.55,
-          }}
-          animate={
-            live ? { y: [0, -18, 0], opacity: [0.25, 0.8, 0.25] } : undefined
-          }
-          transition={{
-            duration: p.d,
-            delay: i * 0.6,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-      ))}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Auth-aware buttons                                                  */
-/* Logged out: "Create free account" -> /register                      */
-/* Logged in:  "Go to dashboard"     -> /student (or role dashboard)   */
-/* ------------------------------------------------------------------ */
-
-/* ------------------------------------------------------------------ */
 /* Section                                                             */
+/* Logged out: "Create free account" -> /register                      */
+/* Logged in:  "Go to dashboard"     -> role dashboard (or /student)   */
 /* ------------------------------------------------------------------ */
 
 // `rating`, `learners` and `stats` are optional: they only render when you
@@ -764,7 +822,11 @@ export function CTASection({
   ];
 
   return (
-    <section className="pb-16 sm:pb-20 lg:pb-24" aria-labelledby="final-cta">
+    <section
+      className="pb-16 sm:pb-20 lg:pb-24"
+      aria-labelledby="final-cta"
+      aria-busy={loading ? true : undefined}
+    >
       <Container>
         <Reveal>
           {/* Outer shell draws the animated gradient border */}
@@ -784,8 +846,9 @@ export function CTASection({
               pxRaw.set(0);
               pyRaw.set(0);
             }}
-            // Two pink tones per theme (RGB triplets): a deep pink paired with rose.
-            className="relative isolate overflow-hidden rounded-3xl bg-border p-px shadow-xl [--cta-a:219_39_119] [--cta-b:244_63_94] dark:[--cta-a:244_114_182] dark:[--cta-b:251_113_133]"
+            // Two pink tones per theme (RGB triplets), plus the text color used
+            // on top of them (white on the deep pink, dark on the lighter pink).
+            className="relative isolate overflow-hidden rounded-3xl bg-border p-px shadow-xl [--cta-a:219_39_119] [--cta-b:244_63_94] [--cta-on:255_255_255] dark:[--cta-a:244_114_182] dark:[--cta-b:251_113_133] dark:[--cta-on:35_10_24]"
           >
             {/* Slowly rotating conic highlight that travels around the edge */}
             <motion.div
@@ -799,7 +862,7 @@ export function CTASection({
               transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
             />
 
-            <div className="relative isolate overflow-hidden rounded-[calc(1.5rem-1px)] bg-card px-6 py-14 text-center text-card-foreground sm:px-12 sm:py-16">
+            <div className="relative isolate overflow-hidden rounded-[calc(1.5rem-1px)] bg-card px-5 py-14 text-center text-card-foreground sm:px-10 sm:py-16 lg:px-16 lg:py-20">
               <Backdrop live={live} px={px} py={py} />
 
               {!reduce && (
@@ -837,7 +900,7 @@ export function CTASection({
 
               {/* ---------- Content ---------- */}
 
-              <div className="relative mx-auto mb-5 flex flex-wrap items-center justify-center gap-2">
+              <div className="relative mx-auto mb-6 flex flex-wrap items-center justify-center gap-2">
                 {badge && (
                   <span className="inline-flex items-center gap-2 rounded-full border border-[rgb(var(--cta-a)/0.35)] bg-[rgb(var(--cta-a)/0.10)] px-3.5 py-1.5 text-xs font-medium">
                     <span className="relative flex size-2">
@@ -850,7 +913,7 @@ export function CTASection({
                   </span>
                 )}
                 {showRating && (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background/70 px-4 py-1.5 text-xs font-medium backdrop-blur-sm">
+                  <span className="inline-flex items-center gap-2 rounded-full border bg-background px-4 py-1.5 text-xs font-medium">
                     {Number(ratingValue) > 0 && (
                       <Stars value={Number(ratingValue)} />
                     )}
@@ -862,14 +925,42 @@ export function CTASection({
               {/* key replays the word animation once auth resolves */}
               <AnimatedTitle key={heading} id="final-cta" text={heading} />
 
-              <p className="relative mx-auto mt-4 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg">
+              <p className="relative mx-auto mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
                 {body}
               </p>
+
+              {/* Primary / secondary actions */}
+              <div className="relative mx-auto mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Magnetic>
+                  <Link
+                    href={user ? dashboard : "/register"}
+                    className={cn(
+                      "group inline-flex min-h-12 items-center gap-2 rounded-full bg-[rgb(var(--cta-a))] px-7 text-sm font-semibold text-[rgb(var(--cta-on))] shadow-lg shadow-[rgb(var(--cta-a)/0.35)] transition-transform hover:scale-[1.03] motion-reduce:transition-none motion-reduce:hover:scale-100",
+                      FOCUS,
+                    )}
+                  >
+                    {user ? "Go to dashboard" : "Create free account"}
+                    <FiArrowRight
+                      className="size-4 transition-transform duration-300 motion-safe:group-hover:translate-x-0.5"
+                      aria-hidden="true"
+                    />
+                  </Link>
+                </Magnetic>
+                <Link
+                  href={user ? secondaryHref : primaryHref}
+                  className={cn(
+                    "inline-flex min-h-12 items-center gap-2 rounded-full border border-[rgb(var(--cta-a)/0.4)] bg-background px-7 text-sm font-semibold text-foreground transition-colors hover:border-[rgb(var(--cta-a)/0.7)] motion-reduce:transition-none",
+                    FOCUS,
+                  )}
+                >
+                  Browse courses
+                </Link>
+              </div>
 
               {/* Trust highlights */}
               <ul
                 key={user ? "member" : "guest"}
-                className="relative mx-auto mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+                className="relative mx-auto mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
               >
                 {highlights.map(({ icon: Icon, text: h }, i) => (
                   <motion.li
@@ -889,36 +980,20 @@ export function CTASection({
                 ))}
               </ul>
 
-              {/* Primary / secondary actions */}
-              <div className="relative mx-auto mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Magnetic>
-                  <Link
-                    href={user ? dashboard : "/register"}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[rgb(var(--cta-a))] px-6 text-sm font-semibold text-white shadow-lg shadow-[rgb(var(--cta-a)/0.35)] transition-transform hover:scale-[1.03] motion-reduce:transition-none motion-reduce:hover:scale-100"
-                  >
-                    {user ? "Go to dashboard" : "Create free account"}
-                    <FiArrowRight className="size-4" aria-hidden="true" />
-                  </Link>
-                </Magnetic>
-                <Link
-                  href={user ? secondaryHref : primaryHref}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[rgb(var(--cta-a)/0.4)] bg-background/70 px-6 text-sm font-semibold text-foreground backdrop-blur-sm transition-colors hover:border-[rgb(var(--cta-a)/0.7)] motion-reduce:transition-none"
-                >
-                  Browse courses
-                </Link>
-              </div>
-
               {/* Quick links to the learning paths */}
               <nav
                 aria-label="Learning paths"
-                className="relative mx-auto mt-5 flex max-w-2xl flex-wrap items-center justify-center gap-x-2 gap-y-2 text-xs"
+                className="relative mx-auto mt-6 flex max-w-2xl flex-wrap items-center justify-center gap-2 text-xs"
               >
                 <span className="text-muted-foreground">Jump to a path:</span>
                 {PATH_LINKS.map((p) => (
                   <Link
                     key={p.id}
                     href={`/courses?category=${p.id}`}
-                    className="rounded-full border border-border bg-background/60 px-3 py-1 font-medium text-foreground/85 backdrop-blur-sm transition-colors hover:border-[rgb(var(--cta-a)/0.6)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--cta-a))] motion-reduce:transition-none"
+                    className={cn(
+                      "rounded-full border bg-background px-3 py-1 font-medium text-foreground/85 transition-colors hover:border-[rgb(var(--cta-a)/0.6)] hover:text-foreground motion-reduce:transition-none",
+                      FOCUS,
+                    )}
                   >
                     {p.label}
                   </Link>
@@ -926,37 +1001,45 @@ export function CTASection({
               </nav>
 
               {/* How it works (interactive); remounts when the steps change */}
-              <StepTabs
-                key={user ? "member-steps" : "guest-steps"}
-                steps={steps}
-                live={live}
-                reduce={reduce}
-              />
+              <Block label="How it works">
+                <StepTabs
+                  key={user ? "member-steps" : "guest-steps"}
+                  steps={steps}
+                  live={live}
+                  reduce={reduce}
+                />
+              </Block>
 
               {/* Technology topics */}
-              <TopicStrip topics={topics} live={live} reduce={reduce} />
+              {topics.length > 0 && (
+                <Block label="Technologies you can learn">
+                  <TopicStrip topics={topics} live={live} reduce={reduce} />
+                </Block>
+              )}
 
               {/* Real numbers only */}
               {allStats.length > 0 && (
-                <dl className="relative mx-auto mt-10 flex max-w-3xl flex-wrap items-stretch justify-center gap-3">
-                  {allStats.map((s) => (
-                    <div
-                      key={s.label}
-                      className="min-w-[8.5rem] flex-1 rounded-2xl border border-border bg-background/70 px-4 py-3 backdrop-blur-sm"
-                    >
-                      <dt className="text-xs text-muted-foreground">
-                        {s.label}
-                      </dt>
-                      <dd className="text-2xl font-semibold tabular-nums text-[rgb(var(--cta-a))]">
-                        <CountUp
-                          to={Number(s.value)}
-                          suffix={s.suffix || ""}
-                          decimals={s.decimals || 0}
-                        />
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <Block>
+                  <dl className="relative flex flex-wrap items-stretch justify-center gap-3">
+                    {allStats.map((s) => (
+                      <div
+                        key={s.label}
+                        className="min-w-[8.5rem] flex-1 rounded-2xl border bg-background px-4 py-3"
+                      >
+                        <dt className="text-xs text-muted-foreground">
+                          {s.label}
+                        </dt>
+                        <dd className="mt-0.5 text-2xl font-semibold tabular-nums text-[rgb(var(--cta-a))]">
+                          <CountUp
+                            to={Number(s.value)}
+                            suffix={s.suffix || ""}
+                            decimals={s.decimals || 0}
+                          />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </Block>
               )}
             </div>
           </div>

@@ -250,6 +250,32 @@ const wordCount = [
   .filter(Boolean).length;
 const readMinutes = Math.max(1, Math.round(wordCount / 220));
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+/* Shared motion variants. MotionConfig reducedMotion="user" disables the
+   transform animations for people who prefer reduced motion. */
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
+};
+
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08 } },
+};
+
+const inView = { once: true, margin: "-60px" };
+
+function Eyebrow({ children }) {
+  return (
+    <p className="inline-flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+      <span aria-hidden="true" className="h-px w-6 bg-primary" />
+      {children}
+    </p>
+  );
+}
+
 function ScrollProgressBar() {
   const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll();
@@ -293,7 +319,7 @@ function BackToTop() {
       aria-label="Back to top"
       aria-hidden={!visible}
       tabIndex={visible ? 0 : -1}
-      className={`fixed bottom-6 right-6 z-40 flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none ${
+      className={`fixed bottom-6 right-6 z-40 flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${focusRing} ${
         visible ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
@@ -335,6 +361,11 @@ export default function PrivacyContent() {
     return () => observer.disconnect();
   }, [visibleKey]);
 
+  const activeNumber = Math.max(
+    1,
+    sections.findIndex((s) => s.id === activeId) + 1,
+  );
+
   return (
     <MotionConfig reducedMotion="user">
       {/* overflow-x-clip (not hidden) so the sticky table of contents keeps working */}
@@ -352,38 +383,66 @@ export default function PrivacyContent() {
 
         {/* Hero with a 3D shield scene */}
         <section className="border-b">
-          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
-            <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-20">
+          <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+            <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-24">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
                 className="max-w-3xl"
               >
-                <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+                <Eyebrow>Privacy Policy</Eyebrow>
+
+                <h1 className="mt-5 text-balance text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                   Privacy, explained{" "}
                   <span className="text-primary">simply.</span>
                 </h1>
 
-                <p className="mt-6 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
+                <p className="mt-6 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
                   We believe learning should feel empowering, and your personal
                   information should feel protected. Here is how Apni University
                   collects, uses, and safeguards your information.
                 </p>
 
                 <ul className="mt-8 flex flex-wrap gap-2">
-                  <li className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm text-foreground">
+                  <li className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm">
                     <FileCheck2
                       className="size-4 text-primary"
                       aria-hidden="true"
                     />
                     Effective: October 7, 2026
                   </li>
-                  <li className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm text-foreground">
+                  <li className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm">
                     <Clock className="size-4 text-primary" aria-hidden="true" />
                     {readMinutes} min read
                   </li>
                 </ul>
+
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <a
+                    href="#your-rights"
+                    className={buttonVariants({
+                      size: "lg",
+                      className: `group/btn min-h-11 ${focusRing}`,
+                    })}
+                  >
+                    Your choices and rights
+                    <ArrowRight
+                      className="size-4 transition-transform duration-200 group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                      aria-hidden="true"
+                    />
+                  </a>
+                  <Link
+                    href="/contact"
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "lg",
+                      className: "min-h-11",
+                    })}
+                  >
+                    Contact us
+                  </Link>
+                </div>
               </motion.div>
 
               {/* 3D scene: depth layers + orbit ring, pointer-responsive on desktop */}
@@ -417,108 +476,168 @@ export default function PrivacyContent() {
           </div>
         </section>
 
-        {/* Key facts: one quiet strip */}
+        {/* Key facts */}
         <section aria-label="Privacy at a glance" className="border-b">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <dl className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+            <motion.dl
+              variants={stagger}
+              initial="hidden"
+              whileInView="show"
+              viewport={inView}
+              className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
+            >
               {stats.map((stat) => (
-                <div
+                <motion.div
                   key={stat.label}
-                  className="flex flex-col-reverse items-center gap-1 px-3 py-6 text-center"
+                  variants={fadeUp}
+                  className="flex min-w-0 flex-col-reverse justify-end gap-2 rounded-2xl border bg-card p-5 shadow-sm"
                 >
-                  <dt className="text-xs text-muted-foreground sm:text-sm">
+                  <dt className="text-xs leading-snug text-muted-foreground sm:text-sm">
                     {stat.label}
                   </dt>
-                  <dd className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  <dd className="text-3xl font-bold leading-none tracking-tight text-primary sm:text-4xl">
                     {stat.value}
                   </dd>
-                </div>
+                </motion.div>
               ))}
-            </dl>
+            </motion.dl>
           </div>
         </section>
 
-        {/* Highlights: open columns */}
+        {/* Highlights */}
         <section
           aria-labelledby="highlights-title"
           className="border-b bg-muted/30"
         >
-          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-16">
-            <h2
-              id="highlights-title"
-              className="max-w-xl text-balance text-3xl font-bold tracking-tight sm:text-4xl"
+          <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              whileInView="show"
+              viewport={inView}
+              className="max-w-2xl"
             >
-              The short version
-            </h2>
-            <ul className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+              <Eyebrow>At a glance</Eyebrow>
+              <h2
+                id="highlights-title"
+                className="mt-3 text-balance text-3xl font-bold leading-[1.1] tracking-tight sm:text-4xl"
+              >
+                The short version
+              </h2>
+              <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg">
+                Four principles that guide how we handle your information.
+              </p>
+            </motion.div>
+
+            <motion.ul
+              variants={stagger}
+              initial="hidden"
+              whileInView="show"
+              viewport={inView}
+              className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6"
+            >
               {highlights.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <li
+                  <motion.li
                     key={item.title}
-                    className="border-t-2 border-primary pt-5"
+                    variants={fadeUp}
+                    className="group min-w-0 rounded-2xl border bg-card p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                   >
-                    <Icon className="size-6 text-primary" aria-hidden="true" />
-                    <h3 className="mt-3 text-base font-semibold">
+                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none">
+                      <Icon className="size-5" aria-hidden="true" />
+                    </span>
+                    <h3 className="mt-5 text-base font-semibold text-foreground">
                       {item.title}
                     </h3>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground sm:text-base">
+                    <p className="mt-1.5 text-sm leading-6 text-muted-foreground sm:text-base">
                       {item.description}
                     </p>
-                  </li>
+                  </motion.li>
                 );
               })}
-            </ul>
+            </motion.ul>
           </div>
         </section>
 
         {/* Policy */}
-        <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
-          <div className="grid gap-10 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-14">
+        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+          <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-16">
             {/* Table of contents (desktop) with the section being read highlighted */}
             <aside className="hidden lg:block">
-              <div className="sticky top-24">
-                <div className="mb-3 flex items-center gap-2">
-                  <BookOpen
-                    className="size-4 text-primary"
-                    aria-hidden="true"
-                  />
-                  <h2 className="font-semibold">On this page</h2>
+              <div className="sticky top-24 space-y-5">
+                <div className="rounded-2xl border bg-card p-3 shadow-sm">
+                  <div className="mb-2 flex items-center justify-between gap-2 px-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <BookOpen
+                        className="size-4 text-primary"
+                        aria-hidden="true"
+                      />
+                      <h2 className="text-sm font-semibold">On this page</h2>
+                    </div>
+                    <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                      {String(activeNumber).padStart(2, "0")} /{" "}
+                      {String(sections.length).padStart(2, "0")}
+                    </span>
+                  </div>
+
+                  <nav
+                    aria-label="Privacy policy sections"
+                    className="max-h-[52vh] space-y-0.5 overflow-y-auto p-1"
+                  >
+                    {toc.map((item) => {
+                      const active = activeId === item.id;
+                      return (
+                        <a
+                          key={item.id}
+                          href={`#${item.id}`}
+                          aria-current={active ? "location" : undefined}
+                          className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm transition-colors motion-reduce:transition-none ${focusRing} ${
+                            active
+                              ? "bg-primary/10 font-semibold text-primary"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <ChevronRight
+                            className={`mt-0.5 size-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
+                              active ? "translate-x-0.5" : ""
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span>{item.heading}</span>
+                        </a>
+                      );
+                    })}
+                  </nav>
                 </div>
 
-                <nav
-                  aria-label="Privacy policy sections"
-                  className="max-h-[65vh] space-y-0.5 overflow-y-auto pr-1"
-                >
-                  {toc.map((item) => {
-                    const active = activeId === item.id;
-                    return (
-                      <a
-                        key={item.id}
-                        href={`#${item.id}`}
-                        aria-current={active ? "location" : undefined}
-                        className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${
-                          active
-                            ? "bg-primary/10 font-medium text-primary"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                      >
-                        <ChevronRight
-                          className="mt-0.5 size-4 shrink-0"
-                          aria-hidden="true"
-                        />
-                        <span>{item.heading}</span>
-                      </a>
-                    );
-                  })}
-                </nav>
+                <div className="rounded-2xl border bg-card p-5 shadow-sm">
+                  <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <Mail className="size-4" aria-hidden="true" />
+                  </span>
+                  <p className="mt-3 text-sm font-semibold text-foreground">
+                    Questions about your data?
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    Ask for access, correction, or deletion.
+                  </p>
+                  <Link
+                    href="/contact"
+                    className={`mt-3 inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline ${focusRing}`}
+                  >
+                    Contact us
+                    <ArrowRight className="size-3.5" aria-hidden="true" />
+                  </Link>
+                </div>
               </div>
             </aside>
 
             <div className="min-w-0">
               {/* Table of contents (mobile) */}
-              <details className="group mb-6 rounded-xl border bg-card lg:hidden">
-                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              <details className="group mb-6 rounded-2xl border bg-card shadow-sm lg:hidden">
+                <summary
+                  className={`flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden`}
+                >
                   <span className="inline-flex items-center gap-2">
                     <BookOpen
                       className="size-4 text-primary"
@@ -539,7 +658,7 @@ export default function PrivacyContent() {
                     <a
                       key={item.id}
                       href={`#${item.id}`}
-                      className="block rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                      className={`block rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring ${"outline-none"}`}
                     >
                       {item.heading}
                     </a>
@@ -563,14 +682,14 @@ export default function PrivacyContent() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search this policy, e.g. Stripe, cookies, deletion"
-                    className="h-12 w-full rounded-xl border bg-card pl-11 pr-11 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-12 w-full rounded-xl border bg-card pl-11 pr-11 text-sm text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
                   />
                   {query && (
                     <button
                       type="button"
                       onClick={() => setQuery("")}
                       aria-label="Clear search"
-                      className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                      className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <X className="size-4" aria-hidden="true" />
                     </button>
@@ -578,7 +697,7 @@ export default function PrivacyContent() {
                 </div>
                 <p
                   aria-live="polite"
-                  className="mt-2 text-sm text-muted-foreground"
+                  className="mt-2.5 text-sm text-muted-foreground"
                 >
                   {query.trim()
                     ? `${filtered.length} of ${sections.length} sections match`
@@ -588,13 +707,18 @@ export default function PrivacyContent() {
 
               {/* Approach */}
               {!query.trim() && (
-                <div className="mb-10 flex gap-4 border-b pb-10">
-                  <ShieldCheck
-                    className="mt-1 size-6 shrink-0 text-primary"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <h2 className="text-xl font-semibold">
+                <motion.div
+                  variants={fadeUp}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={inView}
+                  className="mb-10 flex gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-6 sm:p-7"
+                >
+                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
+                    <ShieldCheck className="size-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-xl font-semibold tracking-tight">
                       Our approach to privacy
                     </h2>
                     <p className="mt-2 max-w-3xl leading-7 text-muted-foreground">
@@ -606,41 +730,45 @@ export default function PrivacyContent() {
                       security controls appropriate for the service we provide.
                     </p>
                   </div>
-                </div>
+                </motion.div>
               )}
 
               {/* Sections */}
               {filtered.length > 0 ? (
-                <div>
+                <div className="space-y-5">
                   {filtered.map((section) => {
                     const Icon = section.icon;
                     const number = sections.indexOf(section) + 1;
 
                     return (
-                      <article
+                      <motion.article
                         key={section.id}
                         id={section.id}
-                        className="scroll-mt-24 border-t py-8 first:border-t-0 first:pt-0"
+                        variants={fadeUp}
+                        initial="hidden"
+                        whileInView="show"
+                        viewport={{ once: true, margin: "-40px" }}
+                        className="scroll-mt-24 rounded-2xl border bg-card p-6 shadow-sm transition-colors hover:border-primary/30 motion-reduce:transition-none sm:p-8"
                       >
-                        <div className="flex items-start gap-4">
-                          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                        <div className="flex items-start gap-4 sm:gap-5">
+                          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                             <Icon className="size-5" aria-hidden="true" />
                           </span>
 
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold tabular-nums text-primary">
+                            <p className="text-xs font-semibold uppercase tracking-[0.12em] tabular-nums text-primary">
                               Section {String(number).padStart(2, "0")}
                             </p>
 
-                            <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
+                            <h2 className="mt-1.5 text-balance text-xl font-bold leading-snug tracking-tight sm:text-2xl">
                               {section.heading}
                             </h2>
 
-                            <div className="mt-4 max-w-3xl space-y-4">
+                            <div className="mt-5 max-w-3xl space-y-4">
                               {section.body.map((paragraph) => (
                                 <p
                                   key={paragraph}
-                                  className="text-sm leading-7 text-muted-foreground sm:text-base"
+                                  className="text-sm leading-7 text-muted-foreground sm:text-base sm:leading-8"
                                 >
                                   {paragraph}
                                 </p>
@@ -648,13 +776,18 @@ export default function PrivacyContent() {
                             </div>
                           </div>
                         </div>
-                      </article>
+                      </motion.article>
                     );
                   })}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed p-8 text-center">
-                  <p className="font-medium">No sections match your search.</p>
+                <div className="rounded-2xl border border-dashed bg-card p-10 text-center">
+                  <span className="mx-auto grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
+                    <Search className="size-5" aria-hidden="true" />
+                  </span>
+                  <p className="mt-4 font-semibold">
+                    No sections match your search.
+                  </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Try a different word, or clear the search to read the whole
                     policy.
@@ -664,7 +797,7 @@ export default function PrivacyContent() {
                     onClick={() => setQuery("")}
                     className={buttonVariants({
                       variant: "outline",
-                      className: "mt-4",
+                      className: "mt-5 min-h-11",
                     })}
                   >
                     Clear search
@@ -673,15 +806,11 @@ export default function PrivacyContent() {
               )}
 
               {/* FAQ */}
-              <section
-                aria-labelledby="privacy-faq"
-                className="mt-12 border-t pt-10"
-              >
+              <section aria-labelledby="privacy-faq" className="mt-16">
                 <div className="mb-6 flex items-center gap-3">
-                  <HelpCircle
-                    className="size-6 text-primary"
-                    aria-hidden="true"
-                  />
+                  <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <HelpCircle className="size-5" aria-hidden="true" />
+                  </span>
                   <h2
                     id="privacy-faq"
                     className="text-xl font-bold tracking-tight sm:text-2xl"
@@ -690,31 +819,56 @@ export default function PrivacyContent() {
                   </h2>
                 </div>
 
-                <div className="divide-y divide-border border-y border-border">
-                  {faqs.map((faq) => (
-                    <details key={faq.q} className="group py-1">
-                      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-left text-base font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                        {faq.q}
-                        <ChevronRight
-                          className="size-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
-                          aria-hidden="true"
-                        />
+                <motion.div
+                  variants={stagger}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={inView}
+                  className="space-y-3"
+                >
+                  {faqs.map((faq, i) => (
+                    <motion.details
+                      key={faq.q}
+                      variants={fadeUp}
+                      className="group rounded-xl border bg-card px-5 shadow-sm transition-colors hover:border-primary/30 open:border-primary/30 motion-reduce:transition-none sm:px-6"
+                    >
+                      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-4 text-left text-base font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                        <span className="flex min-w-0 items-baseline gap-3">
+                          <span
+                            aria-hidden="true"
+                            className="text-xs font-semibold tabular-nums text-primary"
+                          >
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
+                          <span>{faq.q}</span>
+                        </span>
+                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                          <ChevronRight
+                            className="size-4 transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+                            aria-hidden="true"
+                          />
+                        </span>
                       </summary>
-                      <p className="max-w-2xl pb-4 leading-7 text-muted-foreground">
+                      <p className="max-w-2xl pb-5 leading-7 text-muted-foreground sm:pl-8">
                         {faq.a}
                       </p>
-                    </details>
+                    </motion.details>
                   ))}
-                </div>
+                </motion.div>
               </section>
 
               {/* Contact */}
-              <div className="mt-12 flex flex-col gap-6 border-t pt-10 sm:flex-row sm:items-center sm:justify-between">
+              <motion.div
+                variants={fadeUp}
+                initial="hidden"
+                whileInView="show"
+                viewport={inView}
+                className="mt-16 flex flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8"
+              >
                 <div className="flex items-start gap-4">
-                  <Mail
-                    className="mt-1 size-6 shrink-0 text-primary"
-                    aria-hidden="true"
-                  />
+                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
+                    <Mail className="size-5" aria-hidden="true" />
+                  </span>
                   <div className="max-w-xl">
                     <h2 className="text-2xl font-bold tracking-tight">
                       Have a privacy question?
@@ -730,15 +884,18 @@ export default function PrivacyContent() {
                   href="/contact"
                   className={buttonVariants({
                     size: "lg",
-                    className: "shrink-0",
+                    className: "group/btn min-h-11 shrink-0",
                   })}
                 >
                   Contact us
-                  <ArrowRight className="size-4" aria-hidden="true" />
+                  <ArrowRight
+                    className="size-4 transition-transform duration-200 group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                    aria-hidden="true"
+                  />
                 </Link>
-              </div>
+              </motion.div>
 
-              <p className="mt-10 flex items-start gap-3 text-sm leading-6 text-muted-foreground">
+              <p className="mt-8 flex items-start gap-3 text-sm leading-6 text-muted-foreground">
                 <CheckCircle2
                   className="mt-0.5 size-5 shrink-0 text-primary"
                   aria-hidden="true"
@@ -753,17 +910,16 @@ export default function PrivacyContent() {
 
         {/* Bottom brand band */}
         <section className="border-t bg-muted/30">
-          <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-12 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+          <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-14 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
             <div className="flex items-start gap-4">
-              <BookOpen
-                className="mt-1 size-7 shrink-0 text-primary"
-                aria-hidden="true"
-              />
+              <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                <BookOpen className="size-6" aria-hidden="true" />
+              </span>
               <div>
-                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                <h2 className="text-balance text-2xl font-bold tracking-tight sm:text-3xl">
                   Learn with confidence.
                 </h2>
-                <p className="mt-2 max-w-xl text-muted-foreground">
+                <p className="mt-2 max-w-xl leading-7 text-muted-foreground">
                   Practical skills, real projects, and a learning experience
                   built with your trust in mind.
                 </p>
@@ -775,11 +931,14 @@ export default function PrivacyContent() {
               className={buttonVariants({
                 variant: "outline",
                 size: "lg",
-                className: "shrink-0",
+                className: "group/btn min-h-11 shrink-0",
               })}
             >
               Explore courses
-              <ArrowRight className="size-4" aria-hidden="true" />
+              <ArrowRight
+                className="size-4 transition-transform duration-200 group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
             </Link>
           </div>
         </section>

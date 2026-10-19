@@ -1,15 +1,35 @@
 // components/shared/ErrorState.jsx
-import { FiAlertTriangle } from "react-icons/fi";
+"use client";
+
+import { useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { FiAlertTriangle, FiRefreshCw } from "react-icons/fi";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function ErrorState({
   title = "Something went wrong",
   description = "Please try again in a moment.",
   onRetry,
 }) {
+  const reduce = useReducedMotion();
+  const [retrying, setRetrying] = useState(false);
+
+  async function handleRetry() {
+    setRetrying(true);
+    try {
+      await onRetry();
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   return (
-    <div
+    <motion.div
       role="alert"
+      initial={reduce ? false : { opacity: 0, y: 10 }}
+      animate={reduce ? undefined : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="flex flex-col items-center rounded-2xl border border-destructive/25 bg-card px-6 py-12 text-center sm:py-14"
     >
       <span className="grid size-14 place-items-center rounded-full bg-destructive/10 text-destructive ring-8 ring-destructive/5">
@@ -22,10 +42,20 @@ export function ErrorState({
         {description}
       </p>
       {onRetry && (
-        <Button type="button" size="lg" className="mt-6" onClick={onRetry}>
-          Try again
+        <Button
+          type="button"
+          size="lg"
+          className="mt-6 gap-2"
+          onClick={handleRetry}
+          disabled={retrying}
+        >
+          <FiRefreshCw
+            aria-hidden="true"
+            className={cn("size-4", retrying && "animate-spin")}
+          />
+          {retrying ? "Retrying…" : "Try again"}
         </Button>
       )}
-    </div>
+    </motion.div>
   );
 }

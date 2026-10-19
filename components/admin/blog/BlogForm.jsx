@@ -1,5 +1,6 @@
 // components/admin/blog/BlogForm.jsx
 "use client";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,6 +20,7 @@ import {
 import { ImageField } from "@/components/admin/forms/ImageField";
 import { BLOG_TOPICS } from "@/config/blog";
 import { blogSchema } from "@/lib/validations/blog";
+import { readingMinutes } from "@/lib/utils/format";
 import { createPost, updatePost } from "@/app/actions/admin/blog";
 
 const defaults = (p, author) => ({
@@ -35,6 +37,38 @@ const defaults = (p, author) => ({
   featured: !!p?.featured,
 });
 
+// Live "12/300" style counter appended to a field's helper text.
+const counted = (text, value, max) =>
+  `${text} (${(value ?? "").length}/${max})`;
+
+const wordCount = (text) =>
+  text?.trim() ? text.trim().split(/\s+/).length : 0;
+
+// Approximates how the post will look in search results, using the same
+// fallbacks the live page uses (SEO title -> title, SEO description -> excerpt).
+function SeoPreview({ title, description, slug }) {
+  return (
+    <div
+      className="rounded-lg border border-border bg-card p-4"
+      role="group"
+      aria-label="Search result preview"
+    >
+      <p className="text-xs font-medium text-muted-foreground">
+        Search result preview
+      </p>
+      <p className="mt-2 truncate text-xs text-muted-foreground">
+        /blog/{slug || "your-post-slug"}
+      </p>
+      <p className="mt-0.5 line-clamp-2 text-base font-medium leading-snug text-primary">
+        {title || "Post title appears here"}
+      </p>
+      <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
+        {description || "The SEO description, or the excerpt, appears here."}
+      </p>
+    </div>
+  );
+}
+
 export function BlogForm({ record = null, defaultAuthor }) {
   const router = useRouter();
   const edit = !!record;
@@ -42,7 +76,22 @@ export function BlogForm({ record = null, defaultAuthor }) {
     resolver: zodResolver(blogSchema),
     defaultValues: defaults(record, defaultAuthor),
   });
-  const content = useWatch({ control: form.control, name: "content" });
+  const [title, slug, excerpt, content, seoTitle, seoDescription] = useWatch({
+    control: form.control,
+    name: ["title", "slug", "excerpt", "content", "seoTitle", "seoDescription"],
+  });
+
+  // Warn before a full page unload (refresh, closing the tab) with unsaved edits.
+  const { isDirty, isSubmitting } = form.formState;
+  useEffect(() => {
+    if (!isDirty || isSubmitting) return;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty, isSubmitting]);
 
   async function onSubmit(values) {
     const res = edit
@@ -59,6 +108,8 @@ export function BlogForm({ record = null, defaultAuthor }) {
     router.push(`/admin/blog/${res.data.slug}`);
     router.refresh();
   }
+
+  const words = wordCount(content);
 
   return (
     <form
@@ -90,7 +141,11 @@ export function BlogForm({ record = null, defaultAuthor }) {
           label="Excerpt"
           component={Textarea}
           rows={3}
-          description="20–300 characters. Shown on cards and in search results."
+          description={counted(
+            "20–300 characters. Shown on cards and in search results.",
+            excerpt,
+            300,
+          )}
         />
       </FormSection>
 
@@ -112,16 +167,33 @@ export function BlogForm({ record = null, defaultAuthor }) {
               rows={18}
               className="font-mono text-sm"
             />
+            <p
+              className="mt-2 text-xs tabular-nums text-muted-foreground"
+              aria-live="polite"
+            >
+              {words.toLocaleString("en-US")} {words === 1 ? "word" : "words"}
+              {words > 0 && (
+                <> &middot; about {readingMinutes(content)} min read</>
+              )}
+            </p>
           </TabsContent>
           <TabsContent value="preview" className="pt-4">
             {content?.trim() ? (
-              <div className="rounded-lg border bg-card p-5">
-                <ArticleBody text={content} />
+              <div className="rounded-2xl border border-border bg-card p-5 sm:p-8">
+                <div className="max-w-3xl">
+                  <ArticleBody text={content} />
+                </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Nothing to preview yet.
-              </p>
+              <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                <p className="text-sm font-medium text-foreground">
+                  Nothing to preview yet
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Write something in the Write tab and it will appear here as
+                  readers will see it.
+                </p>
+              </div>
             )}
           </TabsContent>
         </Tabs>
@@ -163,12 +235,17 @@ export function BlogForm({ record = null, defaultAuthor }) {
           description="16:9 works best. Required to publish."
         />
       </FormSection>
+
       <FormSection title="SEO">
         <TextField
           control={form.control}
           name="seoTitle"
           label="SEO title"
-          description="Up to 70 characters. Defaults to the post title."
+          description={counted(
+            "Up to 70 characters. Defaults to the post title.",
+            seoTitle,
+            70,
+          )}
         />
         <TextField
           control={form.control}
@@ -176,9 +253,19 @@ export function BlogForm({ record = null, defaultAuthor }) {
           label="SEO description"
           component={Textarea}
           rows={2}
-          description="Up to 160 characters. Defaults to the excerpt."
+          description={counted(
+            "Up to 160 characters. Defaults to the excerpt.",
+            seoDescription,
+            160,
+          )}
+        />
+        <SeoPreview
+          title={seoTitle?.trim() || title?.trim()}
+          description={seoDescription?.trim() || excerpt?.trim()}
+          slug={slug?.trim()}
         />
       </FormSection>
+
       <FormSection title="Settings">
         <SwitchField
           control={form.control}
@@ -195,4 +282,3 @@ export function BlogForm({ record = null, defaultAuthor }) {
     </form>
   );
 }
-

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Controller } from "react-hook-form";
+import { Loader2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -26,17 +27,28 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { TextField } from "@/components/shared/TextField";
+import { cn } from "@/lib/utils";
 
 // `id` is optional: give a section one to make it a link target (#id)
 export function FormSection({ id, title, description, children }) {
   return (
-    <Card id={id} className="scroll-mt-24 gap-5 p-5 sm:p-6">
-      <div>
-        <h2 className="text-lg">{title}</h2>
-        {description && (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        )}
-      </div>
+    <Card id={id} className="scroll-mt-24 gap-6 p-5 shadow-sm sm:p-6">
+      <header className="flex items-start gap-3 border-b pb-4">
+        <span
+          aria-hidden="true"
+          className="mt-1 h-5 w-1 shrink-0 rounded-full bg-[#FACC15]"
+        />
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-lg font-semibold leading-snug tracking-tight">
+            {title}
+          </h2>
+          {description && (
+            <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+          )}
+        </div>
+      </header>
       <FieldGroup>{children}</FieldGroup>
     </Card>
   );
@@ -56,7 +68,7 @@ export function CharCount({ value, min, max }) {
   const bad = n > 0 && ((min && n < min) || (max && n > max));
   return (
     <span
-      className={`ml-1 tabular-nums ${bad ? "font-medium text-destructive" : ""}`}
+      className={cn("ml-1 tabular-nums", bad && "font-medium text-destructive")}
     >
       ({n}
       {max ? `/${max}` : ""})
@@ -94,6 +106,7 @@ export function NumberField({
             value={field.value ?? ""}
             onChange={(e) => field.onChange(e.target.value)}
             aria-invalid={fieldState.invalid}
+            className="tabular-nums"
           />
           {hint(fieldState, description)}
         </Field>
@@ -141,6 +154,7 @@ export function SelectField({
   );
 }
 
+// A bordered row: text on the left, the switch on the right
 export function SwitchField({ control, name, label, description, disabled }) {
   const id = `f-${name}`;
   return (
@@ -148,17 +162,25 @@ export function SwitchField({ control, name, label, description, disabled }) {
       name={name}
       control={control}
       render={({ field }) => (
-        <Field orientation="horizontal" data-disabled={disabled}>
+        <Field
+          orientation="horizontal"
+          data-disabled={disabled}
+          className={cn(
+            "items-center justify-between gap-4 rounded-lg border bg-muted/20 p-4",
+            "motion-safe:transition-colors motion-safe:duration-150",
+            !disabled && "hover:bg-muted/40",
+          )}
+        >
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            {description && <FieldDescription>{description}</FieldDescription>}
+          </div>
           <Switch
             id={id}
             checked={!!field.value}
             onCheckedChange={field.onChange}
             disabled={disabled}
           />
-          <div>
-            <FieldLabel htmlFor={id}>{label}</FieldLabel>
-            {description && <FieldDescription>{description}</FieldDescription>}
-          </div>
         </Field>
       )}
     />
@@ -176,15 +198,30 @@ export function FormFooter({
   submitLabel = "Save changes",
   dirty = false,
 }) {
+  const unsaved = dirty && !submitting;
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2 border-t bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <p aria-live="polite" className="mr-auto text-sm text-muted-foreground">
-        {dirty && !submitting ? "Unsaved changes" : ""}
+    <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_16px_-12px_rgb(0_0_0/0.25)] sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <p
+        aria-live="polite"
+        className="mr-auto flex items-center gap-2 text-sm text-muted-foreground"
+      >
+        {unsaved && (
+          <>
+            <span
+              aria-hidden="true"
+              className="size-2 rounded-full bg-[#FACC15]"
+            />
+            Unsaved changes
+          </>
+        )}
       </p>
       <Link href={cancelHref} className={buttonVariants({ variant: "ghost" })}>
         Cancel
       </Link>
-      <Button type="submit" disabled={submitting}>
+      <Button type="submit" disabled={submitting} aria-busy={submitting}>
+        {submitting && (
+          <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
+        )}
         {submitting ? "Saving…" : submitLabel}
       </Button>
     </div>
@@ -223,6 +260,7 @@ export function DateField({
             max={max}
             value={field.value ?? ""}
             aria-invalid={fieldState.invalid}
+            className="tabular-nums"
           />
           {hint(fieldState, description)}
         </Field>
@@ -255,8 +293,12 @@ function CheckboxList({
 
       {options.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p aria-live="polite" className="text-xs text-muted-foreground">
-            {value.length} of {options.length} selected
+          <p
+            aria-live="polite"
+            className="text-xs tabular-nums text-muted-foreground"
+          >
+            <span className="font-medium text-foreground">{value.length}</span>{" "}
+            of {options.length} selected
           </p>
           <div className="flex gap-1">
             <Button
@@ -295,13 +337,17 @@ function CheckboxList({
         />
       )}
 
-      <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border p-3">
+      <div className="max-h-56 space-y-0.5 overflow-y-auto rounded-lg border bg-muted/10 p-1.5">
         {options.length ? (
           visible.length ? (
             visible.map((o) => {
               const id = `${name}-${o.value}`;
               return (
-                <Field key={o.value} orientation="horizontal">
+                <Field
+                  key={o.value}
+                  orientation="horizontal"
+                  className="items-center rounded-md px-2 py-1.5 motion-safe:transition-colors motion-safe:duration-150 hover:bg-muted/60"
+                >
                   <Checkbox
                     id={id}
                     checked={value.includes(o.value)}
@@ -313,19 +359,24 @@ function CheckboxList({
                       )
                     }
                   />
-                  <FieldLabel htmlFor={id} className="font-normal">
+                  <FieldLabel
+                    htmlFor={id}
+                    className="min-w-0 flex-1 cursor-pointer font-normal leading-snug"
+                  >
                     {o.label}
                   </FieldLabel>
                 </Field>
               );
             })
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="px-2 py-6 text-center text-sm text-muted-foreground">
               No matches for “{query}”.
             </p>
           )
         ) : (
-          <p className="text-sm text-muted-foreground">{emptyText}</p>
+          <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+            {emptyText}
+          </p>
         )}
       </div>
     </FieldSet>

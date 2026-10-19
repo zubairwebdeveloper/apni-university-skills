@@ -1,7 +1,4 @@
 "use client";
-// components/layout/FooterMotion.jsx
-// framer-motion helpers for the footer. Every one of them respects
-// prefers-reduced-motion and only animates transform / opacity.
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -17,99 +14,147 @@ import {
 
 const EASE = [0.22, 1, 0.36, 1];
 
-/* ------------------------------------------------------------------ */
-/* Reveal: fades + slides + tips up in 3D when scrolled into view      */
-/* ------------------------------------------------------------------ */
-// Same props as before (children, delay, y, className) plus:
-// - x: horizontal start offset
-// - rotateX: starting tilt in degrees (0 = flat, plain fade-slide)
+const SPRING = {
+  stiffness: 170,
+  damping: 22,
+  mass: 0.5,
+};
+
+const VIEWPORT = {
+  once: true,
+  margin: "-40px",
+};
+
+// ------------------------------------------------------------
+// Reveal — scroll-triggered entrance with subtle 3D movement
+// ------------------------------------------------------------
+
 export function Reveal({
   children,
   delay = 0,
   y = 24,
   x = 0,
-  rotateX = 10,
+  rotateX = 8,
   className,
+  duration = 0.7,
+  once = true,
+  ...props
 }) {
   const reduce = useReducedMotion();
 
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, y, x, rotateX, scale: 0.98 }}
-      whileInView={{ opacity: 1, y: 0, x: 0, rotateX: 0, scale: 1 }}
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.7, delay, ease: EASE }}
+      initial={reduce ? false : { opacity: 0, y, x, rotateX, scale: 0.985 }}
+      whileInView={{
+        opacity: 1,
+        y: 0,
+        x: 0,
+        rotateX: 0,
+        scale: 1,
+      }}
+      viewport={{ ...VIEWPORT, once }}
+      transition={{
+        duration: reduce ? 0 : duration,
+        delay: reduce ? 0 : delay,
+        ease: EASE,
+      }}
       style={
         reduce
           ? undefined
-          : { transformPerspective: 900, transformOrigin: "50% 100%" }
+          : {
+              transformPerspective: 1000,
+              transformOrigin: "50% 100%",
+            }
       }
       className={className}
+      {...props}
     >
       {children}
     </motion.div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Stagger / StaggerItem: children pop in one after another            */
-/* ------------------------------------------------------------------ */
-// <Stagger as="ul" className="..."> <StaggerItem as="li">...</StaggerItem> </Stagger>
+// ------------------------------------------------------------
+// Stagger — reveal a group of items in sequence
+// ------------------------------------------------------------
+
 export function Stagger({
   as = "div",
   children,
   className,
   stagger = 0.07,
   delay = 0,
+  once = true,
+  ...props
 }) {
   const reduce = useReducedMotion();
-  const Tag = motion[as];
+  const Tag = motion[as] ?? motion.div;
 
   return (
     <Tag
       initial={reduce ? "show" : "hidden"}
       whileInView="show"
-      viewport={{ once: true, margin: "-40px" }}
+      viewport={{ ...VIEWPORT, once }}
       variants={{
         hidden: {},
         show: {
-          transition: { staggerChildren: stagger, delayChildren: delay },
+          transition: {
+            staggerChildren: reduce ? 0 : stagger,
+            delayChildren: reduce ? 0 : delay,
+          },
         },
       }}
       className={className}
+      {...props}
     >
       {children}
     </Tag>
   );
 }
 
-export function StaggerItem({ as = "div", children, className }) {
-  const Tag = motion[as];
+export function StaggerItem({ as = "div", children, className, ...props }) {
+  const reduce = useReducedMotion();
+  const Tag = motion[as] ?? motion.div;
 
   return (
     <Tag
       variants={{
-        hidden: { opacity: 0, y: 18, scale: 0.94 },
+        hidden: reduce
+          ? {}
+          : {
+              opacity: 0,
+              y: 16,
+              scale: 0.98,
+            },
         show: {
           opacity: 1,
           y: 0,
           scale: 1,
-          transition: { duration: 0.5, ease: EASE },
+          transition: {
+            duration: reduce ? 0 : 0.45,
+            ease: EASE,
+          },
         },
       }}
       className={className}
+      {...props}
     >
       {children}
     </Tag>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Tilt3D: card tilts towards the mouse, with a moving glare           */
-/* ------------------------------------------------------------------ */
-// Pass `className` with `relative` and the same border radius as the child,
-// e.g. <Tilt3D className="relative rounded-3xl">...</Tilt3D>
-export function Tilt3D({ children, className, max = 8, glare = true }) {
+// ------------------------------------------------------------
+// Tilt3D — responsive pointer tilt with subtle yellow/purple glare
+// ------------------------------------------------------------
+
+export function Tilt3D({
+  children,
+  className = "",
+  max = 7,
+  glare = true,
+  ...props
+}) {
   const reduce = useReducedMotion();
   const ref = useRef(null);
 
@@ -117,170 +162,265 @@ export function Tilt3D({ children, className, max = 8, glare = true }) {
   const py = useMotionValue(0.5);
   const hover = useMotionValue(0);
 
-  const spring = { stiffness: 170, damping: 20, mass: 0.5 };
-  const sx = useSpring(px, spring);
-  const sy = useSpring(py, spring);
-  const glareOpacity = useSpring(hover, { stiffness: 200, damping: 25 });
+  const sx = useSpring(px, SPRING);
+  const sy = useSpring(py, SPRING);
+  const glareOpacity = useSpring(hover, {
+    stiffness: 200,
+    damping: 25,
+  });
 
   const rotateY = useTransform(sx, [0, 1], [-max, max]);
   const rotateX = useTransform(sy, [0, 1], [max, -max]);
   const gx = useTransform(sx, [0, 1], [0, 100]);
   const gy = useTransform(sy, [0, 1], [0, 100]);
-  const glareBg = useMotionTemplate`radial-gradient(420px circle at ${gx}% ${gy}%, rgba(255,255,255,0.14), transparent 60%)`;
 
-  const onMove = (e) => {
-    if (reduce || e.pointerType !== "mouse" || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    px.set((e.clientX - r.left) / r.width);
-    py.set((e.clientY - r.top) / r.height);
+  const glareBackground = useMotionTemplate`
+    radial-gradient(
+      420px circle at ${gx}% ${gy}%,
+      rgb(250 204 21 / 0.16),
+      rgb(139 92 246 / 0.10) 35%,
+      transparent 68%
+    )
+  `;
+
+  function handlePointerMove(event) {
+    if (reduce || event.pointerType !== "mouse" || !ref.current) {
+      return;
+    }
+
+    const rect = ref.current.getBoundingClientRect();
+
+    if (!rect.width || !rect.height) return;
+
+    px.set(Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)));
+
+    py.set(Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)));
+
     hover.set(1);
-  };
+  }
 
-  const onLeave = () => {
+  function handlePointerLeave() {
     px.set(0.5);
     py.set(0.5);
     hover.set(0);
-  };
+  }
 
   return (
     <motion.div
       ref={ref}
-      onPointerMove={onMove}
-      onPointerLeave={onLeave}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
       style={
-        reduce ? undefined : { rotateX, rotateY, transformPerspective: 1100 }
+        reduce
+          ? undefined
+          : {
+              rotateX,
+              rotateY,
+              transformPerspective: 1100,
+              transformStyle: "preserve-3d",
+            }
       }
       className={className}
+      {...props}
     >
       {children}
+
       {glare && !reduce && (
         <motion.span
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 rounded-[inherit]"
-          style={{ background: glareBg, opacity: glareOpacity }}
+          style={{
+            background: glareBackground,
+            opacity: glareOpacity,
+          }}
         />
       )}
     </motion.div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Magnetic: element is gently pulled towards the cursor               */
-/* ------------------------------------------------------------------ */
-export function Magnetic({ children, className, strength = 0.35 }) {
+// ------------------------------------------------------------
+// Magnetic — subtle cursor attraction for buttons and links
+// ------------------------------------------------------------
+
+export function Magnetic({
+  children,
+  className = "",
+  strength = 0.25,
+  ...props
+}) {
   const reduce = useReducedMotion();
   const ref = useRef(null);
+
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
-  const x = useSpring(mx, { stiffness: 220, damping: 16, mass: 0.5 });
-  const y = useSpring(my, { stiffness: 220, damping: 16, mass: 0.5 });
 
-  const onMove = (e) => {
-    if (reduce || e.pointerType !== "mouse" || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    mx.set((e.clientX - (r.left + r.width / 2)) * strength);
-    my.set((e.clientY - (r.top + r.height / 2)) * strength);
-  };
+  const x = useSpring(mx, {
+    stiffness: 220,
+    damping: 18,
+    mass: 0.45,
+  });
 
-  const onLeave = () => {
+  const y = useSpring(my, {
+    stiffness: 220,
+    damping: 18,
+    mass: 0.45,
+  });
+
+  function handlePointerMove(event) {
+    if (reduce || event.pointerType !== "mouse" || !ref.current) {
+      return;
+    }
+
+    const rect = ref.current.getBoundingClientRect();
+
+    mx.set((event.clientX - (rect.left + rect.width / 2)) * strength);
+
+    my.set((event.clientY - (rect.top + rect.height / 2)) * strength);
+  }
+
+  function handlePointerLeave() {
     mx.set(0);
     my.set(0);
-  };
+  }
 
   return (
     <motion.div
       ref={ref}
-      onPointerMove={onMove}
-      onPointerLeave={onLeave}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
       style={reduce ? undefined : { x, y }}
       className={className}
+      {...props}
     >
       {children}
     </motion.div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* CountUp: "10K+" counts 0 -> 10 when it scrolls into view            */
-/* ------------------------------------------------------------------ */
-// Keeps any prefix / suffix ("K+", "%", "/7"). Text with no digits is
-// shown as is. The final value is what server-side HTML contains.
-export function CountUp({ value, duration = 1.6, className }) {
+// ------------------------------------------------------------
+// CountUp — animate numeric text when it enters the viewport
+// Supports: 10K+, 1,250+, 99.5%, $250, 24/7
+// ------------------------------------------------------------
+
+const NUMBER_PATTERN = /^(\D*)(\d[\d,]*\.?\d*)(.*)$/;
+
+export function CountUp({ value, duration = 1.6, className, ...props }) {
   const reduce = useReducedMotion();
   const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-40px" });
+  const inView = useInView(ref, {
+    once: true,
+    margin: "-40px",
+  });
 
-  const text = String(value);
-  const match = text.match(/^(\D*)(\d[\d,]*\.?\d*)(.*)$/);
-  const target = match ? parseFloat(match[2].replace(/,/g, "")) : 0;
-  const decimals =
-    match && match[2].includes(".") ? match[2].split(".")[1].length : 0;
-  const withCommas = !!match && match[2].includes(",");
+  const text = String(value ?? "");
+  const match = text.match(NUMBER_PATTERN);
 
-  const [n, setN] = useState(target);
+  const numberText = match?.[2] ?? "";
+  const target = match ? Number(numberText.replace(/,/g, "")) : 0;
+
+  const decimals = numberText.includes(".")
+    ? numberText.split(".")[1].length
+    : 0;
+
+  const withCommas = numberText.includes(",");
+
+  const [number, setNumber] = useState(reduce ? target : 0);
 
   useEffect(() => {
-    if (!match || reduce || !inView) return;
+    if (!match) return;
+
+    if (reduce) {
+      setNumber(target);
+      return;
+    }
+
+    if (!inView) return;
+
     const controls = animate(0, target, {
       duration,
       ease: EASE,
-      onUpdate: setN,
+      onUpdate: setNumber,
     });
+
     return () => controls.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, reduce, target, duration]);
+  }, [inView, reduce, target, duration, match]);
 
   if (!match) {
     return (
-      <span ref={ref} className={className}>
+      <span ref={ref} className={className} {...props}>
         {text}
       </span>
     );
   }
 
-  const shown = withCommas
-    ? n.toLocaleString("en-US", {
+  const formatted = withCommas
+    ? number.toLocaleString("en-US", {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
       })
-    : n.toFixed(decimals);
+    : number.toFixed(decimals);
 
   return (
-    <span ref={ref} className={className}>
-      {match[1]}
-      {shown}
-      {match[3]}
+    <span ref={ref} className={className} {...props} aria-label={text}>
+      <span aria-hidden="true">{match[1]}</span>
+      <span aria-hidden="true">{formatted}</span>
+      <span aria-hidden="true">{match[3]}</span>
     </span>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* CursorGlow: a soft light that follows the mouse across the footer   */
-/* ------------------------------------------------------------------ */
-// Put it as a DIRECT child of the (position: relative) footer. It listens
-// on its parent element.
+// ------------------------------------------------------------
+// CursorGlow — soft light that follows the pointer in its parent
+// ------------------------------------------------------------
+
 export function CursorGlow({ size = 560, className = "-z-10" }) {
   const reduce = useReducedMotion();
   const ref = useRef(null);
+
   const mx = useMotionValue(-9999);
   const my = useMotionValue(-9999);
-  const x = useSpring(mx, { stiffness: 55, damping: 18, mass: 0.6 });
-  const y = useSpring(my, { stiffness: 55, damping: 18, mass: 0.6 });
+
+  const x = useSpring(mx, {
+    stiffness: 55,
+    damping: 20,
+    mass: 0.6,
+  });
+
+  const y = useSpring(my, {
+    stiffness: 55,
+    damping: 20,
+    mass: 0.6,
+  });
 
   useEffect(() => {
     const parent = ref.current?.parentElement;
-    if (!parent || reduce) return;
 
-    const move = (e) => {
-      if (e.pointerType && e.pointerType !== "mouse") return;
-      const r = parent.getBoundingClientRect();
-      mx.set(e.clientX - r.left);
-      my.set(e.clientY - r.top);
+    if (!parent || reduce) return undefined;
+
+    function handlePointerMove(event) {
+      if (event.pointerType && event.pointerType !== "mouse") {
+        return;
+      }
+
+      const rect = parent.getBoundingClientRect();
+
+      mx.set(event.clientX - rect.left);
+      my.set(event.clientY - rect.top);
+    }
+
+    function handlePointerLeave() {
+      mx.set(-9999);
+      my.set(-9999);
+    }
+
+    parent.addEventListener("pointermove", handlePointerMove);
+    parent.addEventListener("pointerleave", handlePointerLeave);
+
+    return () => {
+      parent.removeEventListener("pointermove", handlePointerMove);
+      parent.removeEventListener("pointerleave", handlePointerLeave);
     };
-
-    parent.addEventListener("pointermove", move);
-    return () => parent.removeEventListener("pointermove", move);
   }, [reduce, mx, my]);
 
   if (reduce) return null;
@@ -298,45 +438,84 @@ export function CursorGlow({ size = 560, className = "-z-10" }) {
         marginLeft: -size / 2,
         marginTop: -size / 2,
         background:
-          "radial-gradient(closest-side, rgb(var(--ft-d, 139 92 246) / 0.22), rgb(var(--ft-a, 52 211 153) / 0.08) 55%, transparent 72%)",
+          "radial-gradient(closest-side, rgb(250 204 21 / 0.13), rgb(139 92 246 / 0.10) 45%, transparent 75%)",
       }}
     />
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* FloatingGlows: slowly drifting background glows (3 colours)         */
-/* ------------------------------------------------------------------ */
+// ------------------------------------------------------------
+// FloatingGlows — ambient brand lighting
+// ------------------------------------------------------------
+
 export function FloatingGlows() {
   const reduce = useReducedMotion();
 
+  const firstAnimation = reduce
+    ? undefined
+    : {
+        x: [0, 35, 0],
+        y: [0, 24, 0],
+      };
+
+  const secondAnimation = reduce
+    ? undefined
+    : {
+        x: [0, -35, 0],
+        y: [0, -24, 0],
+      };
+
+  const thirdAnimation = reduce
+    ? undefined
+    : {
+        x: [0, 24, -12, 0],
+        y: [0, -24, 12, 0],
+      };
+
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+    >
       <motion.div
-        animate={reduce ? undefined : { x: [0, 50, 0], y: [0, 30, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -left-24 -top-24 size-72 rounded-full bg-[rgb(var(--ft-a,52_211_153)/0.18)] blur-3xl"
+        animate={firstAnimation}
+        transition={{
+          duration: 18,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="absolute -left-24 -top-24 size-72 rounded-full bg-[rgb(250_204_21/0.12)] blur-3xl"
       />
+
       <motion.div
-        animate={reduce ? undefined : { x: [0, -50, 0], y: [0, -30, 0] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -bottom-32 right-0 size-80 rounded-full bg-[rgb(var(--ft-b,79_140_255)/0.18)] blur-3xl"
+        animate={secondAnimation}
+        transition={{
+          duration: 22,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="absolute -bottom-32 right-0 size-80 rounded-full bg-[rgb(139_92_246/0.16)] blur-3xl"
       />
+
       <motion.div
-        animate={
-          reduce ? undefined : { x: [0, 40, -20, 0], y: [0, -40, 20, 0] }
-        }
-        transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute left-1/3 top-1/3 size-64 rounded-full bg-[rgb(var(--ft-d,139_92_246)/0.16)] blur-3xl"
+        animate={thirdAnimation}
+        transition={{
+          duration: 26,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="absolute left-1/3 top-1/3 size-64 rounded-full bg-[rgb(167_139_250/0.10)] blur-3xl"
       />
-      <div className="absolute inset-0 bg-[radial-gradient(circle,hsl(var(--foreground)/0.06)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
+
+      <div className="absolute inset-0 bg-[radial-gradient(circle,hsl(var(--foreground)/0.045)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* ShimmerLine: top edge with a glowing light sweeping across          */
-/* ------------------------------------------------------------------ */
+// ------------------------------------------------------------
+// ShimmerLine — subtle animated top border
+// ------------------------------------------------------------
+
 export function ShimmerLine() {
   const reduce = useReducedMotion();
 
@@ -346,7 +525,7 @@ export function ShimmerLine() {
       className="absolute inset-x-0 top-0 z-10 h-px overflow-hidden"
       style={{
         background:
-          "linear-gradient(90deg, transparent, rgb(var(--ft-a, 52 211 153) / 0.55), rgb(var(--ft-d, 139 92 246) / 0.55), rgb(var(--ft-b, 79 140 255) / 0.55), transparent)",
+          "linear-gradient(90deg, transparent, rgb(250 204 21 / 0.7), rgb(139 92 246 / 0.7), transparent)",
       }}
     >
       {!reduce && (
@@ -363,7 +542,7 @@ export function ShimmerLine() {
           style={{
             background:
               "linear-gradient(90deg, transparent, rgb(255 255 255 / 0.95), transparent)",
-            boxShadow: "0 0 14px 2px rgb(var(--ft-a, 52 211 153) / 0.8)",
+            boxShadow: "0 0 12px 2px rgb(250 204 21 / 0.65)",
           }}
         />
       )}

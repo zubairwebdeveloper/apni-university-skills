@@ -8,9 +8,13 @@ import {
   useReducedMotion,
   useSpring,
 } from "framer-motion";
-import { Compass, Heart, Sparkles } from "lucide-react";
+import { ArrowRight, Compass, Heart, Sparkles } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+/* Design tokens: yellow = highlights, violet = selected / brand accents */
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /* Respects the OS "reduce motion" setting for every motion child below */
 export function MotionRoot({ children }) {
@@ -24,13 +28,12 @@ export function WishlistBackdrop() {
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
     >
-      <div className="absolute -top-40 left-1/2 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15" />
-      <div className="absolute -right-24 top-1/4 h-64 w-64 rounded-full bg-amber-400/15 blur-3xl" />
+      <div className="absolute -top-44 left-1/2 h-[380px] w-[760px] -translate-x-1/2 rounded-full bg-[#8B5CF6]/10 blur-3xl dark:bg-[#8B5CF6]/15" />
+      {/* currentColor keeps the dots theme-aware without relying on CSS variable formats */}
       <div
-        className="absolute inset-0 opacity-[0.4] dark:opacity-[0.25]"
+        className="absolute inset-0 text-border opacity-60 dark:opacity-40"
         style={{
-          backgroundImage:
-            "radial-gradient(hsl(var(--border)) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(currentColor 1px, transparent 1px)",
           backgroundSize: "26px 26px",
           maskImage:
             "radial-gradient(ellipse 70% 50% at 50% 0%, #000 25%, transparent 75%)",
@@ -53,6 +56,7 @@ function HeartScene({ filled }) {
   const onMove = (e) => {
     if (reduce || e.pointerType !== "mouse") return;
     const r = e.currentTarget.getBoundingClientRect();
+    if (!r.width || !r.height) return;
     ry.set(((e.clientX - r.left) / r.width - 0.5) * 30);
     rx.set(-((e.clientY - r.top) / r.height - 0.5) * 30);
   };
@@ -80,24 +84,24 @@ function HeartScene({ filled }) {
         style={{ rotateX: sx, rotateY: sy, transformStyle: "preserve-3d" }}
       >
         <div
-          className="absolute inset-4 rounded-full bg-primary/25 blur-2xl"
+          className="absolute inset-4 rounded-full bg-[#8B5CF6]/25 blur-2xl"
           style={{ transform: "translateZ(-50px)" }}
         />
         <div
-          className="absolute inset-3 rounded-full border border-border bg-card shadow-lg"
+          className="absolute inset-3 rounded-full border border-border bg-background shadow-lg"
           style={{ transform: "translateZ(0)" }}
         />
 
         {[0.92, 0.66].map((s, i) => (
           <motion.div
             key={s}
-            className="absolute left-1/2 top-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/30"
+            className="absolute left-1/2 top-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#8B5CF6]/35"
             style={{
               width: `${s * 100}%`,
               rotateX: 66,
               translateZ: 10 + i * 10,
             }}
-            animate={{ rotate: i % 2 ? -360 : 360 }}
+            animate={reduce ? undefined : { rotate: i % 2 ? -360 : 360 }}
             transition={{
               duration: 24 - i * 8,
               repeat: Infinity,
@@ -110,15 +114,14 @@ function HeartScene({ filled }) {
         <motion.div
           className="absolute inset-0 grid place-items-center"
           style={{ transform: "translateZ(46px)" }}
-          animate={{ scale: [1, 1.08, 1] }}
+          animate={reduce ? undefined : { scale: [1, 1.08, 1] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
         >
           <Heart
             className={cn(
-              "size-16 sm:size-20",
-              filled
-                ? "fill-primary text-primary drop-shadow-[0_0_18px_hsl(var(--primary)/0.5)]"
-                : "text-primary",
+              "size-16 text-[#8B5CF6] sm:size-20",
+              filled &&
+                "fill-[#8B5CF6] drop-shadow-[0_0_18px_rgba(139,92,246,0.45)]",
             )}
           />
         </motion.div>
@@ -128,7 +131,7 @@ function HeartScene({ filled }) {
             key={i}
             className="absolute left-1/2 top-1/2 size-0"
             style={{ transform: "translateZ(30px)" }}
-            animate={{ rotate: 360 }}
+            animate={reduce ? undefined : { rotate: 360 }}
             transition={{
               duration: o.dur,
               repeat: Infinity,
@@ -137,7 +140,7 @@ function HeartScene({ filled }) {
             }}
           >
             <Sparkles
-              className="absolute size-3.5 -translate-x-1/2 -translate-y-1/2 text-amber-500"
+              className="absolute size-3.5 -translate-x-1/2 -translate-y-1/2 fill-[#FACC15] text-[#FACC15]"
               style={{ left: o.r }}
             />
           </motion.div>
@@ -147,44 +150,93 @@ function HeartScene({ filled }) {
   );
 }
 
+const HOW_IT_WORKS = [
+  "Tap the heart on any course",
+  "Find it here whenever you like",
+  "Start learning when you're ready",
+];
+
 /* Real data only: the hero knows just how many courses are saved */
 export function WishlistHero({ count = 0 }) {
   const has = count > 0;
 
   return (
     <motion.section
+      aria-labelledby="wishlist-hero-title"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-5 sm:p-8"
+      className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 sm:p-8"
     >
+      {/* Accent edge */}
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 w-1 bg-[#FACC15]"
+      />
+
       <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <div className="min-w-0">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Heart className="size-3.5 text-primary" aria-hidden="true" />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
+            <Heart
+              className="size-3.5 fill-[#8B5CF6] text-[#8B5CF6]"
+              aria-hidden="true"
+            />
             Saved for later
           </span>
 
-          <h2 className="mt-3 font-serif text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            {has
-              ? `${count} course${count === 1 ? "" : "s"} on your wishlist`
-              : "Start saving courses you love"}
+          <h2
+            id="wishlist-hero-title"
+            className="mt-3 font-serif text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-4xl"
+          >
+            {has ? (
+              <>
+                <span className="tabular-nums text-amber-600 dark:text-[#FACC15]">
+                  {count}
+                </span>{" "}
+                {count === 1 ? "course" : "courses"} on your wishlist
+              </>
+            ) : (
+              "Start saving courses you love"
+            )}
           </h2>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             {has
               ? "Revisit them any time and start learning when you're ready."
               : "Tap the heart on any course and it will wait for you here."}
           </p>
 
+          {!has && (
+            <ol className="mt-5 space-y-2.5">
+              {HOW_IT_WORKS.map((step, index) => (
+                <li
+                  key={step}
+                  className="flex items-center gap-3 text-sm text-foreground/80"
+                >
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 text-xs font-bold tabular-nums text-violet-700 dark:text-violet-300">
+                    {index + 1}
+                  </span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+          )}
+
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/courses" className={cn(buttonVariants(), "group")}>
-              <Compass className="mr-1.5 size-4" aria-hidden="true" />
+            <Link
+              href="/courses"
+              className={cn(buttonVariants(), "group gap-1.5", FOCUS)}
+            >
+              <Compass className="size-4" aria-hidden="true" />
               Browse more courses
+              <ArrowRight
+                className="size-4 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
             </Link>
             {has && (
               <a
                 href="#saved-courses"
-                className={buttonVariants({ variant: "outline" })}
+                className={cn(buttonVariants({ variant: "outline" }), FOCUS)}
               >
                 View saved courses
               </a>

@@ -34,6 +34,19 @@ import { cn } from "@/lib/utils";
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
+// `next` usually comes from a `?next=` query param on the page, so it
+// must be checked before it's handed to the browser — otherwise a link
+// like `/register?next=https://evil.com` would send a freshly created
+// account straight to an attacker's site. Mirrors the same guard used
+// by the password-login flow and by GoogleButton's own redirect.
+function safeNext(value) {
+  return typeof value === "string" &&
+    value.startsWith("/") &&
+    !value.startsWith("//")
+    ? value
+    : "/student";
+}
+
 // Common typos in email domains
 const TYPOS = {
   "gmial.com": "gmail.com",
@@ -338,44 +351,42 @@ export function RegisterForm({ next = "/student" }) {
   ];
   const doneSteps = steps.filter(Boolean).length;
 
-  
-async function onSubmit(values) {
-  setError("");
-  setDone(false);
-
-  try {
-    const { user } = await createUserWithEmailAndPassword(
-      auth,
-      values.email.trim(),
-      values.password,
-    );
-
-    await updateProfile(user, { displayName: values.displayName.trim() });
+  async function onSubmit(values) {
+    setError("");
+    setDone(false);
 
     try {
-      await sendEmailVerification(user);
-    } catch (verificationError) {
-      console.error("Failed to send verification email:", verificationError);
+      const { user } = await createUserWithEmailAndPassword(
+        auth,
+        values.email.trim(),
+        values.password,
+      );
+
+      await updateProfile(user, { displayName: values.displayName.trim() });
+
+      try {
+        await sendEmailVerification(user);
+      } catch (verificationError) {
+        console.error("Failed to send verification email:", verificationError);
+      }
+
+      // Naya token lo, taake updateProfile ke baad ka token cookie mein jaye
+      await user.getIdToken(true);
+
+      // Agar yeh fail ho to catch mein jayega, aur "Account created" nahi dikhega
+      await startServerSession(user);
+
+      setDone(true);
+
+      // Hard navigation: cookie ke saath fresh request
+      window.location.assign(safeNext(next));
+    } catch (error) {
+      console.error("Register failed:", error);
+      setDone(false);
+      setShake((value) => value + 1);
+      setError(authErrorMessage(error));
     }
-
-    // Naya token lo, taake updateProfile ke baad ka token cookie mein jaye
-    await user.getIdToken(true);
-
-    // Agar yeh fail ho to catch mein jayega, aur "Account created" nahi dikhega
-    await startServerSession(user);
-
-    setDone(true);
-
-    // Hard navigation: cookie ke saath fresh request
-    window.location.assign(next);
-  } catch (error) {
-    console.error("Register failed:", error);
-    setDone(false);
-    setShake((value) => value + 1);
-    setError(authErrorMessage(error));
   }
-}
-
 
   return (
     <motion.form

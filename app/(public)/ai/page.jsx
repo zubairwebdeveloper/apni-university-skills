@@ -1,19 +1,21 @@
 // app/(public)/ai/page.jsx
 import Link from "next/link";
 import {
+  FiAlertTriangle,
   FiArrowRight,
   FiBookOpen,
   FiBriefcase,
+  FiCheck,
   FiChevronDown,
   FiCode,
   FiEdit3,
   FiEye,
   FiLock,
-  FiMessageSquare,
   FiRefreshCw,
   FiShield,
   FiSlash,
   FiUsers,
+  FiX,
 } from "react-icons/fi";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -26,12 +28,7 @@ import { Stagger, StaggerItem } from "@/components/motion/Reveal";
 import { BlogCard } from "@/components/public/BlogCard";
 import { CourseCard } from "@/components/public/CourseCard";
 import { JobCard } from "@/components/public/JobCard";
-import {
-  AIGlows,
-  CountUp,
-  Reveal,
-  ToolsMarquee,
-} from "@/components/public/AIMotion";
+import { CountUp, Reveal, ToolsMarquee } from "@/components/public/AIMotion";
 import {
   CanCantToggle,
   ChatDemo,
@@ -51,14 +48,69 @@ export const metadata = {
   alternates: { canonical: "/ai" },
 };
 
-/* Placeholder numbers: replace with real ones. */
-const stats = [
-  { value: 6, suffix: "+", label: "AI topics" },
-  { value: 20, suffix: "+", label: "Projects to build" },
-  { value: 100, suffix: "%", label: "Beginner friendly" },
-];
+/* ------------------------------------------------------------------ */
+/* Design tokens + small building blocks                               */
+/* ------------------------------------------------------------------ */
+// `apni-landing` activates the shared colour tokens (#111318 surface, #FACC15
+// primary, violet accent). HeroSection and TechStrip already emit that CSS.
+// If this page is ever rendered without them, move THEME_CSS (see
+// HeroSection.jsx) into globals.css.
+const SCOPE = "apni-landing bg-background text-foreground";
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const VIOLET = "text-[color:var(--violet)]";
+// Cards react with a border change only, so the page stays calm to scan.
+const CARD =
+  "rounded-2xl border border-border bg-card p-5 transition-colors duration-200 hover:border-primary/60 motion-reduce:transition-none";
 
-// Who this track is actually built for (new)
+// Alternating bands: tinted ones get a top and bottom border.
+const band = (tinted) => (tinted ? "border-y border-border bg-muted/40" : "");
+
+function Tile({ icon: Icon, tone = "primary" }) {
+  return (
+    <span
+      className={`grid size-11 shrink-0 place-items-center rounded-xl ${
+        tone === "violet"
+          ? `bg-[color:var(--violet)]/10 ${VIOLET}`
+          : "bg-primary/10 text-primary"
+      }`}
+    >
+      <Icon aria-hidden="true" className="size-5" />
+    </span>
+  );
+}
+
+// One card pattern for every icon + title + text block on the page.
+function Feature({ icon, title, text, tone, delay = 0 }) {
+  return (
+    <Reveal delay={delay} className="h-full">
+      <div className={`h-full ${CARD}`}>
+        <Tile icon={icon} tone={tone} />
+        <h3 className="mt-4 text-base font-semibold tracking-tight text-foreground">
+          {title}
+        </h3>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{text}</p>
+      </div>
+    </Reveal>
+  );
+}
+
+function FeatureList({ items, cols, tone }) {
+  return (
+    <ul className={`grid grid-cols-1 gap-4 ${cols}`}>
+      {items.map((item, i) => (
+        <li key={item.title} className="min-w-0">
+          <Feature {...item} tone={tone} delay={Math.min(i * 0.07, 0.4)} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Content                                                             */
+/* ------------------------------------------------------------------ */
+// Who this track is actually built for.
 const audiences = [
   {
     icon: FiBookOpen,
@@ -109,7 +161,7 @@ const promptTips = [
   },
 ];
 
-// Short, beginner-facing glossary (new)
+// Short, beginner-facing glossary.
 const glossary = [
   {
     term: "LLM",
@@ -137,7 +189,7 @@ const glossary = [
   },
 ];
 
-// Common early mistakes (new)
+// Common early mistakes.
 const mistakes = [
   {
     title: "Trusting every answer",
@@ -217,6 +269,9 @@ const faqs = [
   },
 ];
 
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
 export default async function AIPage() {
   const [courses, posts, jobs] = await Promise.all([
     safe(courseService.getCoursesByCategorySlug(AI_CATEGORY_SLUG, 4), []),
@@ -224,8 +279,15 @@ export default async function AIPage() {
     safe(jobService.getJobsBySkill("AI", 4), []),
   ]);
 
+  // Figures come from the real config, so they stay true as content grows.
+  const stats = [
+    { value: aiTopics.length, label: "Core AI topics" },
+    { value: aiPaths.length, label: "Learning paths" },
+    { value: aiRoles.length, label: "Career roles" },
+  ];
+
   return (
-    <>
+    <div className={SCOPE}>
       <PageHeader
         title="Artificial Intelligence"
         description="Understand what AI can and can't do, learn to build with it, and see where it leads in your career."
@@ -250,10 +312,10 @@ export default async function AIPage() {
           {stats.map((s) => (
             <div
               key={s.label}
-              className="rounded-xl border border-border bg-card/70 p-3 text-center backdrop-blur sm:p-4"
+              className="rounded-xl border border-border bg-card p-3 text-center sm:p-4"
             >
-              <dd className="font-serif text-xl font-semibold text-primary sm:text-2xl">
-                <CountUp to={s.value} suffix={s.suffix} />
+              <dd className="text-xl font-semibold tabular-nums tracking-tight text-primary sm:text-2xl">
+                <CountUp to={s.value} suffix="" />
               </dd>
               <dt className="mt-1 text-xs text-muted-foreground">{s.label}</dt>
             </div>
@@ -262,8 +324,6 @@ export default async function AIPage() {
       </PageHeader>
 
       <div className="relative overflow-x-clip">
-        <AIGlows />
-
         {/* Live demo */}
         <Section labelledBy="demo">
           <SectionHeader
@@ -277,34 +337,19 @@ export default async function AIPage() {
           </Reveal>
         </Section>
 
-        {/* Who it's for (new) */}
-        <Section labelledBy="who" className="bg-secondary/40">
+        {/* Who it's for */}
+        <Section labelledBy="who" className={band(true)}>
           <SectionHeader
             id="who"
             eyebrow="Who this is for"
             title="Built for more than one starting point"
             description="Wherever you're coming from, there's a way in."
           />
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {audiences.map(({ icon: Icon, title, text }, i) => (
-              <li key={title} className="min-w-0">
-                <Reveal delay={i * 0.07} className="h-full">
-                  <div className="group h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                      <Icon aria-hidden="true" className="size-5" />
-                    </span>
-                    <h3 className="mt-4 font-sans text-base font-semibold text-foreground">
-                      {title}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{text}</p>
-                  </div>
-                </Reveal>
-              </li>
-            ))}
-          </ul>
+          <FeatureList items={audiences} cols="sm:grid-cols-2 lg:grid-cols-4" />
         </Section>
 
-        <Section labelledBy="paths" className="bg-secondary/40">
+        {/* Learning paths */}
+        <Section labelledBy="paths">
           <SectionHeader
             id="paths"
             eyebrow="Learning paths"
@@ -315,18 +360,20 @@ export default async function AIPage() {
               <StaggerItem key={p.href} className="min-w-0">
                 <Link
                   href={p.href}
-                  className="group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className={`group block h-full rounded-xl ${FOCUS}`}
                 >
-                  <Card className="h-full gap-2 p-6 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-lg motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
-                    <h3 className="font-serif text-lg font-semibold text-foreground">
+                  <Card className="h-full gap-2 border-border p-6 transition-colors duration-200 group-hover:border-primary/60 motion-reduce:transition-none">
+                    <h3 className="text-lg font-semibold tracking-tight text-foreground">
                       {p.title}
                     </h3>
-                    <p className="text-sm text-muted-foreground">{p.text}</p>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {p.text}
+                    </p>
                     <span className="mt-auto inline-flex items-center gap-1 pt-2 text-sm font-medium text-primary">
                       View roadmap
                       <FiArrowRight
                         aria-hidden="true"
-                        className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
+                        className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
                       />
                     </span>
                   </Card>
@@ -336,7 +383,8 @@ export default async function AIPage() {
           </Stagger>
         </Section>
 
-        <Section labelledBy="topics">
+        {/* Core topics */}
+        <Section labelledBy="topics" className={band(true)}>
           <SectionHeader
             id="topics"
             eyebrow="Core topics"
@@ -346,12 +394,17 @@ export default async function AIPage() {
           <Stagger className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {aiTopics.map((t) => (
               <StaggerItem key={t.title} className="min-w-0">
-                <Card className="h-full gap-3 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                  <h3 className="font-serif text-lg font-semibold text-foreground">
+                <Card className="h-full gap-3 border-border p-6 transition-colors duration-200 hover:border-primary/60 motion-reduce:transition-none">
+                  <h3 className="text-lg font-semibold tracking-tight text-foreground">
                     {t.title}
                   </h3>
-                  <p className="text-sm text-muted-foreground">{t.text}</p>
-                  <ul className="mt-auto flex flex-wrap gap-1.5 pt-1">
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {t.text}
+                  </p>
+                  <ul
+                    className="mt-auto flex flex-wrap gap-1.5 pt-1"
+                    aria-label={`${t.title} skills`}
+                  >
                     {t.skills.map((s) => (
                       <li key={s}>
                         <Badge variant="outline">{s}</Badge>
@@ -365,7 +418,7 @@ export default async function AIPage() {
         </Section>
 
         {/* Can / can't */}
-        <Section labelledBy="reality" className="bg-secondary/40">
+        <Section labelledBy="reality">
           <SectionHeader
             id="reality"
             eyebrow="Reality check"
@@ -378,7 +431,7 @@ export default async function AIPage() {
         </Section>
 
         {/* Roadmap by level */}
-        <Section labelledBy="levels">
+        <Section labelledBy="levels" className={band(true)}>
           <SectionHeader
             id="levels"
             eyebrow="Your roadmap"
@@ -391,14 +444,11 @@ export default async function AIPage() {
         </Section>
 
         {/* Tools */}
-        <section
-          aria-labelledby="tools-title"
-          className="border-y border-border bg-muted/30 py-8"
-        >
+        <section aria-labelledby="tools-title" className="py-8">
           <Container>
             <h2
               id="tools-title"
-              className="mb-4 text-center font-sans text-sm font-normal text-muted-foreground"
+              className="mb-4 text-center text-sm font-medium text-muted-foreground"
             >
               Tools and libraries you will use
             </h2>
@@ -407,7 +457,7 @@ export default async function AIPage() {
         </section>
 
         {/* Prompt tips */}
-        <Section labelledBy="prompts">
+        <Section labelledBy="prompts" className={band(true)}>
           <SectionHeader
             id="prompts"
             eyebrow="Prompt engineering"
@@ -417,19 +467,22 @@ export default async function AIPage() {
           <Stagger className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             {promptTips.map((t) => (
               <StaggerItem key={t.title} className="min-w-0">
-                <Card className="h-full gap-4 p-6">
-                  <h3 className="font-serif text-lg font-semibold text-foreground">
+                <Card className="h-full gap-4 border-border p-6">
+                  <h3 className="text-lg font-semibold tracking-tight text-foreground">
                     {t.title}
                   </h3>
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-foreground">
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-destructive">
-                      Weak
+                  {/* Icon and label carry the meaning, colour only supports it. */}
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm leading-6 text-foreground">
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-destructive">
+                      <FiX aria-hidden="true" className="size-3.5" />
+                      Weak prompt
                     </p>
                     {t.weak}
                   </div>
-                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-foreground">
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">
-                      Strong
+                  <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm leading-6 text-foreground">
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-primary">
+                      <FiCheck aria-hidden="true" className="size-3.5" />
+                      Strong prompt
                     </p>
                     {t.strong}
                   </div>
@@ -439,8 +492,8 @@ export default async function AIPage() {
           </Stagger>
         </Section>
 
-        {/* Glossary (new) */}
-        <Section labelledBy="glossary" className="bg-secondary/40">
+        {/* Glossary */}
+        <Section labelledBy="glossary">
           <SectionHeader
             id="glossary"
             eyebrow="Speak the language"
@@ -451,18 +504,13 @@ export default async function AIPage() {
             {glossary.map(({ term, text }, i) => (
               <li key={term} className="min-w-0">
                 <Reveal delay={Math.min(i * 0.06, 0.4)} className="h-full">
-                  <div className="flex h-full items-start gap-3 rounded-xl border border-border bg-card p-4">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
-                      <FiMessageSquare aria-hidden="true" className="size-4" />
-                    </span>
-                    <div>
-                      <h3 className="font-sans text-sm font-semibold text-foreground">
-                        {term}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {text}
-                      </p>
-                    </div>
+                  <div className={`h-full ${CARD} p-4`}>
+                    <h3 className={`font-mono text-sm font-semibold ${VIOLET}`}>
+                      {term}
+                    </h3>
+                    <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+                      {text}
+                    </p>
                   </div>
                 </Reveal>
               </li>
@@ -470,7 +518,8 @@ export default async function AIPage() {
           </ul>
         </Section>
 
-        <Section labelledBy="roles" className="bg-secondary/40">
+        {/* Careers */}
+        <Section labelledBy="roles" className={band(true)}>
           <SectionHeader
             id="roles"
             eyebrow="Careers"
@@ -479,17 +528,20 @@ export default async function AIPage() {
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {aiRoles.map(([role, text], i) => (
               <Reveal key={role} delay={(i % 2) * 0.08} className="min-w-0">
-                <div className="h-full rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                  <dt className="font-serif text-lg font-semibold text-foreground">
+                <div className={`h-full ${CARD}`}>
+                  <dt className="text-lg font-semibold tracking-tight text-foreground">
                     {role}
                   </dt>
-                  <dd className="mt-1 text-sm text-muted-foreground">{text}</dd>
+                  <dd className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {text}
+                  </dd>
                 </div>
               </Reveal>
             ))}
           </dl>
         </Section>
 
+        {/* Related courses */}
         <Section labelledBy="ai-courses">
           <SectionHeader
             id="ai-courses"
@@ -507,12 +559,20 @@ export default async function AIPage() {
             <EmptyState
               title="AI courses are coming soon"
               description="Create an account to be ready on day one."
+              action={
+                <Link
+                  href="/register"
+                  className={buttonVariants({ variant: "outline" })}
+                >
+                  Create free account
+                </Link>
+              }
             />
           )}
         </Section>
 
-        {/* Common mistakes (new) */}
-        <Section labelledBy="mistakes">
+        {/* Common mistakes */}
+        <Section labelledBy="mistakes" className={band(true)}>
           <SectionHeader
             id="mistakes"
             eyebrow="Learn from others"
@@ -523,15 +583,15 @@ export default async function AIPage() {
             {mistakes.map(({ title, text }, i) => (
               <li key={title} className="min-w-0">
                 <Reveal delay={i * 0.08} className="h-full">
-                  <div className="flex h-full items-start gap-3 rounded-xl border border-border bg-card p-5">
-                    <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-destructive/10 text-xs font-bold text-destructive">
-                      !
+                  <div className={`flex h-full items-start gap-3 ${CARD}`}>
+                    <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-destructive/10 text-destructive">
+                      <FiAlertTriangle aria-hidden="true" className="size-4" />
                     </span>
                     <div>
-                      <h3 className="font-sans text-base font-semibold text-foreground">
+                      <h3 className="text-base font-semibold tracking-tight text-foreground">
                         {title}
                       </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
                         {text}
                       </p>
                     </div>
@@ -543,34 +603,23 @@ export default async function AIPage() {
         </Section>
 
         {/* Responsible AI */}
-        <Section labelledBy="responsible" className="bg-secondary/40">
+        <Section labelledBy="responsible">
           <SectionHeader
             id="responsible"
             eyebrow="Use it wisely"
             title="Responsible AI habits"
             description="Good AI skills include knowing when not to trust it."
           />
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {responsible.map(({ icon: Icon, title, text }, i) => (
-              <li key={title} className="min-w-0">
-                <Reveal delay={i * 0.08} className="h-full">
-                  <div className="group h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                      <Icon aria-hidden="true" className="size-5" />
-                    </span>
-                    <h3 className="mt-4 font-sans text-base font-semibold text-foreground">
-                      {title}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{text}</p>
-                  </div>
-                </Reveal>
-              </li>
-            ))}
-          </ul>
+          <FeatureList
+            items={responsible}
+            cols="sm:grid-cols-2 lg:grid-cols-3"
+            tone="violet"
+          />
         </Section>
 
+        {/* Related articles */}
         {posts.length > 0 && (
-          <Section labelledBy="ai-posts">
+          <Section labelledBy="ai-posts" className={band(true)}>
             <SectionHeader
               id="ai-posts"
               title="Related articles"
@@ -585,10 +634,8 @@ export default async function AIPage() {
           </Section>
         )}
 
-        <Section
-          labelledBy="ai-jobs"
-          className={posts.length ? "bg-secondary/40" : ""}
-        >
+        {/* Related jobs */}
+        <Section labelledBy="ai-jobs" className={band(!posts.length)}>
           <SectionHeader
             id="ai-jobs"
             title="Related jobs"
@@ -605,43 +652,56 @@ export default async function AIPage() {
             <EmptyState
               title="No AI openings right now"
               description="New roles are posted regularly."
+              action={
+                <Link
+                  href="/jobs"
+                  className={buttonVariants({ variant: "outline" })}
+                >
+                  Browse all jobs
+                </Link>
+              }
             />
           )}
         </Section>
 
         {/* FAQ */}
-        <Section
-          labelledBy="faq"
-          className={posts.length ? "" : "bg-secondary/40"}
-        >
+        <Section labelledBy="faq" className={band(!!posts.length)}>
           <SectionHeader id="faq" title="Common questions" />
-          <div className="mx-auto max-w-3xl space-y-3">
-            {faqs.map(({ q, a }, i) => (
-              <Reveal key={q} delay={i * 0.06}>
-                <details className="group rounded-xl border border-border bg-card px-4 py-3 open:shadow-md">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
+          <Reveal>
+            <div className="mx-auto max-w-3xl divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+              {faqs.map(({ q, a }) => (
+                <details key={q} className="group">
+                  <summary
+                    className={`flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 motion-reduce:transition-none sm:text-base [&::-webkit-details-marker]:hidden ${FOCUS} focus-visible:ring-inset focus-visible:ring-offset-0`}
+                  >
                     {q}
                     <FiChevronDown
                       aria-hidden="true"
                       className="size-4 shrink-0 text-primary transition-transform duration-300 group-open:rotate-180 motion-reduce:transition-none"
                     />
                   </summary>
-                  <p className="mt-3 text-sm text-muted-foreground">{a}</p>
+                  <p className="px-5 pb-5 text-sm leading-7 text-muted-foreground">
+                    {a}
+                  </p>
                 </details>
-              </Reveal>
-            ))}
-          </div>
+              ))}
+            </div>
+          </Reveal>
         </Section>
 
         {/* CTA */}
-        <section className="border-t border-border py-12 sm:py-16">
+        <section className="py-12 sm:py-16">
           <Container>
             <Reveal>
-              <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-r from-primary/10 via-card to-highlight/20 p-6 text-center dark:from-primary/15 dark:via-card dark:to-highlight/10 sm:p-10">
-                <h2 className="text-2xl text-foreground sm:text-3xl">
+              <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 text-center sm:p-10">
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-0 top-0 h-1 bg-primary"
+                />
+                <h2 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
                   Start building with AI today
                 </h2>
-                <p className="mx-auto mt-2 max-w-xl text-muted-foreground">
+                <p className="mx-auto mt-2 max-w-xl text-base leading-7 text-muted-foreground">
                   Create a free account, pick your first AI course and ship a
                   small project this week.
                 </p>
@@ -668,6 +728,6 @@ export default async function AIPage() {
           </Container>
         </section>
       </div>
-    </>
+    </div>
   );
 }

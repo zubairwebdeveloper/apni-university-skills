@@ -3,15 +3,31 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Bell, BellRing, CheckCheck } from "lucide-react";
 
+const TONES = {
+  default: "bg-primary/10 text-primary ring-primary/20",
+  attention:
+    "bg-amber-400/15 text-amber-700 ring-amber-500/25 dark:text-amber-300",
+  success:
+    "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-400",
+};
+
 export function NotificationsStats({ total, unread, latestLabel }) {
   const reduce = useReducedMotion();
+  const caughtUp = unread === 0;
+
   const stats = [
-    { label: "Total", value: total, icon: Bell },
-    { label: "Unread", value: unread, icon: BellRing, accent: unread > 0 },
+    { label: "Total", value: total, icon: Bell, tone: "default" },
     {
-      label: "All caught up",
-      value: unread === 0 ? "Yes" : "Not yet",
+      label: "Unread",
+      value: unread,
+      icon: BellRing,
+      tone: unread > 0 ? "attention" : "default",
+    },
+    {
+      label: "Inbox",
+      value: caughtUp ? "All caught up" : "Needs review",
       icon: CheckCheck,
+      tone: caughtUp ? "success" : "default",
     },
   ];
 
@@ -28,32 +44,27 @@ export function NotificationsStats({ total, unread, latestLabel }) {
               delay: i * 0.07,
               ease: [0.22, 1, 0.36, 1],
             }}
-            whileHover={reduce ? undefined : { y: -3 }}
-            className="flex items-center gap-3 rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur"
+            className="flex items-center gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-sm"
           >
             <span
-              className={
-                "grid h-10 w-10 place-items-center rounded-xl " +
-                (s.accent
-                  ? "bg-amber-400/15 text-amber-700 dark:text-amber-300"
-                  : "bg-primary/10 text-primary")
-              }
+              className={`grid size-10 shrink-0 place-items-center rounded-xl ring-1 ring-inset ${TONES[s.tone]}`}
             >
-              <s.icon className="h-5 w-5" aria-hidden="true" />
+              <s.icon className="size-5" aria-hidden="true" />
             </span>
-            <div>
+            <div className="min-w-0">
               <dt className="text-xs font-medium text-muted-foreground">
                 {s.label}
               </dt>
-              <dd className="text-xl font-semibold tracking-tight text-foreground">
+              <dd className="mt-0.5 truncate text-xl font-semibold tabular-nums tracking-tight text-foreground">
                 {s.value}
               </dd>
             </div>
           </motion.div>
         ))}
       </dl>
+
       {latestLabel && (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-3 text-xs text-muted-foreground">
           Latest update: {latestLabel}
         </p>
       )}

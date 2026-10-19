@@ -33,6 +33,15 @@ const NAMES = {
 const any = (a) => Array.isArray(a) && a.some((x) => x.value > 0);
 const stateOf = (v, ok) => (v === null ? "error" : ok ? "ready" : "empty");
 
+// Shared entrance-animation classes/delays — same pattern used on the other
+// admin pages (fade + slide-up, respects prefers-reduced-motion).
+const ENTRANCE =
+  "animate-in fade-in slide-in-from-bottom-2 duration-500 motion-reduce:animate-none";
+const delay = (ms) => ({
+  animationDelay: `${ms}ms`,
+  animationFillMode: "backwards",
+});
+
 /* ------------------------------------------------------------------ */
 /* Small presentational helpers (server-safe, no hooks)               */
 /* ------------------------------------------------------------------ */
@@ -134,41 +143,36 @@ export default async function AdminAnalyticsPage({ searchParams }) {
     : 0;
 
   return (
-    <div className="ea-stagger space-y-8">
-      <style>{`
-        @keyframes ea-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @media (prefers-reduced-motion: no-preference) {
-          .ea-stagger > * { animation: ea-fade-up 0.5s cubic-bezier(0.22,1,0.36,1) both; }
-          .ea-stagger > *:nth-child(1) { animation-delay: 0ms; }
-          .ea-stagger > *:nth-child(2) { animation-delay: 60ms; }
-          .ea-stagger > *:nth-child(3) { animation-delay: 120ms; }
-          .ea-stagger > *:nth-child(4) { animation-delay: 180ms; }
-          .ea-stagger > *:nth-child(5) { animation-delay: 240ms; }
-          .ea-stagger > *:nth-child(6) { animation-delay: 300ms; }
-        }
-      `}</style>
+    <div className="space-y-8">
+      <div className={ENTRANCE} style={delay(0)}>
+        <AdminPageHeader
+          title="Analytics"
+          description={`Last ${NAMES[range]}, compared with the ${NAMES[range]} before. Real figures from your data, refreshed every few minutes (updated ${updated}).`}
+        />
+      </div>
 
-      <AdminPageHeader
-        title="Analytics"
-        description={`Last ${NAMES[range]}, compared with the ${NAMES[range]} before. Real figures from your data, refreshed every few minutes (updated ${updated}).`}
-      />
-      <DataTableToolbar
-        searchable={false}
-        filters={[
-          {
-            key: "range",
-            label: "Period",
-            allLabel: "Last 30 days",
-            options: [
-              ["7d", "Last 7 days"],
-              ["90d", "Last 90 days"],
-              ["365d", "Last 12 months"],
-            ].map(([value, label]) => ({ value, label })),
-          },
-        ]}
-      />
+      <div className={ENTRANCE} style={delay(60)}>
+        <DataTableToolbar
+          searchable={false}
+          filters={[
+            {
+              key: "range",
+              label: "Period",
+              allLabel: "Last 30 days",
+              options: [
+                ["7d", "Last 7 days"],
+                ["90d", "Last 90 days"],
+                ["365d", "Last 12 months"],
+              ].map(([value, label]) => ({ value, label })),
+            },
+          ]}
+        />
+      </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        className={cn("grid gap-4 sm:grid-cols-2 xl:grid-cols-4", ENTRANCE)}
+        style={delay(120)}
+      >
         <KpiCard label="New students" data={d.students} />
         <KpiCard label="New enrollments" data={d.enrollments} />
         <KpiCard label="Approved reviews" data={d.reviews} />
@@ -205,7 +209,10 @@ export default async function AdminAnalyticsPage({ searchParams }) {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div
+        className={cn("grid gap-4 lg:grid-cols-3", ENTRANCE)}
+        style={delay(180)}
+      >
         <ChartCard
           title="Payment status"
           description="Payments created in this period"
@@ -230,9 +237,7 @@ export default async function AdminAnalyticsPage({ searchParams }) {
         </ChartCard>
         <Card className="gap-3 p-5">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="font-serif text-lg font-semibold">
-              Top courses by revenue
-            </h3>
+            <h3 className="text-lg font-semibold">Top courses by revenue</h3>
             <ExportCsvButton
               filename={`top-courses-${range}`}
               headers={["Course", "Revenue", "Currency"]}
@@ -276,9 +281,9 @@ export default async function AdminAnalyticsPage({ searchParams }) {
         </Card>
       </div>
 
-      <Card className="gap-3 p-5">
+      <Card className={cn("gap-3 p-5", ENTRANCE)} style={delay(240)}>
         <div className="flex items-center justify-between gap-3">
-          <h3 className="font-serif text-lg font-semibold">Categories</h3>
+          <h3 className="text-lg font-semibold">Categories</h3>
           <ExportCsvButton
             filename={`categories-${range}`}
             headers={["Category", "Courses", "Students"]}
@@ -339,8 +344,8 @@ export default async function AdminAnalyticsPage({ searchParams }) {
         )}
       </Card>
 
-      <Card className="gap-3 p-5">
-        <h3 className="font-serif text-lg font-semibold">Content</h3>
+      <Card className={cn("gap-3 p-5", ENTRANCE)} style={delay(300)}>
+        <h3 className="text-lg font-semibold">Content</h3>
         {d.content === null ? (
           <StateMessage icon={AlertCircle}>
             Couldn&apos;t load this section.

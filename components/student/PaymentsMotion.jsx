@@ -38,16 +38,16 @@ export function Reveal({ children, delay = 0, className }) {
   );
 }
 
+/* Quiet backdrop: one soft glow plus a faded grid that dissolves downward */
 export function PaymentsBackdrop() {
   return (
     <div
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
     >
-      <div className="absolute -top-40 left-1/2 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15" />
-      <div className="absolute -right-20 top-1/4 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" />
+      <div className="absolute -top-40 left-1/2 h-[380px] w-[760px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15" />
       <div
-        className="absolute inset-0 opacity-[0.35] dark:opacity-[0.22]"
+        className="absolute inset-0 opacity-[0.3] dark:opacity-[0.2]"
         style={{
           backgroundImage:
             "linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px)",
@@ -78,7 +78,7 @@ function SecureCard3D() {
   );
 
   const onMove = (e) => {
-    if (reduce) return;
+    if (reduce || e.pointerType === "touch") return;
     const r = e.currentTarget.getBoundingClientRect();
     ry.set(((e.clientX - r.left) / r.width - 0.5) * 32);
     rx.set(-((e.clientY - r.top) / r.height - 0.5) * 32);
@@ -93,13 +93,13 @@ function SecureCard3D() {
       onPointerMove={onMove}
       onPointerLeave={onLeave}
       aria-hidden="true"
-      className="relative mx-auto h-48 w-72 sm:h-56 sm:w-[21rem]"
+      className="relative mx-auto h-48 w-72 max-w-full sm:h-56 sm:w-[21rem]"
       style={{ perspective: 900 }}
     >
       <motion.div
         className="relative h-full w-full"
         style={{ rotateX: sx, rotateY: sy, transformStyle: "preserve-3d" }}
-        animate={{ y: [0, -8, 0] }}
+        animate={reduce ? undefined : { y: [0, -8, 0] }}
         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
       >
         {/* soft shadow plate behind the card */}
@@ -156,63 +156,99 @@ export function PaymentsHero({ count = 0 }) {
 
   return (
     <motion.section
+      aria-labelledby="payments-hero-title"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-5 sm:p-8"
+      className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-8 lg:p-10"
     >
-      <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      {/* hairline accent along the top edge */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent"
+      />
+
+      <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-12">
         <div className="min-w-0">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
             <FiShield className="size-3.5 text-primary" aria-hidden="true" />
             Secure billing
           </span>
-          <h2 className="mt-3 font-serif text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            {hasPayments
-              ? `${count} purchase${count > 1 ? "s" : ""} on record`
-              : "Your billing, in one place"}
+
+          <h2
+            id="payments-hero-title"
+            className="mt-4 font-serif text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl"
+          >
+            {hasPayments ? (
+              <>
+                <span className="text-primary">{count}</span>{" "}
+                {`purchase${count > 1 ? "s" : ""} on record`}
+              </>
+            ) : (
+              "Your billing, in one place"
+            )}
           </h2>
 
-          <ul className="mt-4 space-y-2">
+          <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {hasPayments
+              ? "Review every payment and its status, and download receipts for your paid courses."
+              : "Once you enrol in a paid course, your payments and receipts will appear here."}
+          </p>
+
+          <ul className="mt-6 space-y-2.5">
             {TRUST.map((t) => (
               <li
                 key={t.text}
-                className="flex items-center gap-2.5 text-sm text-muted-foreground"
+                className="flex items-center gap-3 text-sm text-foreground/80"
               >
-                <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                  <t.icon className="size-3.5" aria-hidden="true" />
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                  <t.icon className="size-4" aria-hidden="true" />
                 </span>
                 {t.text}
               </li>
             ))}
           </ul>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link
               href="/courses?price=paid"
-              className={cn(buttonVariants(), "group")}
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "group w-full sm:w-auto",
+              )}
             >
               Browse paid courses
-              <FiArrowRight className="ml-1.5 size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none" />
+              <FiArrowRight
+                aria-hidden="true"
+                className="ml-1.5 size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+              />
             </Link>
             {hasPayments && (
               <a
                 href="#payment-history"
-                className={buttonVariants({ variant: "outline" })}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "lg" }),
+                  "w-full sm:w-auto",
+                )}
               >
                 View history
               </a>
             )}
             <a
               href="#payment-faq"
-              className={buttonVariants({ variant: "ghost" })}
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "lg" }),
+                "w-full sm:w-auto",
+              )}
             >
               Billing help
             </a>
           </div>
         </div>
 
-        <SecureCard3D />
+        <div className="rounded-2xl border border-border bg-muted/40 px-4 py-10 sm:py-12">
+          <SecureCard3D />
+        </div>
       </div>
     </motion.section>
   );

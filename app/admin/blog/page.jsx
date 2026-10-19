@@ -32,6 +32,15 @@ export const metadata = { title: "Blog" };
 
 const BASE = "/admin/blog";
 
+// Shared entrance-animation classes/delays — same pattern used on the other
+// admin pages (fade + slide-up, respects prefers-reduced-motion).
+const ENTRANCE =
+  "animate-in fade-in slide-in-from-bottom-2 duration-500 motion-reduce:animate-none";
+const delay = (ms) => ({
+  animationDelay: `${ms}ms`,
+  animationFillMode: "backwards",
+});
+
 /**
  * Builds a list URL from the raw search params, applying overrides.
  * An override of `null` removes the key. The cursor is always reset
@@ -171,26 +180,32 @@ export default async function AdminBlogPage({ searchParams }) {
 
   return (
     <>
-      <AdminPageHeader
-        title="Blog"
-        description="Write, schedule and publish articles."
-        actions={
-          canCreate && (
-            <Link
-              href={`${BASE}/create`}
-              className={cn(buttonVariants(), "gap-2")}
-            >
-              <FiPlus aria-hidden />
-              New post
-            </Link>
-          )
-        }
-      />
+      <div className={ENTRANCE} style={delay(0)}>
+        <AdminPageHeader
+          title="Blog"
+          description="Write, schedule and publish articles."
+          actions={
+            canCreate && (
+              <Link
+                href={`${BASE}/create`}
+                className={cn(buttonVariants(), "gap-2")}
+              >
+                <FiPlus aria-hidden />
+                New post
+              </Link>
+            )
+          }
+        />
+      </div>
 
       {/* Status tabs: the main way to move around the list */}
       <nav
         aria-label="Filter posts by status"
-        className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1"
+        className={cn(
+          "-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1",
+          ENTRANCE,
+        )}
+        style={delay(60)}
       >
         <Pill to={href(sp, { status: null })} active={!p.status}>
           All
@@ -217,7 +232,11 @@ export default async function AdminBlogPage({ searchParams }) {
       {/* Topic shortcuts */}
       <nav
         aria-label="Filter posts by topic"
-        className="-mx-1 mb-4 flex flex-wrap items-center gap-2 overflow-x-auto px-1 pb-1"
+        className={cn(
+          "-mx-1 mb-4 flex flex-wrap items-center gap-2 overflow-x-auto px-1 pb-1",
+          ENTRANCE,
+        )}
+        style={delay(120)}
       >
         <span className="shrink-0 text-sm text-muted-foreground">Topic</span>
         <Pill to={href(sp, { topic: null })} active={!p.topic}>
@@ -235,7 +254,13 @@ export default async function AdminBlogPage({ searchParams }) {
       </nav>
 
       {/* Read-out of the current view */}
-      <dl className="mb-4 grid grid-cols-3 divide-x divide-border rounded-xl border bg-card">
+      <dl
+        className={cn(
+          "mb-4 grid grid-cols-3 divide-x divide-border rounded-xl border bg-card",
+          ENTRANCE,
+        )}
+        style={delay(180)}
+      >
         {summary.map((s) => (
           <div
             key={s.label}
@@ -244,68 +269,70 @@ export default async function AdminBlogPage({ searchParams }) {
             <dt className="text-xs text-muted-foreground sm:text-sm">
               {s.label}
             </dt>
-            <dd className="font-serif text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
+            <dd className="text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
               {s.value}
             </dd>
           </div>
         ))}
       </dl>
 
-      <DataTableToolbar
-        searchPlaceholder="Search by title, topic, author or tag…"
-        total={total}
-        sorts={sortOptions(BLOG_SORTS)}
-        filters={[
-          {
-            key: "status",
-            label: "Status",
-            allLabel: "All (not in trash)",
-            options: BLOG_STATUS_OPTIONS,
-          },
-          {
-            key: "topic",
-            label: "Topic",
-            allLabel: "All topics",
-            options: BLOG_TOPICS.map((t) => ({
-              value: t.slug,
-              label: t.label,
-            })),
-          },
-          {
-            key: "featured",
-            label: "Featured",
-            allLabel: "All",
-            options: [{ value: "yes", label: "Featured only" }],
-          },
-          {
-            key: "range",
-            label: "Created",
-            allLabel: "Any time",
-            options: RANGE_OPTIONS,
-          },
-        ]}
-      />
+      <div className={ENTRANCE} style={delay(240)}>
+        <DataTableToolbar
+          searchPlaceholder="Search by title, topic, author or tag…"
+          total={total}
+          sorts={sortOptions(BLOG_SORTS)}
+          filters={[
+            {
+              key: "status",
+              label: "Status",
+              allLabel: "All (not in trash)",
+              options: BLOG_STATUS_OPTIONS,
+            },
+            {
+              key: "topic",
+              label: "Topic",
+              allLabel: "All topics",
+              options: BLOG_TOPICS.map((t) => ({
+                value: t.slug,
+                label: t.label,
+              })),
+            },
+            {
+              key: "featured",
+              label: "Featured",
+              allLabel: "All",
+              options: [{ value: "yes", label: "Featured only" }],
+            },
+            {
+              key: "range",
+              label: "Created",
+              allLabel: "Any time",
+              options: RANGE_OPTIONS,
+            },
+          ]}
+        />
 
-      {/* Applied filters, each removable with one click */}
-      {chips.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Showing</span>
-          {chips.map((c) => (
-            <Chip key={c.key} to={c.to}>
-              {c.label}
-            </Chip>
-          ))}
-          <Link
-            href={BASE}
-            scroll={false}
-            className="ml-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Clear all
-          </Link>
-        </div>
-      )}
+        {/* Applied filters, each removable with one click */}
+        {chips.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">Showing</span>
+            {chips.map((c) => (
+              <Chip key={c.key} to={c.to}>
+                {c.label}
+              </Chip>
+            ))}
+            <Link
+              href={BASE}
+              scroll={false}
+              className="ml-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Clear all
+            </Link>
+          </div>
+        )}
+      </div>
 
-      <div className="mt-4">
+      <div className={cn("mt-4", ENTRANCE)} style={delay(300)}>
         {items.length > 0 ? (
           <>
             <BlogTable rows={items} perms={perms} />

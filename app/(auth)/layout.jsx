@@ -22,6 +22,12 @@ export default async function AuthLayout({ children }) {
 
   const logo = <Logo src={s?.logo || undefined} name={siteName} />;
 
+  // TODO: source real course count and testimonials (e.g. from
+  // settingsService or a dedicated endpoint) before launch — placeholder
+  // "..." testimonial copy was removed so nothing fake ships in the meantime.
+  const stats = [{ value: 120, suffix: "+", label: "Courses" }];
+  const testimonials = [];
+
   return (
     <div className="min-h-dvh bg-background">
       <div className="mx-auto grid min-h-dvh w-full max-w-[1600px] lg:grid-cols-[1fr_1.1fr]">
@@ -31,8 +37,8 @@ export default async function AuthLayout({ children }) {
           tagline={tagline}
           year={new Date().getFullYear()}
           logo={logo}
-          stats={[{ value: 120, suffix: "+", label: "Courses" }]}
-          testimonials={[{ quote: "...", name: "...", role: "..." }]}
+          stats={stats}
+          testimonials={testimonials}
         />
 
         {/* Right Side */}

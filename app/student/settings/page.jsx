@@ -1,4 +1,11 @@
-import { FiCheckCircle, FiLock, FiMail, FiMonitor } from "react-icons/fi";
+// app/student/settings/page.jsx
+import {
+  FiAlertCircle,
+  FiCheckCircle,
+  FiLock,
+  FiMail,
+  FiMonitor,
+} from "react-icons/fi";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -25,9 +32,9 @@ import { requireUser } from "@/lib/auth/session";
 export const metadata = { title: "Settings" };
 
 const PASSWORD_TIPS = [
-  "Kam az kam 8 characters",
-  "Letters, numbers aur symbols mix karein",
-  "Dusri sites wala password dobara use na karein",
+  "At least 8 characters",
+  "Mix letters, numbers and symbols",
+  "Don't reuse a password from another site",
 ];
 
 export default async function SettingsPage() {
@@ -50,7 +57,7 @@ export default async function SettingsPage() {
             <SecurityOverview user={user} />
           </Reveal>
 
-          <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
+          <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-10">
             <div className="lg:sticky lg:top-24 lg:self-start">
               <SettingsNav />
             </div>
@@ -58,21 +65,32 @@ export default async function SettingsPage() {
             <div className="min-w-0 max-w-2xl space-y-6">
               <Reveal>
                 <TiltCard>
-                  <Card id="email" className="scroll-mt-24 gap-3 p-6">
+                  <Card id="email" className="scroll-mt-24 gap-3 p-5 sm:p-6">
                     <SectionTitle icon={FiMail} title="Email" />
-                    <p className="flex flex-wrap items-center gap-2 text-sm">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                       <span className="break-all">{user.email}</span>
                       <Badge
                         className={
                           user.emailVerified
-                            ? "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300"
-                            : "bg-amber-500/15 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300"
+                            ? "gap-1 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300"
+                            : "gap-1 bg-amber-500/15 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300"
                         }
                       >
+                        {user.emailVerified ? (
+                          <FiCheckCircle
+                            aria-hidden="true"
+                            className="size-3"
+                          />
+                        ) : (
+                          <FiAlertCircle
+                            aria-hidden="true"
+                            className="size-3"
+                          />
+                        )}
                         {user.emailVerified ? "Verified" : "Not verified"}
                       </Badge>
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
                       We use this address for sign-in, receipts and course
                       updates.
                     </p>
@@ -83,14 +101,21 @@ export default async function SettingsPage() {
 
               <Reveal delay={0.05}>
                 {/* no tilt here: this card holds a form */}
-                <Card id="password" className="scroll-mt-24 gap-4 p-6">
+                <Card id="password" className="scroll-mt-24 gap-4 p-5 sm:p-6">
                   <SectionTitle icon={FiLock} title="Change password" />
-                  <ul className="space-y-1.5 text-xs text-muted-foreground">
+                  <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+                    Choose a strong password that you don&apos;t use anywhere
+                    else.
+                  </p>
+                  <ul
+                    aria-label="Password requirements"
+                    className="space-y-2 rounded-lg bg-muted/40 p-3.5 text-sm text-muted-foreground"
+                  >
                     {PASSWORD_TIPS.map((tip) => (
-                      <li key={tip} className="flex items-start gap-2">
+                      <li key={tip} className="flex items-start gap-2.5">
                         <FiCheckCircle
                           aria-hidden="true"
-                          className="mt-0.5 size-3.5 shrink-0 text-emerald-700 dark:text-emerald-300"
+                          className="mt-0.5 size-4 shrink-0 text-emerald-700 dark:text-emerald-300"
                         />
                         {tip}
                       </li>
@@ -110,9 +135,9 @@ export default async function SettingsPage() {
 
               <Reveal delay={0.05}>
                 <TiltCard>
-                  <Card id="sessions" className="scroll-mt-24 gap-3 p-6">
+                  <Card id="sessions" className="scroll-mt-24 gap-3 p-5 sm:p-6">
                     <SectionTitle icon={FiMonitor} title="Sessions" />
-                    <p className="text-sm text-muted-foreground">
+                    <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
                       Signs you out everywhere, including this device. Use it if
                       you think someone else has access to your account.
                     </p>

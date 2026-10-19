@@ -3,9 +3,11 @@
 import { useRef, useState } from "react";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { toast } from "sonner";
+import { Camera, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { storage } from "@/lib/firebase/client/storage";
+import { cn } from "@/lib/utils";
 
 const TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
@@ -41,12 +43,33 @@ export function ImageUpload({
 
   return (
     <div className="flex items-center gap-4">
-      <Avatar className="size-20">
-        <AvatarImage src={currentUrl ?? undefined} alt="" />
-        <AvatarFallback className="font-serif text-xl">
-          {fallbackText}
-        </AvatarFallback>
-      </Avatar>
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        disabled={busy}
+        aria-label={label}
+        className="group relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-wait"
+      >
+        <Avatar className="size-20 ring-1 ring-border transition-opacity group-hover:opacity-90">
+          <AvatarImage src={currentUrl ?? undefined} alt="" />
+          <AvatarFallback className="font-serif text-xl">
+            {fallbackText}
+          </AvatarFallback>
+        </Avatar>
+        <span
+          aria-hidden="true"
+          className={cn(
+            "absolute inset-0 grid place-items-center rounded-full bg-background/70 opacity-0 transition-opacity",
+            busy ? "opacity-100" : "group-hover:opacity-100",
+          )}
+        >
+          {busy ? (
+            <Loader2 className="size-5 animate-spin text-foreground" />
+          ) : (
+            <Camera className="size-5 text-foreground" />
+          )}
+        </span>
+      </button>
       <div>
         <Button
           type="button"
@@ -54,7 +77,11 @@ export function ImageUpload({
           size="sm"
           onClick={() => input.current?.click()}
           disabled={busy}
+          className="gap-1.5"
         >
+          {busy && (
+            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
+          )}
           {busy ? "Uploading…" : label}
         </Button>
         <p className="mt-1.5 text-xs text-muted-foreground">
@@ -71,4 +98,3 @@ export function ImageUpload({
     </div>
   );
 }
-

@@ -11,6 +11,7 @@ import {
   updatePassword,
 } from "firebase/auth";
 import { toast } from "sonner";
+import { KeyRound, Loader2, LogOut, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { TextField } from "@/components/shared/TextField";
@@ -23,6 +24,15 @@ import {
 import { authErrorMessage } from "@/lib/firebase/client/errors";
 import { changePasswordSchema } from "@/lib/validations/auth";
 import { signOutEverywhere } from "@/app/actions/student";
+
+function Spinner() {
+  return (
+    <Loader2
+      aria-hidden="true"
+      className="size-4 animate-spin motion-reduce:animate-none"
+    />
+  );
+}
 
 export function ChangePasswordForm() {
   const form = useForm({
@@ -47,8 +57,15 @@ export function ChangePasswordForm() {
     }
   }
 
+  const { isSubmitting } = form.formState;
+
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      noValidate
+      aria-busy={isSubmitting}
+      className="max-w-xl"
+    >
       <FieldGroup>
         <TextField
           control={form.control}
@@ -72,13 +89,29 @@ export function ChangePasswordForm() {
           component={PasswordInput}
           autoComplete="new-password"
         />
-        <Button
-          type="submit"
-          className="sm:w-fit"
-          disabled={form.formState.isSubmitting}
-        >
-          {form.formState.isSubmitting ? "Updating…" : "Update password"}
-        </Button>
+        <div className="flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            You will stay signed in on this device after updating.
+          </p>
+          <Button
+            type="submit"
+            size="lg"
+            className="sm:w-fit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Spinner />
+                Updating…
+              </>
+            ) : (
+              <>
+                <KeyRound aria-hidden="true" className="size-4" />
+                Update password
+              </>
+            )}
+          </Button>
+        </div>
       </FieldGroup>
     </form>
   );
@@ -99,25 +132,69 @@ export function SignOutEverywhere() {
     router.refresh();
   }
   return (
-    <Button type="button" variant="outline" onClick={run} disabled={busy}>
-      {busy ? "Signing out…" : "Sign out of all devices"}
-    </Button>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+        End your session on every device, including this one. You will need to
+        log in again.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={run}
+        disabled={busy}
+        aria-busy={busy}
+        className="shrink-0"
+      >
+        {busy ? (
+          <>
+            <Spinner />
+            Signing out…
+          </>
+        ) : (
+          <>
+            <LogOut aria-hidden="true" className="size-4" />
+            Sign out of all devices
+          </>
+        )}
+      </Button>
+    </div>
   );
 }
 
 export function ResendVerification() {
+  const [sending, setSending] = useState(false);
+
   async function resend() {
+    setSending(true);
     try {
       await sendEmailVerification(auth.currentUser);
       toast.success("Verification email sent.");
     } catch (e) {
       toast.error(authErrorMessage(e));
+    } finally {
+      setSending(false);
     }
   }
   return (
-    <Button type="button" variant="outline" size="sm" onClick={resend}>
-      Resend verification email
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={resend}
+      disabled={sending}
+      aria-busy={sending}
+    >
+      {sending ? (
+        <>
+          <Spinner />
+          Sending…
+        </>
+      ) : (
+        <>
+          <MailCheck aria-hidden="true" className="size-4" />
+          Resend verification email
+        </>
+      )}
     </Button>
   );
 }
-

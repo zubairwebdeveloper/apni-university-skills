@@ -8,6 +8,7 @@ import {
   AnimatePresence,
   MotionConfig,
   motion,
+  useReducedMotion,
   useScroll,
   useSpring,
 } from "framer-motion";
@@ -62,6 +63,14 @@ const TICKER_KEY = "student-ticker-dismissed";
 const XP_PER_LEVEL = 500;
 const SESSION_ENDPOINT = "/api/auth/session"; // route that clears the session cookie
 
+/* Design tokens: yellow = progress / key highlights, violet = selected states */
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const SELECTED_TEXT = "text-violet-700 dark:text-violet-300";
+
+const RING_R = 20;
+const RING_C = 2 * Math.PI * RING_R;
+
 const ICONS = {
   dashboard: LayoutDashboard,
   book: BookOpen,
@@ -101,6 +110,13 @@ const QUICK_ACTIONS = [
   },
 ];
 
+const KIND_LABEL = {
+  query: "Search",
+  recent: "Recent",
+  link: "Go to",
+  suggestion: "Topic",
+};
+
 const toNumber = (value) => Math.max(0, Number(value) || 0);
 
 function getGreeting() {
@@ -112,9 +128,62 @@ function getGreeting() {
 
 function Shortcut({ children }) {
   return (
-    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-border bg-muted px-1.5 font-mono text-[10px] font-semibold text-muted-foreground">
+    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-border bg-background px-1.5 font-mono text-[10px] font-semibold text-muted-foreground shadow-[0_1px_0_0_var(--border)]">
       {children}
     </kbd>
+  );
+}
+
+/* Avatar wrapped in an XP progress ring with a level badge */
+function LevelRing({ progress, level, children }) {
+  return (
+    <span className="relative inline-flex size-11 shrink-0 items-center justify-center">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 44 44"
+        className="absolute inset-0 size-full -rotate-90"
+      >
+        <circle
+          cx="22"
+          cy="22"
+          r={RING_R}
+          fill="none"
+          strokeWidth="2.5"
+          className="stroke-border"
+        />
+        <motion.circle
+          cx="22"
+          cy="22"
+          r={RING_R}
+          fill="none"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          className="stroke-[#FACC15]"
+          strokeDasharray={RING_C}
+          initial={{ strokeDashoffset: RING_C }}
+          animate={{ strokeDashoffset: RING_C * (1 - progress / 100) }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+        />
+      </svg>
+      {children}
+      <span className="absolute -bottom-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-background bg-[#8B5CF6] px-1 text-[9px] font-bold leading-none text-white">
+        {level}
+      </span>
+    </span>
+  );
+}
+
+function StatTile({ icon: Icon, value, label, iconClass }) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-muted/40 px-2 py-2.5 text-center">
+      <Icon className={cn("mx-auto mb-1.5 size-4", iconClass)} />
+      <span className="block text-sm font-bold tabular-nums leading-none">
+        {value}
+      </span>
+      <span className="mt-1 block text-[10px] font-medium text-muted-foreground">
+        {label}
+      </span>
+    </div>
   );
 }
 
@@ -126,10 +195,12 @@ function SearchPanel({
   suggestions,
   recent,
   onClearRecent,
+  modKey,
 }) {
   const [value, setValue] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
+  const dialogRef = useRef(null);
 
   // Lock page scroll, focus the input, and give focus back on close
   useEffect(() => {
@@ -145,6 +216,37 @@ function SearchPanel({
     };
   }, []);
 
+  // Escape closes from anywhere inside the dialog; Tab stays trapped in it
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key === "Tab") {
+        const nodes = dialogRef.current?.querySelectorAll(
+          'input, button:not([tabindex="-1"])',
+        );
+        if (!nodes || !nodes.length) return;
+        const first = nodes[0];
+        const last = nodes[nodes.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   const query = value.trim();
 
   const results = useMemo(() => {
@@ -155,7 +257,7 @@ function SearchPanel({
       out.push({
         kind: "query",
         label: `Search courses for “${query}”`,
-        hint: "Press Enter",
+        hint: "Find matching courses across the catalog",
         icon: Search,
         query,
       });
@@ -164,7 +266,7 @@ function SearchPanel({
         out.push({
           kind: "recent",
           label,
-          hint: "Recent search",
+          hint: "Search again",
           icon: History,
         }),
       );
@@ -212,12 +314,12 @@ function SearchPanel({
   const headings = {
     recent: "Recent searches",
     link: "Quick links",
-    suggestion: query ? "Suggestions" : "Suggested",
+    suggestion: query ? "Suggestions" : "Suggested topics",
   };
 
   return (
     <motion.div
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/50 px-3 pb-6 pt-[8vh] backdrop-blur-sm sm:px-6 sm:pt-[12vh]"
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-[#111318]/70 px-3 pb-6 pt-[8vh] backdrop-blur-sm sm:px-6 sm:pt-[12vh]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -226,6 +328,7 @@ function SearchPanel({
       }}
     >
       <motion.section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Search"
@@ -236,7 +339,7 @@ function SearchPanel({
         className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
       >
         <div className="flex items-center gap-3 border-b border-border px-3 sm:px-4">
-          <Search className="size-5 shrink-0 text-primary" />
+          <Search className="size-5 shrink-0 text-[#8B5CF6]" />
 
           <Input
             ref={inputRef}
@@ -246,10 +349,7 @@ function SearchPanel({
               setActive(0);
             }}
             onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                onClose();
-              } else if (event.key === "ArrowDown" && results.length) {
+              if (event.key === "ArrowDown" && results.length) {
                 event.preventDefault();
                 setActive((i) => (i + 1) % results.length);
               } else if (event.key === "ArrowUp" && results.length) {
@@ -260,7 +360,7 @@ function SearchPanel({
                 choose(results[current]);
               }
             }}
-            placeholder="Search courses, lessons, resources..."
+            placeholder="Search courses, lessons, resources…"
             className="h-14 min-w-0 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 sm:text-base"
             aria-label="Search courses and student pages"
             role="combobox"
@@ -270,10 +370,17 @@ function SearchPanel({
             autoComplete="off"
           />
 
+          <span className="hidden sm:block">
+            <Shortcut>Esc</Shortcut>
+          </span>
+
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className={cn(
+              "inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              FOCUS,
+            )}
             aria-label="Close search"
           >
             <X className="size-4" />
@@ -283,6 +390,7 @@ function SearchPanel({
         <div
           id="search-results"
           role="listbox"
+          aria-label="Search results"
           className="max-h-[min(60vh,28rem)] overflow-y-auto p-2 sm:p-3"
         >
           {results.map((item, index) => {
@@ -294,7 +402,7 @@ function SearchPanel({
             return (
               <div key={`${item.kind}-${item.label}-${index}`}>
                 {showHeading && (
-                  <div className="mb-1 mt-2 flex items-center justify-between gap-2 px-2 first:mt-0">
+                  <div className="mb-1 mt-3 flex items-center justify-between gap-2 px-2 first:mt-0">
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                       {headings[item.kind]}
                     </p>
@@ -302,7 +410,10 @@ function SearchPanel({
                       <button
                         type="button"
                         onClick={onClearRecent}
-                        className="cursor-pointer text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                        className={cn(
+                          "cursor-pointer rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground",
+                          FOCUS,
+                        )}
                       >
                         Clear
                       </button>
@@ -314,19 +425,19 @@ function SearchPanel({
                   id={`search-opt-${index}`}
                   role="option"
                   aria-selected={isActive}
+                  tabIndex={-1}
                   type="button"
                   onMouseEnter={() => setActive(index)}
                   onClick={() => choose(item)}
                   className={cn(
-                    "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
-                    isActive ? "bg-primary/10" : "hover:bg-muted/70",
+                    "flex w-full cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors",
+                    isActive ? "bg-[#8B5CF6]/10" : "hover:bg-muted/70",
                   )}
                 >
                   <span
                     className={cn(
-                      "flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground transition-colors",
-                      isActive &&
-                        "border-primary/20 bg-primary text-primary-foreground",
+                      "flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground transition-colors",
+                      isActive && "border-[#8B5CF6] bg-[#8B5CF6] text-white",
                     )}
                   >
                     <ItemIcon className="size-[17px]" />
@@ -341,38 +452,56 @@ function SearchPanel({
                     </span>
                   </span>
 
-                  {isActive && (
-                    <CornerDownLeft className="size-4 shrink-0 text-primary" />
-                  )}
+                  <span className="hidden shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:inline">
+                    {KIND_LABEL[item.kind]}
+                  </span>
+
+                  <CornerDownLeft
+                    className={cn(
+                      "size-4 shrink-0 text-[#8B5CF6] transition-opacity",
+                      isActive ? "opacity-100" : "opacity-0",
+                    )}
+                  />
                 </button>
               </div>
             );
           })}
 
           {!results.length && (
-            <div className="px-4 py-10 text-center">
-              <Search className="mx-auto mb-3 size-7 text-muted-foreground/60" />
+            <div className="px-4 py-12 text-center">
+              <span className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl border border-border bg-muted/50">
+                <Search className="size-5 text-muted-foreground" />
+              </span>
               <p className="text-sm font-semibold">Nothing to show yet</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Type something to search all courses.
+              <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground">
+                Start typing to search every course, or press {modKey}+K any
+                time to open search from anywhere.
               </p>
             </div>
           )}
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/30 px-3 py-3 text-[11px] text-muted-foreground sm:px-4">
-          <span className="flex items-center gap-1.5">
-            <Shortcut>↑</Shortcut>
-            <Shortcut>↓</Shortcut>
-            <span>Navigate</span>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="flex items-center gap-1.5">
+              <Shortcut>↑</Shortcut>
+              <Shortcut>↓</Shortcut>
+              <span>Navigate</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Shortcut>↵</Shortcut>
+              <span>Open</span>
+            </span>
           </span>
-          <span className="flex items-center gap-1.5">
-            <Shortcut>↵</Shortcut>
-            <span>Open</span>
-            <Shortcut>Esc</Shortcut>
-            <span>Close</span>
+          <span className="tabular-nums">
+            {results.length} {results.length === 1 ? "result" : "results"}
           </span>
         </footer>
+
+        <div className="sr-only" aria-live="polite">
+          {results.length} {results.length === 1 ? "result" : "results"}{" "}
+          available
+        </div>
       </motion.section>
     </motion.div>
   );
@@ -382,6 +511,7 @@ function SearchPanel({
 export function StudentHeader({ person, onSignOut }) {
   const router = useRouter();
   const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -391,6 +521,7 @@ export function StudentHeader({ person, onSignOut }) {
   const [tickerIndex, setTickerIndex] = useState(0);
   const [tickerPaused, setTickerPaused] = useState(false);
   const [tickerHidden, setTickerHidden] = useState(false);
+  const [isMac, setIsMac] = useState(false);
 
   const recentRef = useRef([]);
 
@@ -412,7 +543,10 @@ export function StudentHeader({ person, onSignOut }) {
   const dailyGoal = Math.min(100, toNumber(person?.dailyGoalProgress));
 
   const level = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const levelProgress = ((xp % XP_PER_LEVEL) / XP_PER_LEVEL) * 100;
+  const xpInLevel = xp % XP_PER_LEVEL;
+  const levelProgress = (xpInLevel / XP_PER_LEVEL) * 100;
+
+  const modKey = isMac ? "⌘" : "Ctrl";
 
   const tickers = Array.isArray(TECH_TICKER) ? TECH_TICKER : [];
   const ticker = tickers.length ? tickers[tickerIndex % tickers.length] : null;
@@ -430,6 +564,12 @@ export function StudentHeader({ person, onSignOut }) {
   useEffect(() => {
     const id = window.setTimeout(() => {
       setGreeting(getGreeting());
+
+      try {
+        setIsMac(/Mac|iPhone|iPad|iPod/i.test(navigator.platform || ""));
+      } catch {
+        // ignore
+      }
 
       try {
         const stored = JSON.parse(
@@ -464,14 +604,16 @@ export function StudentHeader({ person, onSignOut }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Auto-rotation stops for people who prefer reduced motion
   useEffect(() => {
-    if (tickerPaused || tickerHidden || tickers.length < 2) return undefined;
+    if (reduceMotion || tickerPaused || tickerHidden || tickers.length < 2)
+      return undefined;
     const id = window.setInterval(
       () => setTickerIndex((index) => (index + 1) % tickers.length),
       4000,
     );
     return () => window.clearInterval(id);
-  }, [tickerPaused, tickerHidden, tickers.length]);
+  }, [reduceMotion, tickerPaused, tickerHidden, tickers.length]);
 
   const saveRecent = useCallback((label) => {
     const next = [
@@ -584,6 +726,8 @@ export function StudentHeader({ person, onSignOut }) {
     }
   };
 
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+
   return (
     <MotionConfig reducedMotion="user">
       <header className="sticky top-0 z-50 w-full">
@@ -591,11 +735,27 @@ export function StudentHeader({ person, onSignOut }) {
           className={cn(
             "relative border-b transition-[background-color,box-shadow,border-color] duration-300",
             scrolled
-              ? "border-border/80 bg-background/90 shadow-sm backdrop-blur-xl"
-              : "border-border/50 bg-background",
+              ? "border-border bg-background/95 shadow-[0_8px_24px_-16px_rgba(17,19,24,0.45)] backdrop-blur-md"
+              : "border-border/60 bg-background",
           )}
         >
           <div className="mx-auto flex min-h-[64px] max-w-[1600px] items-center gap-2 px-3 sm:min-h-[68px] sm:gap-3 sm:px-5 lg:px-8">
+            {/* Greeting (mobile + tablet, where the desktop nav is hidden) */}
+            <div className="flex min-w-0 items-center gap-2.5 lg:hidden">
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-medium text-muted-foreground">
+                  {greeting}
+                </p>
+                <p className="truncate text-sm font-bold leading-tight tracking-tight">
+                  {firstName}
+                </p>
+              </div>
+              <span className="hidden shrink-0 items-center gap-1 rounded-full border border-[#FACC15]/40 bg-[#FACC15]/10 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-[#FACC15] sm:inline-flex">
+                <Zap className="size-3" />
+                Level {level}
+              </span>
+            </div>
+
             {/* Desktop navigation */}
             <nav
               className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto lg:flex [scrollbar-width:none]"
@@ -612,15 +772,16 @@ export function StudentHeader({ person, onSignOut }) {
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "group relative flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-semibold transition-colors",
+                      FOCUS,
                       active
-                        ? "text-primary"
+                        ? SELECTED_TEXT
                         : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                     )}
                   >
                     {active && (
                       <motion.span
                         layoutId="student-nav-active"
-                        className="absolute inset-0 rounded-xl bg-primary/10"
+                        className="absolute inset-0 rounded-xl border border-[#8B5CF6]/25 bg-[#8B5CF6]/10"
                         transition={{
                           type: "spring",
                           stiffness: 380,
@@ -629,7 +790,7 @@ export function StudentHeader({ person, onSignOut }) {
                       />
                     )}
 
-                    <Icon className="relative size-4 shrink-0" />
+                    <Icon className="relative size-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
                     <span className="relative whitespace-nowrap">
                       {item.label}
                     </span>
@@ -646,18 +807,20 @@ export function StudentHeader({ person, onSignOut }) {
                   {streak > 0 && (
                     <span
                       title={`${streak}-day learning streak`}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-orange-500/20 bg-orange-500/10 px-2.5 text-xs font-bold text-orange-600 dark:text-orange-300"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-orange-500/25 bg-orange-500/10 px-2.5 text-xs font-bold tabular-nums text-orange-700 dark:text-orange-300"
                     >
                       <Flame className="size-4" />
                       {streak}
+                      <span className="sr-only">day streak</span>
                     </span>
                   )}
                   <span
-                    title={`${xp} XP total`}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 px-2.5 text-xs font-bold text-amber-700 dark:text-amber-300"
+                    title={`${xp.toLocaleString()} XP total`}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#FACC15]/40 bg-[#FACC15]/10 px-2.5 text-xs font-bold tabular-nums text-amber-700 dark:text-[#FACC15]"
                   >
                     <Zap className="size-4" />
                     {xp.toLocaleString()}
+                    <span className="sr-only">XP</span>
                   </span>
                 </div>
               )}
@@ -666,12 +829,15 @@ export function StudentHeader({ person, onSignOut }) {
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
-                className="group hidden h-10 min-w-[200px] cursor-pointer items-center gap-2 rounded-xl border border-border/80 bg-muted/35 px-3 text-left text-sm text-muted-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:bg-primary/[0.04] hover:text-foreground xl:flex 2xl:min-w-[260px]"
-                aria-label="Open search (Ctrl plus K)"
+                className={cn(
+                  "group hidden h-10 min-w-[200px] cursor-pointer items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 text-left text-sm text-muted-foreground transition-all duration-200 hover:border-[#8B5CF6]/50 hover:bg-[#8B5CF6]/[0.05] hover:text-foreground xl:flex 2xl:min-w-[260px]",
+                  FOCUS,
+                )}
+                aria-label={`Open search (${isMac ? "Command" : "Control"} plus K)`}
               >
-                <Search className="size-4 shrink-0 transition-colors group-hover:text-primary" />
-                <span className="flex-1">Search…</span>
-                <Shortcut>Ctrl</Shortcut>
+                <Search className="size-4 shrink-0 transition-colors group-hover:text-[#8B5CF6]" />
+                <span className="flex-1">Search courses…</span>
+                <Shortcut>{modKey}</Shortcut>
                 <Shortcut>K</Shortcut>
               </button>
 
@@ -680,7 +846,10 @@ export function StudentHeader({ person, onSignOut }) {
                 type="button"
                 onClick={() => setSearchOpen(true)}
                 aria-label="Open search"
-                className="inline-flex size-10 cursor-pointer items-center justify-center rounded-xl border border-border/80 bg-background text-muted-foreground shadow-sm transition-all duration-200 hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-95 xl:hidden"
+                className={cn(
+                  "inline-flex size-10 cursor-pointer items-center justify-center rounded-xl border border-border bg-background text-muted-foreground transition-all duration-200 hover:border-[#8B5CF6]/50 hover:bg-[#8B5CF6]/[0.06] hover:text-[#8B5CF6] active:scale-95 xl:hidden",
+                  FOCUS,
+                )}
               >
                 <Search className="size-[18px]" />
               </button>
@@ -692,22 +861,22 @@ export function StudentHeader({ person, onSignOut }) {
               <DropdownMenu>
                 <DropdownMenuTrigger
                   aria-label="Open student profile menu"
-                  className="group flex cursor-pointer items-center gap-2 rounded-xl border border-transparent p-1 outline-none transition-colors hover:border-border hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-primary active:scale-[0.98] xl:pr-2"
+                  className={cn(
+                    "group flex cursor-pointer items-center gap-2 rounded-xl border border-transparent p-0.5 transition-colors hover:border-border hover:bg-muted/60 active:scale-[0.98] xl:pr-2",
+                    FOCUS,
+                  )}
                 >
-                  <span className="relative">
-                    <Avatar className="size-9 border border-border shadow-sm">
+                  <LevelRing progress={levelProgress} level={level}>
+                    <Avatar className="size-8">
                       <AvatarImage
                         src={person?.photoURL || person?.avatar || ""}
                         alt={name}
                       />
-                      <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+                      <AvatarFallback className="bg-[#8B5CF6]/10 text-[11px] font-bold text-violet-700 dark:text-violet-300">
                         {initials}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-background bg-primary px-1 text-[9px] font-bold text-primary-foreground">
-                      {level}
-                    </span>
-                  </span>
+                  </LevelRing>
 
                   <span className="hidden max-w-32 text-left xl:block">
                     <span className="block truncate text-[10px] text-muted-foreground">
@@ -725,77 +894,86 @@ export function StudentHeader({ person, onSignOut }) {
                 <DropdownMenuContent
                   align="end"
                   sideOffset={10}
-                  className="w-[min(18rem,calc(100vw-1rem))] rounded-2xl p-2"
+                  className="w-[min(20rem,calc(100vw-1rem))] rounded-2xl p-2"
                 >
                   {/* Profile summary (plain div: no group label needed) */}
-                  <div className="px-3 pb-3 pt-2">
+                  <div className="px-2 pb-3 pt-2">
                     <div className="flex items-center gap-3">
-                      <Avatar className="size-11 border border-border">
+                      <Avatar className="size-12 border border-border">
                         <AvatarImage
                           src={person?.photoURL || person?.avatar || ""}
                           alt=""
                         />
-                        <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">
+                        <AvatarFallback className="bg-[#8B5CF6]/10 text-sm font-bold text-violet-700 dark:text-violet-300">
                           {initials}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-bold">{name}</p>
+                        <p className="truncate text-sm font-bold tracking-tight">
+                          {name}
+                        </p>
                         <p className="truncate text-xs text-muted-foreground">
                           {person?.email || "Keep your learning streak alive"}
                         </p>
                       </div>
                     </div>
 
-                    <div className="mt-3 flex items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold">Level {level}</span>
-                      <span className="text-muted-foreground">
-                        {xp % XP_PER_LEVEL}/{XP_PER_LEVEL} XP
-                      </span>
-                    </div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${levelProgress}%` }}
-                        transition={{ duration: 0.6, ease: "easeOut" }}
-                        className="h-full rounded-full bg-primary"
-                      />
+                    {/* Level progress */}
+                    <div className="mt-3 rounded-xl border border-border/70 bg-muted/40 p-3">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="inline-flex items-center gap-1.5 font-bold">
+                          <Zap className="size-3.5 text-amber-600 dark:text-[#FACC15]" />
+                          Level {level}
+                        </span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {xpInLevel}/{XP_PER_LEVEL} XP
+                        </span>
+                      </div>
+                      <div
+                        role="progressbar"
+                        aria-label="Progress to next level"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(levelProgress)}
+                        className="mt-2 h-1.5 overflow-hidden rounded-full bg-border"
+                      >
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${levelProgress}%` }}
+                          transition={{ duration: 0.6, ease: "easeOut" }}
+                          className="h-full rounded-full bg-[#FACC15]"
+                        />
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        {XP_PER_LEVEL - xpInLevel} XP to reach level {level + 1}
+                      </p>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      <div className="rounded-lg bg-muted/70 p-2 text-center">
-                        <Flame className="mx-auto mb-1 size-3.5 text-orange-500" />
-                        <span className="block text-xs font-bold">
-                          {streak}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          Day streak
-                        </span>
-                      </div>
-                      <div className="rounded-lg bg-muted/70 p-2 text-center">
-                        <BookOpen className="mx-auto mb-1 size-3.5 text-primary" />
-                        <span className="block text-xs font-bold">
-                          {coursesCount}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          Courses
-                        </span>
-                      </div>
-                      <div className="rounded-lg bg-muted/70 p-2 text-center">
-                        <Target className="mx-auto mb-1 size-3.5 text-emerald-500" />
-                        <span className="block text-xs font-bold">
-                          {dailyGoal}%
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          Daily goal
-                        </span>
-                      </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      <StatTile
+                        icon={Flame}
+                        value={streak}
+                        label="Day streak"
+                        iconClass="text-orange-500"
+                      />
+                      <StatTile
+                        icon={BookOpen}
+                        value={coursesCount}
+                        label="Courses"
+                        iconClass="text-[#8B5CF6]"
+                      />
+                      <StatTile
+                        icon={Target}
+                        value={`${dailyGoal}%`}
+                        label="Daily goal"
+                        iconClass="text-emerald-500"
+                      />
                     </div>
                   </div>
 
                   <DropdownMenuSeparator />
 
-                  <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  <p className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                     Quick actions
                   </p>
                   {QUICK_ACTIONS.map((action) => {
@@ -806,7 +984,7 @@ export function StudentHeader({ person, onSignOut }) {
                         onClick={() => router.push(action.href)}
                         className="cursor-pointer gap-3 rounded-lg px-2 py-2"
                       >
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-primary">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-[#8B5CF6]">
                           <ActionIcon className="size-4" />
                         </span>
                         <span className="min-w-0">
@@ -829,7 +1007,7 @@ export function StudentHeader({ person, onSignOut }) {
                       <DropdownMenuItem
                         key={item.href || item.label}
                         onClick={() => item.href && router.push(item.href)}
-                        className="cursor-pointer gap-2 rounded-lg py-2.5"
+                        className="cursor-pointer gap-2.5 rounded-lg px-2 py-2.5"
                       >
                         <Icon className="size-4 text-muted-foreground" />
                         {item.label}
@@ -837,10 +1015,12 @@ export function StudentHeader({ person, onSignOut }) {
                     );
                   })}
 
+                  <DropdownMenuSeparator />
+
                   <DropdownMenuItem
                     onClick={handleSignOut}
                     disabled={signingOut}
-                    className="cursor-pointer gap-2 rounded-lg py-2.5 text-destructive focus:text-destructive"
+                    className="cursor-pointer gap-2.5 rounded-lg px-2 py-2.5 text-destructive focus:text-destructive"
                   >
                     {signingOut ? (
                       <Loader2 className="size-4 animate-spin" />
@@ -866,21 +1046,19 @@ export function StudentHeader({ person, onSignOut }) {
           {/* Scroll progress */}
           <motion.div
             aria-hidden
-            style={{ scaleX: progress }}
-            className="absolute inset-x-0 bottom-[-1px] h-0.5 origin-left bg-primary"
+            style={{ scaleX: reduceMotion ? scrollYProgress : progress }}
+            className="absolute inset-x-0 bottom-[-1px] h-0.5 origin-left bg-[#FACC15]"
           />
         </div>
 
         {/* Explore ticker */}
         {ticker && !tickerHidden && (
-          <div className="border-b border-border/70 bg-muted/25">
+          <div className="border-b border-border/70 bg-muted/30">
             <div className="mx-auto flex max-w-[1600px] items-center gap-2 px-3 py-1.5 sm:gap-3 sm:px-6 lg:px-8">
-              <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-primary sm:tracking-[0.16em]">
-                <Sparkles className="size-3.5" />
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#FACC15] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#111318]">
+                <Sparkles className="size-3" />
                 Explore
               </span>
-
-              <div className="h-4 w-px shrink-0 bg-border" />
 
               <Link
                 href={
@@ -891,7 +1069,10 @@ export function StudentHeader({ person, onSignOut }) {
                 onMouseLeave={() => setTickerPaused(false)}
                 onFocus={() => setTickerPaused(true)}
                 onBlur={() => setTickerPaused(false)}
-                className="group flex min-w-0 flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                  "group flex min-w-0 flex-1 items-center gap-2 rounded-md py-0.5 text-left",
+                  FOCUS,
+                )}
               >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
@@ -900,7 +1081,7 @@ export function StudentHeader({ person, onSignOut }) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -7 }}
                     transition={{ duration: 0.22 }}
-                    className="truncate text-xs font-semibold group-hover:text-primary"
+                    className="truncate text-xs font-semibold transition-colors group-hover:text-violet-700 dark:group-hover:text-violet-300"
                   >
                     {ticker.label}
                   </motion.span>
@@ -912,7 +1093,7 @@ export function StudentHeader({ person, onSignOut }) {
                   </span>
                 )}
 
-                <ArrowRight className="size-3.5 shrink-0 text-primary opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
+                <ArrowRight className="size-3.5 shrink-0 text-[#8B5CF6] opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 group-focus-visible:opacity-100" />
               </Link>
 
               {tickers.length > 1 && tickers.length <= 8 && (
@@ -929,9 +1110,10 @@ export function StudentHeader({ person, onSignOut }) {
                       aria-label={`Show ${item.label}`}
                       aria-current={index === tickerIndex % tickers.length}
                       className={cn(
-                        "h-1.5 rounded-full transition-all",
+                        "h-1.5 cursor-pointer rounded-full transition-all",
+                        FOCUS,
                         index === tickerIndex % tickers.length
-                          ? "w-4 bg-primary"
+                          ? "w-4 bg-[#8B5CF6]"
                           : "w-1.5 bg-border hover:bg-muted-foreground/50",
                       )}
                     />
@@ -943,7 +1125,10 @@ export function StudentHeader({ person, onSignOut }) {
                 type="button"
                 onClick={dismissTicker}
                 aria-label="Hide featured technologies"
-                className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className={cn(
+                  "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  FOCUS,
+                )}
               >
                 <X className="size-3.5" />
               </button>
@@ -956,7 +1141,7 @@ export function StudentHeader({ person, onSignOut }) {
       <AnimatePresence>
         {searchOpen && (
           <SearchPanel
-            onClose={() => setSearchOpen(false)}
+            onClose={closeSearch}
             onSearch={goSearch}
             onNavigate={goTo}
             suggestions={
@@ -964,6 +1149,7 @@ export function StudentHeader({ person, onSignOut }) {
             }
             recent={recent}
             onClearRecent={clearRecent}
+            modKey={modKey}
           />
         )}
       </AnimatePresence>

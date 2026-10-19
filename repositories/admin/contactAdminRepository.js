@@ -44,7 +44,7 @@ const CONTACT_LIFECYCLE = {
   },
 };
 export const contactAdminRepository = createAdminRepository({
-  collection: "contacts",
+  collection: "contactMessages",
   resourceName: "contact",
   activeStatuses: ["new", "read", "replied", "archived", "spam"],
   lifecycle: CONTACT_LIFECYCLE,

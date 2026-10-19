@@ -39,12 +39,15 @@ export const metadata = {
 };
 
 const h2Class =
-  "text-balance text-[clamp(1.5rem,3vw,2.25rem)] font-semibold leading-tight tracking-tight";
+  "text-balance text-[clamp(1.75rem,3.2vw,2.5rem)] font-semibold leading-[1.1] tracking-tight text-foreground";
+
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 // Hover fix: the outer "group" element never moves. Only the inner card
 // transforms, so the cursor cannot leave the hover area and cause flicker.
 const cardHover =
-  "transition-all duration-300 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-lg motion-reduce:transition-none motion-reduce:group-hover:translate-y-0";
+  "shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-lg motion-reduce:transition-none motion-reduce:group-hover:translate-y-0";
 
 const chips = [
   { icon: FiHelpCircle, text: "What it is" },
@@ -152,6 +155,32 @@ const faqJsonLd = JSON.stringify({
   })),
 }).replace(/</g, "\\u003c");
 
+function Eyebrow({ children }) {
+  return (
+    <p className="inline-flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+      <span aria-hidden="true" className="h-px w-6 bg-primary" />
+      {children}
+      <span aria-hidden="true" className="h-px w-6 bg-primary" />
+    </p>
+  );
+}
+
+function SectionHeading({ id, eyebrow, title, description }) {
+  return (
+    <Reveal className="mx-auto max-w-2xl text-center">
+      {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
+      <h2 id={id} className={`${eyebrow ? "mt-3" : ""} ${h2Class}`}>
+        {title}
+      </h2>
+      {description ? (
+        <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
+          {description}
+        </p>
+      ) : null}
+    </Reveal>
+  );
+}
+
 export default async function TechnologyPage() {
   const raw = await technologyService.getAllTechnologies();
 
@@ -182,11 +211,11 @@ export default async function TechnologyPage() {
         description="What each technology is, why it matters, the skills it needs, and the roles it leads to."
         breadcrumbs={[{ label: "Home", href: "/" }, { label: "Technology" }]}
       >
-        <ul className="mt-5 flex flex-wrap gap-2.5">
+        <ul className="mt-6 flex flex-wrap gap-2.5">
           {chips.map(({ icon: Icon, text }) => (
             <li
               key={text}
-              className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3.5 py-1.5 text-sm font-medium backdrop-blur"
+              className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-4 py-2 text-sm font-medium shadow-sm backdrop-blur"
             >
               <Icon aria-hidden="true" className="size-4 text-primary" />
               {text}
@@ -204,7 +233,7 @@ export default async function TechnologyPage() {
         />
 
         {/* Stats */}
-        <Container className="relative pt-10">
+        <Container className="relative pt-12">
           <ul
             className={`grid grid-cols-1 gap-4 ${
               stats.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"
@@ -215,16 +244,16 @@ export default async function TechnologyPage() {
                 <Reveal delay={i * 0.08} className="h-full">
                   <div className="group h-full">
                     <div
-                      className={`flex h-full items-center gap-4 rounded-2xl border bg-card p-5 ${cardHover}`}
+                      className={`flex h-full items-center gap-5 rounded-2xl border bg-card p-6 ${cardHover}`}
                     >
-                      <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
-                        <Icon aria-hidden="true" className="size-5" />
+                      <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
+                        <Icon aria-hidden="true" className="size-6" />
                       </span>
-                      <div>
-                        <p className="font-serif text-3xl font-semibold leading-none">
+                      <div className="min-w-0">
+                        <p className="font-serif text-4xl font-semibold leading-none tracking-tight text-foreground">
                           {value}
                         </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-1.5 text-sm font-medium text-muted-foreground">
                           {label}
                         </p>
                       </div>
@@ -242,7 +271,7 @@ export default async function TechnologyPage() {
             <div className="group">
               <Link
                 href="/ai"
-                className="relative block overflow-hidden rounded-3xl border border-primary/30 bg-accent p-6 outline-none transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0 sm:p-8"
+                className="relative block overflow-hidden rounded-3xl border border-primary/30 bg-accent p-6 shadow-sm outline-none transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none motion-reduce:group-hover:translate-y-0 sm:p-10"
               >
                 <span
                   aria-hidden="true"
@@ -252,21 +281,21 @@ export default async function TechnologyPage() {
                   aria-hidden="true"
                   className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/15 blur-3xl transition-transform duration-700 group-hover:scale-125 motion-reduce:transition-none"
                 />
-                <div className="relative grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_18rem]">
-                  <div className="flex items-start gap-4">
-                    <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground transition-transform duration-300 group-hover:rotate-6 motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
+                <div className="relative grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_18rem]">
+                  <div className="flex items-start gap-5">
+                    <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/20 transition-transform duration-300 group-hover:rotate-6 motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
                       <FiCpu aria-hidden="true" className="size-6" />
                     </span>
-                    <div>
-                      <Badge className="mb-2">Featured hub</Badge>
-                      <h2 className="font-serif text-xl font-semibold sm:text-2xl">
+                    <div className="min-w-0">
+                      <Badge className="mb-3">Featured hub</Badge>
+                      <h2 className="font-serif text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
                         Artificial Intelligence
                       </h2>
-                      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                      <p className="mt-2 max-w-xl text-base leading-relaxed text-muted-foreground">
                         Generative AI, agents, automation, and machine learning,
                         in one dedicated hub.
                       </p>
-                      <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                      <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
                         Explore the AI hub
                         <FiArrowRight
                           aria-hidden="true"
@@ -290,7 +319,7 @@ export default async function TechnologyPage() {
 
         {/* Explorer */}
         <span id="explorer" className="block" />
-        <Container className="relative py-10">
+        <Container className="relative py-12 sm:py-16">
           <Reveal>
             <TechnologyExplorer items={items} />
           </Reveal>
@@ -300,22 +329,16 @@ export default async function TechnologyPage() {
         <section
           id="areas"
           aria-labelledby="areas-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t py-16 sm:py-24"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                Fields overview
-              </Badge>
-              <h2 id="areas-title" className={h2Class}>
-                What is established and what is still developing
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                See what you could build in each field and what to know first.
-                Newer fields change fast, so we label them honestly.
-              </p>
-            </Reveal>
-            <div className="mt-8">
+            <SectionHeading
+              id="areas-title"
+              eyebrow="Fields overview"
+              title="What is established and what is still developing"
+              description="See what you could build in each field and what to know first. Newer fields change fast, so we label them honestly."
+            />
+            <div className="mt-12">
               <AreasMap />
             </div>
           </Container>
@@ -325,35 +348,36 @@ export default async function TechnologyPage() {
         <section
           id="how"
           aria-labelledby="how-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t bg-muted/20 py-16 sm:py-24"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                How to use this page
-              </Badge>
-              <h2 id="how-title" className={h2Class}>
-                From curious to confident
-              </h2>
-            </Reveal>
-            <ol className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <SectionHeading
+              id="how-title"
+              eyebrow="How to use this page"
+              title="From curious to confident"
+              description="Four steps to go from browsing to learning."
+            />
+            <ol className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {howTo.map(({ icon: Icon, title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.08} className="h-full">
                     <div className="group h-full">
                       <div
-                        className={`relative h-full rounded-2xl border bg-card p-5 ${cardHover}`}
+                        className={`relative h-full rounded-2xl border bg-card p-6 ${cardHover}`}
                       >
-                        <span className="pointer-events-none absolute right-4 top-3 font-serif text-4xl font-semibold text-primary/10">
-                          {i + 1}
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute right-5 top-4 font-serif text-5xl font-semibold tabular-nums text-primary/10"
+                        >
+                          {String(i + 1).padStart(2, "0")}
                         </span>
-                        <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
+                        <span className="grid size-12 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
                           <Icon aria-hidden="true" className="size-5" />
                         </span>
-                        <h3 className="mt-4 font-sans text-base font-semibold">
+                        <h3 className="mt-5 font-sans text-lg font-semibold leading-snug">
                           {title}
                         </h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
                           {text}
                         </p>
                       </div>
@@ -369,32 +393,29 @@ export default async function TechnologyPage() {
         <section
           id="why"
           aria-labelledby="why-title"
-          className="border-t py-12 sm:py-16"
+          className="border-t py-16 sm:py-24"
         >
           <Container>
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                Why it matters
-              </Badge>
-              <h2 id="why-title" className={h2Class}>
-                Why technology knowledge pays off
-              </h2>
-            </Reveal>
-            <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <SectionHeading
+              id="why-title"
+              eyebrow="Why it matters"
+              title="Why technology knowledge pays off"
+            />
+            <ul className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {whyItMatters.map(({ icon: Icon, title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.08} className="h-full">
                     <div className="group h-full">
                       <div
-                        className={`h-full rounded-2xl border bg-card p-5 text-center ${cardHover}`}
+                        className={`h-full rounded-2xl border bg-card p-6 text-center ${cardHover}`}
                       >
-                        <span className="mx-auto grid size-12 place-items-center rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:scale-100">
-                          <Icon aria-hidden="true" className="size-5" />
+                        <span className="mx-auto grid size-14 place-items-center rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+                          <Icon aria-hidden="true" className="size-6" />
                         </span>
-                        <h3 className="mt-4 font-sans text-base font-semibold">
+                        <h3 className="mt-5 font-sans text-lg font-semibold leading-snug">
                           {title}
                         </h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
                           {text}
                         </p>
                       </div>
@@ -410,34 +431,34 @@ export default async function TechnologyPage() {
         <section
           id="path"
           aria-labelledby="path-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t bg-muted/20 py-16 sm:py-24"
         >
           <Container className="max-w-4xl">
-            <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
-                Your learning path
-              </Badge>
-              <h2 id="path-title" className={h2Class}>
-                Three steps from guide to job-ready
-              </h2>
-            </Reveal>
-            <ol className="relative mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <SectionHeading
+              id="path-title"
+              eyebrow="Your learning path"
+              title="Three steps from guide to job-ready"
+            />
+            <ol className="relative mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute left-[16%] right-[16%] top-9 hidden h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent md:block"
+                className="pointer-events-none absolute left-[16%] right-[16%] top-11 hidden h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent md:block"
               />
               {path.map(({ title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.1} className="h-full">
                     <Tilt className="h-full" max={4}>
-                      <div className="relative h-full rounded-2xl border bg-card p-5 text-center">
-                        <span className="mx-auto grid size-12 place-items-center rounded-full bg-primary font-serif text-lg font-semibold text-primary-foreground">
+                      <div className="relative h-full rounded-2xl border bg-card p-6 text-center shadow-sm transition-colors hover:border-primary/40 motion-reduce:transition-none sm:p-7">
+                        <span className="mx-auto grid size-14 place-items-center rounded-full bg-primary font-serif text-xl font-semibold tabular-nums text-primary-foreground shadow-md shadow-primary/20 ring-4 ring-card">
                           {i + 1}
                         </span>
-                        <h3 className="mt-3 font-sans text-base font-semibold">
+                        <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                          Step {String(i + 1).padStart(2, "0")}
+                        </p>
+                        <h3 className="mt-1 font-sans text-lg font-semibold leading-snug">
                           {title}
                         </h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
                           {text}
                         </p>
                       </div>
@@ -450,24 +471,24 @@ export default async function TechnologyPage() {
         </section>
 
         {/* Careers banner */}
-        <section className="border-t py-12 sm:py-14">
+        <section className="border-t py-16 sm:py-20">
           <Container>
             <Reveal>
-              <div className="relative overflow-hidden rounded-3xl border bg-card p-8 sm:p-10">
+              <div className="relative overflow-hidden rounded-3xl border bg-card p-8 shadow-sm sm:p-12">
                 <span
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
                 />
-                <div className="flex flex-col items-start gap-5 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-start gap-4">
-                    <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                      <FiCompass aria-hidden="true" className="size-5" />
+                <div className="flex flex-col items-start gap-8 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-start gap-5">
+                    <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
+                      <FiCompass aria-hidden="true" className="size-6" />
                     </span>
-                    <div>
-                      <h2 className="text-xl sm:text-2xl">
+                    <div className="min-w-0">
+                      <h2 className="text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
                         Ready to turn knowledge into skills?
                       </h2>
-                      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                      <p className="mt-3 max-w-xl text-base leading-relaxed text-muted-foreground">
                         See which careers use these technologies, then learn
                         them with practical courses. Many are free.
                       </p>
@@ -476,13 +497,25 @@ export default async function TechnologyPage() {
                   <div className="flex flex-wrap gap-3">
                     <Link
                       href="/careers"
-                      className={buttonVariants({ variant: "default" })}
+                      className={buttonVariants({
+                        variant: "default",
+                        size: "lg",
+                        className: "group/btn min-h-11",
+                      })}
                     >
                       Explore careers
+                      <FiArrowRight
+                        aria-hidden="true"
+                        className="transition-transform duration-200 group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                      />
                     </Link>
                     <Link
                       href="/courses"
-                      className={buttonVariants({ variant: "outline" })}
+                      className={buttonVariants({
+                        variant: "outline",
+                        size: "lg",
+                        className: "min-h-11",
+                      })}
                     >
                       <FiSearch aria-hidden="true" />
                       Browse courses
@@ -498,26 +531,41 @@ export default async function TechnologyPage() {
         <section
           id="faq"
           aria-labelledby="faq-title"
-          className="border-t bg-muted/20 py-12 sm:py-16"
+          className="border-t bg-muted/20 py-16 sm:py-24"
         >
           <Container className="max-w-3xl">
-            <Reveal className="text-center">
-              <h2 id="faq-title" className={h2Class}>
-                Technology questions
-              </h2>
-            </Reveal>
-            <div className="mt-8 space-y-3">
+            <SectionHeading
+              id="faq-title"
+              eyebrow="FAQ"
+              title="Technology questions"
+              description="Quick answers about the guides and how to use them."
+            />
+            <div className="mt-12 space-y-3">
               {faqs.map(({ q, a }, i) => (
                 <Reveal key={q} delay={i * 0.06}>
-                  <details className="group rounded-xl border bg-card px-4 py-3 open:shadow-md">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
-                      {q}
-                      <FiChevronDown
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-primary transition-transform duration-300 group-open:rotate-180 motion-reduce:transition-none"
-                      />
+                  <details className="group rounded-xl border bg-card px-5 shadow-sm transition-colors hover:border-primary/30 open:border-primary/30 open:shadow-md motion-reduce:transition-none sm:px-6">
+                    <summary
+                      className={`flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-4 text-left text-base font-medium focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden outline-none`}
+                    >
+                      <span className="flex min-w-0 items-baseline gap-3">
+                        <span
+                          aria-hidden="true"
+                          className="text-xs font-semibold tabular-nums text-primary"
+                        >
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <span>{q}</span>
+                      </span>
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                        <FiChevronDown
+                          aria-hidden="true"
+                          className="size-4 transition-transform duration-300 group-open:rotate-180 motion-reduce:transition-none"
+                        />
+                      </span>
                     </summary>
-                    <p className="mt-3 text-sm text-muted-foreground">{a}</p>
+                    <p className="max-w-2xl pb-5 leading-7 text-muted-foreground sm:pl-8">
+                      {a}
+                    </p>
                   </details>
                 </Reveal>
               ))}

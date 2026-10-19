@@ -23,8 +23,18 @@ import {
   CAREER_SORTS,
   careerAdminRepository,
 } from "@/repositories/admin/careerAdminRepository";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Careers" };
+
+// Shared entrance-animation classes/delays — same pattern used on the other
+// admin pages (fade + slide-up, respects prefers-reduced-motion).
+const ENTRANCE =
+  "animate-in fade-in slide-in-from-bottom-2 duration-500 motion-reduce:animate-none";
+const delay = (ms) => ({
+  animationDelay: `${ms}ms`,
+  animationFillMode: "backwards",
+});
 
 export default async function AdminCareersPage({ searchParams }) {
   const user = await requirePermission(P.CAREERS_READ);
@@ -59,20 +69,28 @@ export default async function AdminCareersPage({ searchParams }) {
 
   return (
     <>
-      <AdminPageHeader
-        title="Careers"
-        description="Role guides with roadmaps, skills, interview preparation and portfolio ideas."
-        actions={
-          canCreate && (
-            <Link href="/admin/careers/create" className={buttonVariants()}>
-              New guide
-            </Link>
-          )
-        }
-      />
+      <div className={ENTRANCE} style={delay(0)}>
+        <AdminPageHeader
+          title="Careers"
+          description="Role guides with roadmaps, skills, interview preparation and portfolio ideas."
+          actions={
+            canCreate && (
+              <Link href="/admin/careers/create" className={buttonVariants()}>
+                New guide
+              </Link>
+            )
+          }
+        />
+      </div>
 
       {/* Summary: a compact read-out of the current view */}
-      <dl className="mb-4 grid grid-cols-3 divide-x divide-border rounded-xl border bg-card">
+      <dl
+        className={cn(
+          "mb-4 grid grid-cols-3 divide-x divide-border rounded-xl border bg-card",
+          ENTRANCE,
+        )}
+        style={delay(60)}
+      >
         {summary.map((s) => (
           <div
             key={s.label}
@@ -81,34 +99,36 @@ export default async function AdminCareersPage({ searchParams }) {
             <dt className="text-xs text-muted-foreground sm:text-sm">
               {s.label}
             </dt>
-            <dd className="font-serif text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
+            <dd className="text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
               {s.value}
             </dd>
           </div>
         ))}
       </dl>
 
-      <DataTableToolbar
-        searchPlaceholder="Search by title, summary or skill…"
-        total={total}
-        sorts={sortOptions(CAREER_SORTS)}
-        filters={[
-          {
-            key: "status",
-            label: "Status",
-            allLabel: "All (not in trash)",
-            options: CONTENT_STATUS_OPTIONS,
-          },
-          {
-            key: "range",
-            label: "Created",
-            allLabel: "Any time",
-            options: RANGE_OPTIONS,
-          },
-        ]}
-      />
+      <div className={ENTRANCE} style={delay(120)}>
+        <DataTableToolbar
+          searchPlaceholder="Search by title, summary or skill…"
+          total={total}
+          sorts={sortOptions(CAREER_SORTS)}
+          filters={[
+            {
+              key: "status",
+              label: "Status",
+              allLabel: "All (not in trash)",
+              options: CONTENT_STATUS_OPTIONS,
+            },
+            {
+              key: "range",
+              label: "Created",
+              allLabel: "Any time",
+              options: RANGE_OPTIONS,
+            },
+          ]}
+        />
+      </div>
 
-      <div className="mt-4">
+      <div className={cn("mt-4", ENTRANCE)} style={delay(180)}>
         {items.length > 0 ? (
           <>
             <CareersTable rows={items} perms={permissionsFor(user.role)} />

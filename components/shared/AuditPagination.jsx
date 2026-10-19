@@ -25,7 +25,7 @@ function buildHref(basePath, params, { after, trail }) {
 function NavItem({ href, disabled, label, children, className }) {
   const cls = cn(
     buttonVariants({ variant: "outline", size: "sm" }),
-    "gap-1",
+    "gap-1 transition-colors",
     className,
   );
   if (disabled || !href) {
@@ -33,14 +33,18 @@ function NavItem({ href, disabled, label, children, className }) {
       <span
         aria-disabled="true"
         aria-label={label}
-        className={cn(cls, "pointer-events-none opacity-50")}
+        className={cn(cls, "pointer-events-none opacity-40")}
       >
         {children}
       </span>
     );
   }
   return (
-    <Link href={href} aria-label={label} className={cls}>
+    <Link
+      href={href}
+      aria-label={label}
+      className={cn(cls, "hover:border-primary/40 hover:text-primary")}
+    >
       {children}
     </Link>
   );
@@ -79,15 +83,20 @@ export function AuditPagination({
   if (!hasPrev && !nextCursor) {
     return total ? (
       <p className="mt-4 text-center text-xs text-muted-foreground">
-        Showing all {shown} of {total} entries
+        Showing all <span className="font-medium text-foreground">{shown}</span>{" "}
+        of {total} entries
       </p>
     ) : null;
   }
 
   return (
-    <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
-      <p className="text-xs text-muted-foreground" aria-live="polite">
-        Page {page} · {shown} entries shown
+    <div className="mt-4 flex flex-col items-center justify-between gap-3 border-t pt-4 sm:flex-row">
+      <p
+        className="text-xs tabular-nums text-muted-foreground"
+        aria-live="polite"
+      >
+        Page <span className="font-medium text-foreground">{page}</span> ·{" "}
+        {shown} entries shown
         {total ? ` · ${total} total` : ""}
       </p>
       <Pagination className="mx-0 w-auto justify-end">
@@ -109,7 +118,7 @@ export function AuditPagination({
               aria-current="page"
               className={cn(
                 buttonVariants({ variant: "default", size: "sm" }),
-                "pointer-events-none min-w-9",
+                "pointer-events-none min-w-9 tabular-nums shadow-sm",
               )}
             >
               {page}

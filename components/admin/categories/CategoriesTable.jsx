@@ -18,6 +18,16 @@ import {
   runCategoryAction,
 } from "@/app/actions/admin/categories";
 
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+// Muted placeholder for empty cells, with a label for screen readers.
+const Empty = ({ label }) => (
+  <span className="text-muted-foreground" aria-label={label}>
+    —
+  </span>
+);
+
 export function CategoriesTable({ rows, perms }) {
   const { selected, setSelected, clear, ids } = useSelection(rows);
   const columns = [
@@ -28,11 +38,16 @@ export function CategoriesTable({ rows, perms }) {
         <div className="min-w-0">
           <Link
             href={`/admin/categories/${r.slug}/edit`}
-            className="font-medium hover:underline"
+            className={`rounded-sm font-medium text-foreground underline-offset-4 hover:text-primary hover:underline ${FOCUS}`}
           >
             {r.name}
           </Link>
-          <p className="font-mono text-xs text-muted-foreground">{r.slug}</p>
+          <p
+            className="mt-0.5 max-w-xs truncate font-mono text-xs text-muted-foreground"
+            title={r.slug}
+          >
+            {r.slug}
+          </p>
         </div>
       ),
     },
@@ -40,13 +55,21 @@ export function CategoriesTable({ rows, perms }) {
       key: "courses",
       header: "Courses",
       className: "tabular-nums",
-      cell: (r) => r.coursesCount ?? 0,
+      cell: (r) => {
+        const count = r.coursesCount ?? 0;
+        // A zero is dimmed so categories that still need courses stand out.
+        return (
+          <span className={count === 0 ? "text-muted-foreground" : undefined}>
+            {count}
+          </span>
+        );
+      },
     },
     {
       key: "order",
       header: "Order",
       className: "tabular-nums",
-      cell: (r) => r.order,
+      cell: (r) => r.order ?? <Empty label="No order set" />,
     },
     {
       key: "status",
@@ -66,16 +89,14 @@ export function CategoriesTable({ rows, perms }) {
             <span className="sr-only">Featured</span>
           </>
         ) : (
-          <span className="text-muted-foreground" aria-label="Not featured">
-            —
-          </span>
+          <Empty label="Not featured" />
         ),
     },
     {
       key: "updated",
       header: "Updated",
-      className: "whitespace-nowrap text-muted-foreground",
-      cell: (r) => formatDate(r.updatedAt),
+      className: "whitespace-nowrap tabular-nums text-muted-foreground",
+      cell: (r) => formatDate(r.updatedAt) || <Empty label="Not updated" />,
     },
     {
       key: "actions",
@@ -134,4 +155,3 @@ export function CategoriesTable({ rows, perms }) {
     </>
   );
 }
-

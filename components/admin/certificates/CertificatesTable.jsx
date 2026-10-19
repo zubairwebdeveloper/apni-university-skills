@@ -9,6 +9,16 @@ import { RowActions } from "@/components/admin/table/RowActions";
 import { formatDate } from "@/lib/utils/format";
 import { reinstateCertificate } from "@/app/actions/admin/certificates";
 
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+// Muted placeholder for empty cells, with a label for screen readers.
+const Empty = ({ label }) => (
+  <span className="text-muted-foreground" aria-label={label}>
+    —
+  </span>
+);
+
 export function CertificatesTable({ rows, perms }) {
   const columns = [
     {
@@ -17,18 +27,23 @@ export function CertificatesTable({ rows, perms }) {
       cell: (r) => (
         <Link
           href={`/admin/certificates/${r.slug}`}
-          className="font-mono text-sm font-medium hover:underline"
+          className={`whitespace-nowrap rounded-sm font-mono text-sm font-medium text-foreground underline-offset-4 hover:text-primary hover:underline ${FOCUS}`}
         >
           {r.certificateNumber}
         </Link>
       ),
     },
-    { key: "student", header: "Student", cell: (r) => r.studentName },
+    {
+      key: "student",
+      header: "Student",
+      className: "min-w-40",
+      cell: (r) => r.studentName || <Empty label="No student name" />,
+    },
     {
       key: "course",
       header: "Course",
-      className: "min-w-48",
-      cell: (r) => r.courseTitle,
+      className: "min-w-48 text-muted-foreground",
+      cell: (r) => r.courseTitle || <Empty label="No course" />,
     },
     {
       key: "status",
@@ -38,8 +53,8 @@ export function CertificatesTable({ rows, perms }) {
     {
       key: "issued",
       header: "Issued",
-      className: "whitespace-nowrap text-muted-foreground",
-      cell: (r) => formatDate(r.issuedAt),
+      className: "whitespace-nowrap tabular-nums text-muted-foreground",
+      cell: (r) => formatDate(r.issuedAt) || <Empty label="No issue date" />,
     },
     {
       key: "actions",
@@ -85,4 +100,3 @@ export function CertificatesTable({ rows, perms }) {
     />
   );
 }
-

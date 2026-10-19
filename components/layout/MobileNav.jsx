@@ -1,6 +1,6 @@
-// components/layout/MobileNav.jsx
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
@@ -30,6 +30,7 @@ import {
   FiX,
   FiGrid,
 } from "react-icons/fi";
+
 import {
   Sheet,
   SheetClose,
@@ -48,10 +49,10 @@ import { AnimatedLogo } from "./AnimatedLogo";
 import { primaryNav, moreNav } from "@/config/site";
 import { cn } from "@/lib/utils";
 
-/* ----------------------------- config ----------------------------- */
+/* -------------------------------------------------------------------------- */
+/* Configuration                                                              */
+/* -------------------------------------------------------------------------- */
 
-// Route -> icon. If a link in config has its own `icon`, that wins.
-// Config links can also carry: `badge` ("New"), `external` (true), `keywords` (["learn"]).
 const ICONS = {
   "/": FiHome,
   "/courses": FiBookOpen,
@@ -67,107 +68,167 @@ const ICONS = {
   "/ai": FiCpu,
 };
 
-// Profile card links (shown only when a `user` is passed in).
 const PROFILE_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: FiGrid },
   { href: "/profile", label: "Profile", icon: FiUser },
   { href: "/settings", label: "Settings", icon: FiSettings },
 ];
 
-// Shown when there are no recent searches yet.
 const SUGGESTIONS = ["courses", "jobs", "pricing", "contact"];
 
 const RECENT_KEY = "mobilenav:recent";
 const MAX_RECENT = 4;
 
-/* ----------------------------- helpers ---------------------------- */
+const EXTERNAL_PROTOCOLS = new Set(["https:", "http:"]);
+
+const listVariants = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.035,
+      delayChildren: 0.035,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, x: 10 },
+  show: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.22, ease: "easeOut" },
+  },
+};
+
+const sectionLabel =
+  "mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground";
+
+const quickCard =
+  "group flex min-h-11 min-w-0 items-center gap-2.5 rounded-xl border border-border/80 bg-card px-3 py-2.5 text-sm font-medium text-card-foreground outline-none transition-colors duration-200 hover:border-amber-500/50 hover:bg-amber-500/5 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
+
+const chip =
+  "max-w-[10rem] truncate rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground outline-none transition-colors hover:border-violet-500/50 hover:bg-violet-500/5 focus-visible:ring-2 focus-visible:ring-ring";
+
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
 
 function getIcon(link) {
   return link.icon || ICONS[link.href] || FiChevronRight;
 }
 
+function getSafeExternalUrl(href) {
+  if (typeof href !== "string") return null;
+
+  try {
+    const url = new URL(href);
+
+    if (!EXTERNAL_PROTOCOLS.has(url.protocol)) return null;
+
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
 function isExternal(link) {
-  return link.external || /^https?:\/\//.test(link.href);
+  return Boolean(link?.external || /^https?:\/\//i.test(link?.href || ""));
 }
 
 function isActive(pathname, href) {
-  if (!pathname) return false;
+  if (!pathname || !href) return false;
+
   if (href === "/") return pathname === "/";
+
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function matches(link, q) {
-  if (link.label.toLowerCase().includes(q)) return true;
-  return (link.keywords || []).some((k) => k.toLowerCase().includes(q));
+function matches(link, query) {
+  const label = typeof link?.label === "string" ? link.label : "";
+
+  if (label.toLowerCase().includes(query)) return true;
+
+  return (Array.isArray(link?.keywords) ? link.keywords : []).some(
+    (keyword) =>
+      typeof keyword === "string" && keyword.toLowerCase().includes(query),
+  );
 }
 
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function getInitials(name = "") {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "U";
-  return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
-}
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
 
-// Wrap the matched part of a label in <mark> so users see why it matched.
-function Highlight({ text, q }) {
-  if (!q) return text;
-  const parts = text.split(new RegExp(`(${escapeRegExp(q)})`, "i"));
-  return parts.map((part, i) =>
-    part.toLowerCase() === q ? (
-      <mark key={i} className="rounded-sm bg-primary/15 px-0.5 text-foreground">
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
-  );
+  if (!parts.length) return "U";
+
+  return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
 }
 
 function readRecent() {
   try {
-    const raw = localStorage.getItem(RECENT_KEY);
+    const raw = window.localStorage.getItem(RECENT_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_RECENT) : [];
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((item) => typeof item === "string" && item.trim())
+      .map((item) => item.trim())
+      .slice(0, MAX_RECENT);
   } catch {
     return [];
   }
 }
 
-function writeRecent(list) {
+function writeRecent(items) {
   try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(items));
   } catch {
-    /* storage unavailable (private mode etc.) */
+    // Storage may be unavailable in private browsing or restricted contexts.
   }
 }
 
-/* ---------------------------- animations -------------------------- */
+/* -------------------------------------------------------------------------- */
+/* Search highlighting                                                        */
+/* -------------------------------------------------------------------------- */
 
-const listVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.04, delayChildren: 0.06 } },
-};
+const Highlight = memo(function Highlight({ text, query }) {
+  if (!query || typeof text !== "string") return text;
 
-const itemVariants = {
-  hidden: { opacity: 0, x: 14 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.26, ease: "easeOut" } },
-};
+  const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, "ig"));
 
-const sectionLabel =
-  "mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+  return parts.map((part, index) => {
+    const matched = part.toLowerCase() === query.toLowerCase();
 
-const quickCard =
-  "group flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium text-card-foreground outline-none transition-[border-color,box-shadow] duration-200 hover:border-primary/40 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
+    return matched ? (
+      <mark
+        key={`${index}-${part}`}
+        className="rounded bg-amber-400/25 px-0.5 text-inherit"
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    );
+  });
+});
 
-const chip =
-  "max-w-[10rem] truncate rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-card-foreground outline-none transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring";
+/* -------------------------------------------------------------------------- */
+/* Navigation list                                                            */
+/* -------------------------------------------------------------------------- */
 
-/* ------------------------------ NavList --------------------------- */
-
-function NavList({ links, pathname, onNavigate, reduce, q }) {
+const NavList = memo(function NavList({
+  links,
+  pathname,
+  onNavigate,
+  reduce,
+  query,
+}) {
   return (
     <motion.ul
       className="min-w-0 space-y-1"
@@ -175,16 +236,23 @@ function NavList({ links, pathname, onNavigate, reduce, q }) {
       initial={reduce ? false : "hidden"}
       animate="show"
     >
-      {links.map((l) => {
-        const Icon = getIcon(l);
-        const external = isExternal(l);
-        const active = !external && isActive(pathname, l.href);
+      {links.map((link, index) => {
+        const Icon = getIcon(link);
+        const external = isExternal(link);
+        const externalHref = external ? getSafeExternalUrl(link.href) : null;
 
-        const className = cn(
-          "group relative flex min-h-11 min-w-0 items-center gap-3 rounded-lg px-3 py-2 text-base font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+        // Invalid external destinations are not rendered as links.
+        if (external && !externalHref) return null;
+
+        const active = !external && isActive(pathname, link.href);
+
+        const linkClass = cn(
+          "group relative flex min-h-12 min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium",
+          "transition-colors duration-200 motion-reduce:transition-none",
+          focusRing,
           active
-            ? "bg-accent font-semibold text-foreground"
-            : "text-foreground/90 hover:bg-accent hover:text-foreground",
+            ? "bg-primary/10 text-foreground"
+            : "text-foreground/85 hover:bg-accent hover:text-foreground",
         );
 
         const content = (
@@ -192,45 +260,46 @@ function NavList({ links, pathname, onNavigate, reduce, q }) {
             {active && (
               <span
                 aria-hidden="true"
-                className="absolute inset-y-2 left-0 w-1 rounded-full bg-primary"
+                className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-primary"
               />
             )}
+
             <span
               className={cn(
-                "grid size-8 shrink-0 place-items-center rounded-lg transition-colors duration-200 motion-reduce:transition-none",
+                "grid size-9 shrink-0 place-items-center rounded-xl transition-colors duration-200",
+                "motion-reduce:transition-none",
                 active
                   ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary",
+                  : "bg-muted text-muted-foreground group-hover:bg-violet-500/10 group-hover:text-violet-700 dark:group-hover:text-violet-300",
               )}
             >
-              <Icon className="size-4" aria-hidden="true" />
+              <Icon className="size-[17px]" aria-hidden="true" />
             </span>
 
-            {/* min-w-0 + truncate stops long labels from pushing the row wider */}
             <span className="min-w-0 flex-1 truncate">
-              <Highlight text={l.label} q={q} />
+              <Highlight text={link.label} query={query} />
             </span>
 
-            {l.badge && (
-              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                {l.badge}
+            {link.badge && (
+              <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                {link.badge}
               </span>
             )}
 
             {external ? (
               <FiArrowUpRight
-                aria-hidden="true"
                 className="size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
               />
             ) : (
               <FiChevronRight
-                aria-hidden="true"
                 className={cn(
-                  "size-4 shrink-0 text-muted-foreground transition-all duration-200 motion-reduce:transition-none",
+                  "size-4 shrink-0 transition-all duration-200 motion-reduce:transition-none",
                   active
-                    ? "opacity-100"
-                    : "opacity-0 group-hover:translate-x-0.5 group-hover:opacity-100 group-focus-visible:opacity-100",
+                    ? "translate-x-0 text-primary opacity-100"
+                    : "text-muted-foreground opacity-50 group-hover:translate-x-0.5 group-hover:opacity-100",
                 )}
+                aria-hidden="true"
               />
             )}
           </>
@@ -238,27 +307,27 @@ function NavList({ links, pathname, onNavigate, reduce, q }) {
 
         return (
           <motion.li
-            key={l.href}
+            key={`${link.href}-${link.label || index}`}
             variants={reduce ? undefined : itemVariants}
             className="min-w-0"
           >
             {external ? (
               <a
-                href={l.href}
+                href={externalHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => onNavigate(l)}
-                className={className}
+                onClick={() => onNavigate(link)}
+                className={linkClass}
               >
                 {content}
-                <span className="sr-only"> (opens in a new tab)</span>
+                <span className="sr-only">(opens in a new tab)</span>
               </a>
             ) : (
               <Link
-                href={l.href}
-                onClick={() => onNavigate(l)}
+                href={link.href}
+                onClick={() => onNavigate(link)}
                 aria-current={active ? "page" : undefined}
-                className={className}
+                className={linkClass}
               >
                 {content}
               </Link>
@@ -268,46 +337,77 @@ function NavList({ links, pathname, onNavigate, reduce, q }) {
       })}
     </motion.ul>
   );
-}
+});
 
-/* ---------------------------- ProfileCard ------------------------- */
+/* -------------------------------------------------------------------------- */
+/* Profile card                                                               */
+/* -------------------------------------------------------------------------- */
 
 function ProfileCard({ user, onSignOut, onNavigate, pathname }) {
-  // Collapsed by default: only the avatar row shows. Tap it to show/hide the rest.
   const [expanded, setExpanded] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const displayName = user.name || user.displayName || "Student";
+  const email = user.email || "";
+
+  async function handleSignOut() {
+    if (!onSignOut || signingOut) return;
+
+    setSigningOut(true);
+
+    try {
+      await onSignOut();
+      onNavigate?.();
+    } catch (error) {
+      console.error("[MobileNav] Sign out failed:", error);
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   return (
     <div className="min-w-0">
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
         aria-controls="mobilenav-profile"
-        className="flex w-full min-w-0 items-center gap-3 rounded-xl p-1 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+        className={cn(
+          "flex w-full min-w-0 items-center gap-3 rounded-2xl border border-transparent p-2 text-left transition-colors",
+          "hover:border-border hover:bg-background/80",
+          focusRing,
+        )}
       >
-        <Avatar className="size-11 shrink-0 border border-border">
-          {user.photoURL ? (
-            <AvatarImage src={user.photoURL} alt={user.name || "Profile"} />
+        <Avatar className="size-11 shrink-0 border border-border shadow-sm">
+          {user.photoURL || user.photoUrl ? (
+            <AvatarImage
+              src={user.photoURL || user.photoUrl}
+              alt={displayName}
+            />
           ) : null}
-          <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
-            {getInitials(user.name || user.email)}
+
+          <AvatarFallback className="bg-violet-500/10 font-semibold text-violet-800 dark:text-violet-300">
+            {getInitials(displayName || email)}
           </AvatarFallback>
         </Avatar>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">
-            {user.name || "Student"}
-          </p>
-          {user.email && (
-            <p className="truncate text-xs text-muted-foreground">
-              {user.email}
-            </p>
+
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-foreground">
+            {displayName}
+          </span>
+
+          {email && (
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+              {email}
+            </span>
           )}
-        </div>
+        </span>
+
         <FiChevronDown
           aria-hidden="true"
           className={cn(
             "size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none",
-            expanded ? "rotate-0" : "rotate-180",
+            expanded ? "rotate-180" : "rotate-0",
           )}
         />
       </button>
@@ -320,10 +420,11 @@ function ProfileCard({ user, onSignOut, onNavigate, pathname }) {
         )}
       >
         <div className="min-h-0 overflow-hidden" inert={!expanded}>
-          <div className="space-y-3 pt-3">
+          <div className="space-y-3 px-1 pb-1 pt-3">
             <div className="grid grid-cols-3 gap-2">
               {PROFILE_LINKS.map(({ href, label, icon: Icon }) => {
                 const active = isActive(pathname, href);
+
                 return (
                   <Link
                     key={href}
@@ -331,13 +432,15 @@ function ProfileCard({ user, onSignOut, onNavigate, pathname }) {
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[11px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                      "flex min-h-[66px] min-w-0 flex-col items-center justify-center gap-2 rounded-xl border px-1 py-2 text-[11px] font-semibold",
+                      "transition-colors motion-reduce:transition-none",
+                      focusRing,
                       active
-                        ? "border-primary/40 bg-primary/10 text-primary"
-                        : "border-border bg-card text-card-foreground hover:border-primary/40 hover:bg-accent",
+                        ? "border-primary/30 bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-violet-500/40 hover:text-foreground",
                     )}
                   >
-                    <Icon aria-hidden="true" className="size-4 shrink-0" />
+                    <Icon className="size-[17px] shrink-0" aria-hidden="true" />
                     <span className="max-w-full truncate">{label}</span>
                   </Link>
                 );
@@ -348,14 +451,12 @@ function ProfileCard({ user, onSignOut, onNavigate, pathname }) {
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 w-full justify-center gap-2"
-                onClick={() => {
-                  onNavigate?.();
-                  onSignOut();
-                }}
+                disabled={signingOut}
+                className="h-11 w-full justify-center gap-2 rounded-xl border-destructive/20 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                onClick={handleSignOut}
               >
-                <FiLogOut aria-hidden="true" className="size-4" />
-                Sign out
+                <FiLogOut className="size-4" aria-hidden="true" />
+                {signingOut ? "Signing out..." : "Sign out"}
               </Button>
             )}
           </div>
@@ -365,121 +466,179 @@ function ProfileCard({ user, onSignOut, onNavigate, pathname }) {
   );
 }
 
-/* ----------------------------- MobileNav -------------------------- */
+/* -------------------------------------------------------------------------- */
+/* Main mobile navigation                                                     */
+/* -------------------------------------------------------------------------- */
 
-/**
- * Props (both optional):
- *  - user: { name, email, photoURL } -> shows the profile card in the footer.
- *          Without it the footer falls back to <AuthNav stacked /> (sign in / sign up).
- *  - onSignOut: () => void -> shows a "Sign out" button inside the profile card.
- */
-export function MobileNav({ user = null, onSignOut }) {
+export function MobileNav({ user = null, onSignOut, className }) {
   const reduce = useReducedMotion();
   const pathname = usePathname();
   const router = useRouter();
-  const [previousPathname, setPreviousPathname] = useState(pathname);
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [moreOpen, setMoreOpen] = useState(true);
   const [recent, setRecent] = useState([]);
   const inputRef = useRef(null);
 
-  const close = () => setOpen(false);
+  const normalizedQuery = query.trim().toLowerCase();
 
-  function handleOpenChange(next) {
-    setOpen(next);
-    if (!next) setQuery("");
-  }
-
-  // Reset the menu when the route changes.
-  if (previousPathname !== pathname) {
-    setPreviousPathname(pathname);
+  const close = useCallback(() => {
     setOpen(false);
     setQuery("");
-  }
+  }, []);
 
-  // Load recent searches each time the menu opens.
-  useEffect(() => {
-    if (open) setRecent(readRecent());
-  }, [open]);
+  const handleOpenChange = useCallback((nextOpen) => {
+    setOpen(nextOpen);
 
-  // Close automatically if the screen grows to desktop (lg) while open.
-  useEffect(() => {
-    if (!open) return;
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const onChange = (e) => e.matches && setOpen(false);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [open]);
-
-  const q = query.trim().toLowerCase();
-
-  const primary = useMemo(
-    () => (q ? primaryNav.filter((l) => matches(l, q)) : primaryNav),
-    [q],
-  );
-  const more = useMemo(
-    () => (q ? moreNav.filter((l) => matches(l, q)) : moreNav),
-    [q],
-  );
-  const total = primary.length + more.length;
-  const noResults = q && total === 0;
-  const showMore = q ? true : moreOpen; // always expand while searching
-
-  function remember(term) {
-    const t = term.trim();
-    if (!t) return;
-    const next = [
-      t,
-      ...readRecent().filter((r) => r.toLowerCase() !== t.toLowerCase()),
-    ].slice(0, MAX_RECENT);
-    writeRecent(next);
-    setRecent(next);
-  }
-
-  // Called by every nav link.
-  function handleNavigate() {
-    if (q) remember(query);
-    close();
-  }
-
-  function handleSearchKeyDown(e) {
-    if (e.key === "Escape" && query) {
-      e.preventDefault();
-      e.stopPropagation(); // clear the search first, don't close the sheet
+    if (!nextOpen) {
       setQuery("");
     }
-    if (e.key === "Enter") {
-      const first = [...primary, ...more][0];
+  }, []);
+
+  // Close and reset the menu when the active route changes.
+  useEffect(() => {
+    setOpen(false);
+    setQuery("");
+  }, [pathname]);
+
+  // Read search history only in the browser.
+  useEffect(() => {
+    if (open) {
+      setRecent(readRecent());
+    }
+  }, [open]);
+
+  // Close the drawer if the viewport becomes desktop-sized.
+  useEffect(() => {
+    if (!open) return;
+
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+
+    const handleMediaChange = (event) => {
+      if (event.matches) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+
+    if (mediaQuery.matches) {
+      setOpen(false);
+      return;
+    }
+
+    mediaQuery.addEventListener("change", handleMediaChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleMediaChange);
+    };
+  }, [open]);
+
+  const primary = useMemo(() => {
+    const links = Array.isArray(primaryNav) ? primaryNav : [];
+
+    return normalizedQuery
+      ? links.filter((link) => matches(link, normalizedQuery))
+      : links;
+  }, [normalizedQuery]);
+
+  const more = useMemo(() => {
+    const links = Array.isArray(moreNav) ? moreNav : [];
+
+    return normalizedQuery
+      ? links.filter((link) => matches(link, normalizedQuery))
+      : links;
+  }, [normalizedQuery]);
+
+  const total = primary.length + more.length;
+  const noResults = Boolean(normalizedQuery) && total === 0;
+  const showMore = normalizedQuery ? true : moreOpen;
+  const chips = recent.length > 0 ? recent : SUGGESTIONS;
+
+  const remember = useCallback((term) => {
+    const trimmed = term.trim();
+
+    if (!trimmed) return;
+
+    const next = [
+      trimmed,
+      ...readRecent().filter(
+        (item) => item.toLowerCase() !== trimmed.toLowerCase(),
+      ),
+    ].slice(0, MAX_RECENT);
+
+    writeRecent(next);
+    setRecent(next);
+  }, []);
+
+  const handleNavigate = useCallback(
+    (link) => {
+      if (normalizedQuery) remember(query);
+
+      // A selected link closes the drawer. Route changes also close it.
+      close();
+    },
+    [close, normalizedQuery, query, remember],
+  );
+
+  const handleSearchKeyDown = useCallback(
+    (event) => {
+      if (event.key === "Escape" && query) {
+        event.preventDefault();
+        event.stopPropagation();
+        setQuery("");
+        return;
+      }
+
+      if (event.key !== "Enter") return;
+
+      const first = [...primary, ...more].find((link) => {
+        if (!link?.href) return false;
+
+        return !isExternal(link) || Boolean(getSafeExternalUrl(link.href));
+      });
+
       if (!first) return;
-      e.preventDefault();
+
+      event.preventDefault();
       remember(query);
       close();
-      if (isExternal(first)) window.open(first.href, "_blank", "noopener");
-      else router.push(first.href);
-    }
-  }
 
-  function clearRecent() {
+      if (isExternal(first)) {
+        const href = getSafeExternalUrl(first.href);
+
+        if (href) {
+          window.open(href, "_blank", "noopener,noreferrer");
+        }
+      } else {
+        router.push(first.href);
+      }
+    },
+    [close, more, primary, query, remember, router],
+  );
+
+  const clearRecent = useCallback(() => {
     writeRecent([]);
     setRecent([]);
-  }
+  }, []);
 
-  function pickTerm(term) {
+  const pickTerm = useCallback((term) => {
     setQuery(term);
-    inputRef.current?.focus();
-  }
 
-  const chips = recent.length > 0 ? recent : SUGGESTIONS;
+    // Focus is applied after React commits the new state.
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger
+        aria-label="Open navigation menu"
         className={cn(
           buttonVariants({ variant: "ghost", size: "icon" }),
-          "group lg:hidden",
+          "group size-10 rounded-xl lg:hidden",
+          focusRing,
+          className,
         )}
-        aria-label="Open menu"
       >
         <FiMenu
           className="size-5 transition-transform duration-200 group-active:scale-90 motion-reduce:transition-none motion-reduce:group-active:scale-100"
@@ -487,60 +646,67 @@ export function MobileNav({ user = null, onSignOut }) {
         />
       </SheetTrigger>
 
-      {/*
-        Height is split into 4 zones (flex column, h-dvh):
-          1. Header  (shrink-0)  logo + close button
-          2. Search  (shrink-0)  search box + chips
-          3. Body    (flex-1)    the ONLY part that scrolls
-          4. Footer  (shrink-0)  profile card / auth buttons
-        `[&>button.absolute]:hidden` hides the default built-in X so only our own
-        Close button shows (no duplicate).
-      */}
       <SheetContent
         side="right"
-        className="flex h-dvh w-full max-w-full flex-col gap-0  border-border bg-background p-0 pt-[env(safe-area-inset-top)] text-foreground min-[420px]:w-[88vw] min-[420px]:max-w-sm sm:max-w-md [&>button.absolute]:hidden"
+        className={cn(
+          "flex h-dvh w-full max-w-full flex-col gap-0 overflow-hidden border-border bg-background p-0 pt-[env(safe-area-inset-top)] text-foreground",
+          "min-[420px]:w-[88vw] min-[420px]:max-w-sm sm:max-w-md",
+          "[&>button.absolute]:hidden",
+        )}
       >
-        {/* 1. Header */}
-        <SheetHeader className="flex shrink-0 flex-row items-center justify-between gap-3 space-y-0 border-b border-border p-4">
-          <SheetTitle className="sr-only">Menu</SheetTitle>
+        {/* Header */}
+        <SheetHeader className="flex shrink-0 flex-row items-center justify-between gap-3 space-y-0 border-b border-border/80 px-4 py-3.5">
+          <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+
           <SheetDescription className="sr-only">
-            Site navigation
+            Search and navigate the Apni University website.
           </SheetDescription>
-          {/* Clicks bubble up from the logo link so the sheet closes, even on "/" */}
+
           <div onClick={close} className="min-w-0 max-w-full overflow-hidden">
             <AnimatedLogo size="sm" />
           </div>
+
           <SheetClose
-            aria-label="Close menu"
+            aria-label="Close navigation menu"
             className={cn(
               buttonVariants({ variant: "ghost", size: "icon" }),
-              "shrink-0",
+              "size-10 shrink-0 rounded-xl",
+              focusRing,
             )}
           >
             <FiX className="size-5" aria-hidden="true" />
           </SheetClose>
         </SheetHeader>
 
-        {/* 2. Search (pinned, does not scroll) */}
-        <div className="shrink-0 space-y-2 border-b border-border p-4">
+        {/* Pinned search section */}
+        <div className="shrink-0 space-y-3 border-b border-border/80 p-4">
           <div className="relative">
             <FiSearch
               aria-hidden="true"
               className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
             />
+
             <input
               ref={inputRef}
               type="search"
               inputMode="search"
               enterKeyHint="go"
               autoComplete="off"
+              spellCheck={false}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event) => setQuery(event.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Search the menu"
-              aria-label="Search the menu"
-              className="h-11 w-full min-w-0 rounded-xl border border-input bg-background pl-9 pr-10 text-base text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring sm:text-sm [&::-webkit-search-cancel-button]:hidden"
+              placeholder="Search courses, jobs, pages..."
+              aria-label="Search website navigation"
+              aria-controls="mobilenav-results"
+              className={cn(
+                "h-12 w-full min-w-0 rounded-xl border border-input bg-muted/30 pl-10 pr-10 text-base text-foreground",
+                "outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground",
+                "focus:border-violet-500/60 focus-visible:ring-2 focus-visible:ring-violet-500/20",
+                "sm:text-sm [&::-webkit-search-cancel-button]:hidden",
+              )}
             />
+
             {query && (
               <button
                 type="button"
@@ -549,54 +715,63 @@ export function MobileNav({ user = null, onSignOut }) {
                   inputRef.current?.focus();
                 }}
                 aria-label="Clear search"
-                className="absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                  "absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground",
+                  "transition-colors hover:bg-accent hover:text-foreground",
+                  focusRing,
+                )}
               >
-                <FiX aria-hidden="true" className="size-4" />
+                <FiX size={16} aria-hidden="true" />
               </button>
             )}
           </div>
 
-          {/* Result count */}
-          {q && (
+          {normalizedQuery && (
             <p
               role="status"
               aria-live="polite"
               className="px-1 text-xs text-muted-foreground"
             >
               {total === 0
-                ? "No results"
+                ? "No matching pages found"
                 : `${total} ${total === 1 ? "result" : "results"} · press Enter to open the first`}
             </p>
           )}
 
-          {/* Recent searches (or suggestions the first time) */}
-          {!q && (
+          {!normalizedQuery && (
             <div className="flex min-w-0 items-start gap-2 [@media(max-height:560px)]:hidden">
               <FiClock
                 aria-hidden="true"
                 className="mt-1.5 size-3.5 shrink-0 text-muted-foreground"
               />
+
               <ul
                 className="flex min-w-0 flex-1 flex-wrap gap-1.5"
-                aria-label={recent.length ? "Recent searches" : "Suggestions"}
+                aria-label={
+                  recent.length ? "Recent searches" : "Suggested searches"
+                }
               >
-                {chips.map((r) => (
-                  <li key={r} className="shrink-0">
+                {chips.map((term) => (
+                  <li key={term} className="shrink-0">
                     <button
                       type="button"
-                      onClick={() => pickTerm(r)}
+                      onClick={() => pickTerm(term)}
                       className={chip}
                     >
-                      {r}
+                      {term}
                     </button>
                   </li>
                 ))}
               </ul>
+
               {recent.length > 0 && (
                 <button
                   type="button"
                   onClick={clearRecent}
-                  className="mt-1 shrink-0 rounded text-xs text-muted-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                  className={cn(
+                    "mt-1 shrink-0 rounded text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline",
+                    focusRing,
+                  )}
                 >
                   Clear
                 </button>
@@ -605,90 +780,117 @@ export function MobileNav({ user = null, onSignOut }) {
           )}
         </div>
 
-        {/* 3. Body (the only scrolling zone).
-            min-h-0 lets the flex child shrink so ScrollArea actually scrolls;
-            overscroll-contain stops the page behind from scrolling. */}
-        <ScrollArea className="min-h-0 flex-1 overscroll-contain [&>div>div]:!block">
+        {/* Scrollable navigation body */}
+        <ScrollArea
+          className="min-h-0 flex-1 overscroll-contain"
+          id="mobilenav-results"
+        >
           <nav
-            aria-label="Mobile"
+            aria-label="Mobile navigation"
             className="min-w-0 max-w-full space-y-5 overflow-x-hidden p-4"
           >
-            {/* Quick actions (hidden while searching and on very short screens) */}
-            {!q && (
-              <motion.div
+            {!normalizedQuery && (
+              <motion.section
                 initial={reduce ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.28, delay: 0.04 }}
+                transition={{ duration: reduce ? 0 : 0.22 }}
+                aria-label="Quick actions"
                 className="space-y-2.5 [@media(max-height:560px)]:hidden"
               >
+                <p className={sectionLabel}>Quick access</p>
+
                 <Link
                   href="/courses"
-                  onClick={close}
-                  className={buttonVariants({
-                    className: "group h-11 w-full min-w-0 justify-between",
-                  })}
+                  onClick={handleNavigate}
+                  className={cn(
+                    buttonVariants({ variant: "default" }),
+                    "group h-12 w-full min-w-0 justify-between rounded-xl px-4",
+                    "bg-primary font-semibold text-primary-foreground shadow-sm",
+                    "transition-transform hover:translate-y-[-1px] motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+                  )}
                 >
-                  <span className="inline-flex min-w-0 items-center gap-2 truncate">
-                    <FiBookOpen aria-hidden="true" className="shrink-0" />
+                  <span className="inline-flex min-w-0 items-center gap-2.5 truncate">
+                    <FiBookOpen
+                      aria-hidden="true"
+                      className="size-4 shrink-0"
+                    />
                     <span className="truncate">Browse courses</span>
                   </span>
+
                   <FiArrowRight
                     aria-hidden="true"
-                    className="shrink-0 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                    className="size-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
                   />
                 </Link>
-                {/* Two columns on normal phones, one column on very narrow screens */}
-                <div className="grid grid-cols-1 gap-2.5 min-[340px]:grid-cols-2">
+
+                <div className="grid grid-cols-1 gap-2 min-[340px]:grid-cols-2">
                   <Link
                     href="/courses?price=free"
-                    onClick={close}
+                    onClick={handleNavigate}
                     className={quickCard}
                   >
                     <FiGift
                       aria-hidden="true"
-                      className="size-4 shrink-0 text-primary"
+                      className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
                     />
                     <span className="truncate">Free courses</span>
                   </Link>
-                  <Link href="/careers" onClick={close} className={quickCard}>
+
+                  <Link
+                    href="/careers"
+                    onClick={handleNavigate}
+                    className={quickCard}
+                  >
                     <FiCompass
                       aria-hidden="true"
-                      className="size-4 shrink-0 text-primary"
+                      className="size-4 shrink-0 text-violet-600 dark:text-violet-400"
                     />
-                    <span className="truncate">Careers</span>
+                    <span className="truncate">Explore careers</span>
                   </Link>
                 </div>
-              </motion.div>
+              </motion.section>
             )}
 
             {primary.length > 0 && (
-              <div className="min-w-0">
+              <section className="min-w-0" aria-label="Explore pages">
                 <p className={sectionLabel}>Explore</p>
+
                 <NavList
                   links={primary}
                   pathname={pathname}
                   onNavigate={handleNavigate}
                   reduce={reduce}
-                  q={q}
+                  query={normalizedQuery}
                 />
-              </div>
+              </section>
             )}
 
-            {primary.length > 0 && more.length > 0 && <Separator />}
+            {primary.length > 0 && more.length > 0 && (
+              <Separator className="bg-border/80" />
+            )}
 
             {more.length > 0 && (
-              <div className="min-w-0">
-                {/* Collapsible "More" section (always open while searching) */}
+              <section className="min-w-0" aria-label="Additional pages">
                 <button
                   type="button"
-                  onClick={() => !q && setMoreOpen((v) => !v)}
+                  onClick={() => {
+                    if (!normalizedQuery) {
+                      setMoreOpen((current) => !current);
+                    }
+                  }}
                   aria-expanded={showMore}
                   aria-controls="mobilenav-more"
-                  disabled={!!q}
-                  className="mb-2 flex w-full items-center justify-between rounded px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+                  disabled={Boolean(normalizedQuery)}
+                  className={cn(
+                    "mb-2 flex min-h-9 w-full items-center justify-between rounded-lg px-1 text-left",
+                    sectionLabel.replace("mb-2 ", ""),
+                    focusRing,
+                    "disabled:cursor-default",
+                  )}
                 >
                   <span>More</span>
-                  {!q && (
+
+                  {!normalizedQuery && (
                     <FiChevronDown
                       aria-hidden="true"
                       className={cn(
@@ -698,6 +900,7 @@ export function MobileNav({ user = null, onSignOut }) {
                     />
                   )}
                 </button>
+
                 <div
                   id="mobilenav-more"
                   className={cn(
@@ -711,44 +914,46 @@ export function MobileNav({ user = null, onSignOut }) {
                       pathname={pathname}
                       onNavigate={handleNavigate}
                       reduce={reduce}
-                      q={q}
+                      query={normalizedQuery}
                     />
                   </div>
                 </div>
-              </div>
+              </section>
             )}
 
             {noResults && (
               <div
                 role="status"
-                className="rounded-xl border border-dashed border-border p-6 text-center"
+                className="rounded-2xl border border-dashed border-border bg-muted/20 px-5 py-8 text-center"
               >
-                <span className="mx-auto grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
-                  <FiSearch aria-hidden="true" className="size-4" />
+                <span className="mx-auto grid size-11 place-items-center rounded-2xl border border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-300">
+                  <FiSearch size={18} aria-hidden="true" />
                 </span>
-                <p className="mt-3 break-words text-sm font-medium">
+
+                <p className="mt-4 break-words text-sm font-semibold">
                   No matches for “{query.trim()}”
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Try another word, or browse all courses.
+
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                  Try another keyword or browse all available courses.
                 </p>
-                <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  <button
+
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setQuery("");
                       inputRef.current?.focus();
                     }}
-                    className={buttonVariants({
-                      variant: "ghost",
-                      size: "sm",
-                    })}
                   >
                     Clear search
-                  </button>
+                  </Button>
+
                   <Link
                     href="/courses"
-                    onClick={close}
+                    onClick={handleNavigate}
                     className={buttonVariants({
                       variant: "outline",
                       size: "sm",
@@ -762,8 +967,8 @@ export function MobileNav({ user = null, onSignOut }) {
           </nav>
         </ScrollArea>
 
-        {/* 4. Footer: profile card (signed in) or auth buttons (signed out) */}
-        <div className="max-h-[45dvh] shrink-0 overflow-y-auto overscroll-contain border-t border-border bg-muted/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {/* Pinned account footer */}
+        <div className="max-h-[45dvh] shrink-0 overflow-y-auto overscroll-contain border-t border-border/80 bg-muted/30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
           {user ? (
             <ProfileCard
               user={user}
@@ -776,7 +981,8 @@ export function MobileNav({ user = null, onSignOut }) {
               <AuthNav stacked />
             </div>
           )}
-          <p className="mt-3 text-center text-[11px] text-muted-foreground">
+
+          <p className="mt-3 text-center text-[10px] font-medium tracking-wide text-muted-foreground">
             © {new Date().getFullYear()} Apni University
           </p>
         </div>

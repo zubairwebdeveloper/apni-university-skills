@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FiSearch } from "react-icons/fi";
+import { FiLoader, FiSearch, FiX } from "react-icons/fi";
 
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -19,15 +19,24 @@ import { useUrlParams } from "@/hooks/useUrlParams";
 
 const ALL = "all";
 
+const pressable =
+  "transition-transform active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100";
+
 function ToolbarSelect({ id, label, value, onChange, options, allLabel }) {
   return (
-    <Field className="lg:w-44">
-      <FieldLabel htmlFor={id} className="text-xs text-muted-foreground">
+    <Field className="min-w-0 lg:w-44">
+      <FieldLabel
+        htmlFor={id}
+        className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+      >
         {label}
       </FieldLabel>
 
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger id={id} className="w-full">
+        <SelectTrigger
+          id={id}
+          className="w-full focus-visible:border-yellow-400 focus-visible:ring-yellow-400/30"
+        >
           <SelectValue />
         </SelectTrigger>
 
@@ -102,13 +111,17 @@ export function DataTableToolbar({
     ...(sorts ? ["sort"] : []),
   ];
 
-  const active = keys.some((key) => params.has(key));
+  const activeCount = keys.filter((key) => params.has(key)).length;
+  const active = activeCount > 0;
 
   return (
-    <div className="space-y-3" aria-busy={pending}>
+    <div
+      className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4"
+      aria-busy={pending}
+    >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
         {searchable && (
-          <Field className="flex-1">
+          <Field className="min-w-0 flex-1">
             <FieldLabel htmlFor="admin-search" className="sr-only">
               {searchLabel}
             </FieldLabel>
@@ -126,7 +139,7 @@ export function DataTableToolbar({
                 onChange={(event) => setQ(event.target.value)}
                 placeholder={searchPlaceholder}
                 maxLength={60}
-                className="pl-9"
+                className="pl-9 focus-visible:border-yellow-400 focus-visible:ring-yellow-400/30"
                 autoComplete="off"
               />
             </div>
@@ -162,24 +175,48 @@ export function DataTableToolbar({
         </div>
       </div>
 
-      <div className="flex min-h-6 flex-wrap items-center gap-3 text-sm text-muted-foreground">
+      <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3 text-sm text-muted-foreground">
         {typeof total === "number" && (
-          <p aria-live="polite">
-            {total.toLocaleString("en-US")} {total === 1 ? "result" : "results"}
+          <p aria-live="polite" className="flex items-center gap-1.5">
+            <span className="inline-flex min-w-6 items-center justify-center rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-0.5 text-xs font-semibold leading-4 tabular-nums text-violet-700 dark:text-violet-300">
+              {total.toLocaleString("en-US")}
+            </span>
+            <span>{total === 1 ? "result" : "results"}</span>
           </p>
         )}
 
         {searchable && searchHint !== null && (
-          <p className="hidden sm:block">{searchHint}</p>
+          <p className="hidden text-xs leading-5 sm:block">{searchHint}</p>
         )}
 
         {active && (
-          <Button type="button" variant="ghost" size="sm" onClick={clear}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={clear}
+            className={`gap-1.5 ${pressable}`}
+          >
+            <FiX aria-hidden="true" className="size-4" />
             Clear filters
+            <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums text-foreground">
+              {activeCount}
+            </span>
           </Button>
         )}
 
-        {pending && <p role="status">Updating…</p>}
+        {pending && (
+          <p
+            role="status"
+            className="ml-auto flex items-center gap-1.5 text-xs"
+          >
+            <FiLoader
+              aria-hidden="true"
+              className="size-3.5 animate-spin motion-reduce:animate-none"
+            />
+            Updating…
+          </p>
+        )}
       </div>
     </div>
   );

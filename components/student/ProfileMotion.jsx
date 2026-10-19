@@ -17,10 +17,11 @@ export function MotionRoot({ children }) {
 
 /* Ambient background + a tilted orbit scene (md and up only, for performance) */
 export function ProfileBackdrop() {
+  const reduce = useReducedMotion();
   const rings = [
-    { size: 460, dur: 40, tone: "border-primary/25" },
-    { size: 330, dur: 28, tone: "border-primary/40" },
-    { size: 200, dur: 18, tone: "border-primary/60" },
+    { size: 460, dur: 40, tone: "border-primary/20" },
+    { size: 330, dur: 28, tone: "border-primary/30" },
+    { size: 200, dur: 18, tone: "border-primary/50" },
   ];
 
   return (
@@ -28,11 +29,10 @@ export function ProfileBackdrop() {
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
     >
-      <div className="absolute -top-40 left-1/3 h-[420px] w-[780px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15" />
-      <div className="absolute -right-24 top-1/3 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" />
+      <div className="absolute -top-40 left-1/3 h-[380px] w-[720px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15" />
 
       <div
-        className="absolute inset-0 opacity-[0.4] dark:opacity-[0.25]"
+        className="absolute inset-0 opacity-[0.35] dark:opacity-[0.22]"
         style={{
           backgroundImage:
             "radial-gradient(hsl(var(--border)) 1px, transparent 1px)",
@@ -63,16 +63,20 @@ export function ProfileBackdrop() {
                 marginTop: -r.size / 2,
                 rotateX: 66,
               }}
-              animate={{ rotate: i % 2 ? -360 : 360 }}
+              animate={reduce ? undefined : { rotate: i % 2 ? -360 : 360 }}
               transition={{ duration: r.dur, ease: "linear", repeat: Infinity }}
             />
           ))}
           <motion.span
             className="absolute left-1/2 top-1/2 -ml-1.5 -mt-1.5 size-3 rounded-full bg-amber-400 shadow-[0_0_14px_#F5B82E]"
-            animate={{
-              x: [165, 0, -165, 0, 165],
-              y: [0, 62, 0, -62, 0],
-            }}
+            animate={
+              reduce
+                ? undefined
+                : {
+                    x: [165, 0, -165, 0, 165],
+                    y: [0, 62, 0, -62, 0],
+                  }
+            }
             transition={{ duration: 12, ease: "linear", repeat: Infinity }}
           />
         </div>
@@ -146,20 +150,24 @@ export function ProfileQuickNav() {
   }, []);
 
   return (
-    <nav aria-label="Profile sections" className="-mx-1 overflow-x-auto px-1">
-      <ul className="flex w-max gap-2 [scrollbar-width:none]">
+    <nav
+      aria-label="Profile sections"
+      className="-mx-1 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <ul className="flex w-max gap-2">
         {SECTIONS.map((s) => {
           const on = active === s.id;
           return (
             <li key={s.id}>
               <a
                 href={`#${s.id}`}
+                onClick={() => setActive(s.id)}
                 aria-current={on ? "true" : undefined}
                 className={cn(
-                  "relative inline-flex rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "relative inline-flex min-h-9 items-center rounded-full border px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none",
                   on
                     ? "border-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:border-primary/40 hover:text-primary",
+                    : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-primary",
                 )}
               >
                 {on && (

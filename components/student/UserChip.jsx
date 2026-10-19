@@ -1,3 +1,4 @@
+// components/student/UserChip.jsx
 "use client";
 
 import {
@@ -11,24 +12,29 @@ import {
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
-  FiAward,
-  FiCamera,
-  FiCheck,
-  FiChevronDown,
-  FiCopy,
-  FiHelpCircle,
-  FiLifeBuoy,
-  FiLogOut,
-  FiUser,
-  FiZap,
-} from "react-icons/fi";
+  Award,
+  BookOpen,
+  Camera,
+  Check,
+  ChevronDown,
+  Copy,
+  LifeBuoy,
+  UserRound,
+  Zap,
+} from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
-// Clean, solid-color design — no gradients.
-const ACCENT = "#7c3aed";
+/* Design tokens: yellow = XP / progress, violet = selected / hover */
 const XP_PER_LEVEL = 500;
+const RING_R = 20;
+const RING_C = 2 * Math.PI * RING_R;
+
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const FOCUS_INSET =
+  "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#8B5CF6]";
 
 const PROFILE_HREF = "/student/profile";
 const ACHIEVEMENTS_HREF = "/student/achievements";
@@ -36,27 +42,15 @@ const SUPPORT_HREF = "/student/support";
 const HELP_HREF = "/faq";
 
 const QUICK_LINKS = [
-  {
-    href: PROFILE_HREF,
-    label: "My Profile",
-    icon: FiUser,
-  },
-  {
-    href: ACHIEVEMENTS_HREF,
-    label: "Achievements",
-    icon: FiAward,
-  },
-  {
-    href: SUPPORT_HREF,
-    label: "Support",
-    icon: FiLifeBuoy,
-  },
-  {
-    href: HELP_HREF,
-    label: "Help Center",
-    icon: FiHelpCircle,
-  },
+  { href: PROFILE_HREF, label: "My Profile", icon: UserRound },
+  { href: ACHIEVEMENTS_HREF, label: "Achievements", icon: Award },
+  { href: SUPPORT_HREF, label: "Support", icon: LifeBuoy },
+  { href: HELP_HREF, label: "Help Center", icon: BookOpen },
 ];
+
+/* -------------------------------------------------------------------------- */
+/* Clock (greeting) - null on the server so hydration always matches          */
+/* -------------------------------------------------------------------------- */
 
 function subscribeToClock(callback) {
   const interval = setInterval(callback, 60_000);
@@ -91,18 +85,16 @@ function getGreeting(hour) {
   return "Good evening";
 }
 
+/* -------------------------------------------------------------------------- */
+/* Small pieces                                                               */
+/* -------------------------------------------------------------------------- */
+
 function TiltWrap({ children, disabled }) {
   const reduce = useReducedMotion();
 
   return (
     <motion.div
-      whileHover={
-        reduce || disabled
-          ? undefined
-          : {
-              y: -1,
-            }
-      }
+      whileHover={reduce || disabled ? undefined : { y: -1 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
     >
       {children}
@@ -122,22 +114,77 @@ function IconAction({ children, label, onClick, disabled }) {
       onClick={onClick}
       whileHover={reduce ? undefined : { scale: 1.06 }}
       whileTap={reduce ? undefined : { scale: 0.94 }}
-      className="grid size-9 shrink-0 place-items-center rounded-lg
-        text-muted-foreground transition-colors
-        hover:bg-background hover:text-foreground
-        focus-visible:outline-none focus-visible:ring-2
-        focus-visible:ring-ring disabled:cursor-not-allowed
-        disabled:opacity-50"
+      className={cn(
+        "grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-[#8B5CF6]/10 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-violet-300",
+        FOCUS,
+      )}
     >
       {children}
     </motion.button>
   );
 }
 
+/* Avatar wrapped in an XP progress ring with a level badge */
+function LevelRing({ progress, level, hasXp, children }) {
+  return (
+    <span className="relative grid size-11 shrink-0 place-items-center">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 44 44"
+        className="absolute inset-0 size-full -rotate-90"
+      >
+        <circle
+          cx="22"
+          cy="22"
+          r={RING_R}
+          fill="none"
+          strokeWidth="2.5"
+          className="stroke-border"
+        />
+        {hasXp && (
+          <motion.circle
+            cx="22"
+            cy="22"
+            r={RING_R}
+            fill="none"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            className="stroke-[#FACC15]"
+            strokeDasharray={RING_C}
+            initial={{ strokeDashoffset: RING_C }}
+            animate={{ strokeDashoffset: RING_C * (1 - progress / 100) }}
+            transition={{ duration: 0.9, ease: "easeOut" }}
+          />
+        )}
+      </svg>
+
+      {children}
+
+      {hasXp && (
+        <span
+          title={`Level ${level}`}
+          className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full border-2 border-card bg-[#8B5CF6] px-1 text-[10px] font-bold leading-none text-white"
+        >
+          {level}
+        </span>
+      )}
+
+      <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-card bg-emerald-500">
+        <span className="sr-only">Signed in</span>
+      </span>
+    </span>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Component                                                                  */
+/* -------------------------------------------------------------------------- */
+
 export function UserChip({ person }) {
   const reduce = useReducedMotion();
   const uid = useId();
   const rootRef = useRef(null);
+  const triggerRef = useRef(null);
   const copyTimeoutRef = useRef(null);
 
   const [open, setOpen] = useState(false);
@@ -149,9 +196,9 @@ export function UserChip({ person }) {
     getServerHour,
   );
 
-  const name = person?.name?.trim() || "Student";
+  const name = person?.name?.trim() || person?.displayName?.trim() || "Student";
   const email = person?.email || "";
-  const photoURL = person?.photoURL || "";
+  const photoURL = person?.photoURL || person?.avatar || "";
   const hasPhoto = Boolean(photoURL);
 
   const hasXp =
@@ -177,9 +224,9 @@ export function UserChip({ person }) {
     setOpen(false);
   }, []);
 
-  // Close when clicking outside or pressing Escape.
+  // Close when clicking outside or pressing Escape (Escape returns focus to the chip).
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
 
     function handlePointerDown(event) {
       if (!rootRef.current?.contains(event.target)) {
@@ -190,6 +237,7 @@ export function UserChip({ person }) {
     function handleKeyDown(event) {
       if (event.key === "Escape") {
         setOpen(false);
+        triggerRef.current?.focus();
       }
     }
 
@@ -236,110 +284,57 @@ export function UserChip({ person }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
       className={cn(
-        "group/chip relative rounded-xl border bg-card p-1",
-        "transition-[border-color,box-shadow] duration-200",
-        "hover:border-primary/25",
-        open && "border-primary/30 shadow-sm",
+        "group/chip relative rounded-2xl border border-border bg-card p-1 transition-[border-color,box-shadow] duration-200",
+        "hover:border-[#8B5CF6]/30",
+        open && "border-[#8B5CF6]/40 shadow-sm",
       )}
     >
       {/* Main student chip */}
       <TiltWrap disabled={open}>
         <button
+          ref={triggerRef}
           type="button"
           aria-expanded={open}
           aria-controls={uid}
           aria-label={`${name}, student account menu`}
           onClick={() => setOpen((value) => !value)}
           className={cn(
-            "group flex w-full items-center gap-3 rounded-lg",
-            "px-2 py-2 text-left",
-            "transition-colors duration-200",
-            "hover:bg-muted/60",
-            "focus-visible:outline-none focus-visible:ring-2",
-            "focus-visible:ring-ring",
+            "group flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors duration-200 hover:bg-muted/60",
+            FOCUS_INSET,
           )}
         >
-          {/* Avatar */}
-          <motion.span
-            whileHover={reduce ? undefined : { scale: 1.04 }}
-            transition={{ duration: 0.2 }}
-            className="relative grid size-11 shrink-0 place-items-center"
-          >
-            <span
-              className={cn(
-                "absolute inset-0 rounded-full border-2",
-                "border-border transition-colors duration-200",
-                "group-hover:border-primary/60",
-                open && "border-primary/60",
-              )}
-            />
-
-            <Avatar className="size-9">
+          <LevelRing progress={progress} level={level} hasXp={hasXp}>
+            <Avatar className="size-8">
               <AvatarImage
                 src={photoURL || undefined}
                 alt={`${name}'s profile`}
                 referrerPolicy="no-referrer"
               />
-
-              <AvatarFallback
-                className="bg-muted text-xs font-semibold"
-                style={{ color: ACCENT }}
-              >
+              <AvatarFallback className="bg-[#8B5CF6]/10 text-[11px] font-bold text-violet-700 dark:text-violet-300">
                 {getInitials(name)}
               </AvatarFallback>
             </Avatar>
-
-            {/* Level badge */}
-            {hasXp && (
-              <span
-                title={`Level ${level}`}
-                className="absolute -right-1 -top-1 grid h-[18px]
-                  min-w-[18px] place-items-center rounded-full
-                  border-2 border-card bg-primary px-1
-                  text-[9px] font-bold text-primary-foreground"
-              >
-                {level}
-              </span>
-            )}
-
-            {/* Online status */}
-            <span
-              className="absolute bottom-0 right-0 size-3
-                rounded-full border-2 border-card bg-emerald-500"
-            >
-              <span className="sr-only">Signed in</span>
-            </span>
-          </motion.span>
+          </LevelRing>
 
           {/* Student information */}
           <span className="min-w-0 flex-1">
-            <span className="block text-[11px] text-muted-foreground">
+            <span className="block text-[11px] font-medium text-muted-foreground">
               {greeting}
             </span>
-
-            <span
-              className="block truncate text-sm font-semibold
-                tracking-tight text-foreground"
-            >
+            <span className="block truncate text-sm font-bold tracking-tight text-foreground">
               {name}
             </span>
-
             <span className="block truncate text-xs text-muted-foreground">
               {email || "Student account"}
             </span>
           </span>
 
-          {/* Chevron */}
           <motion.span
             animate={{ rotate: open ? 180 : 0 }}
-            transition={{
-              duration: reduce ? 0 : 0.2,
-            }}
-            className="grid size-7 shrink-0 place-items-center
-              rounded-md text-muted-foreground
-              transition-colors group-hover:text-foreground"
+            transition={{ duration: reduce ? 0 : 0.2 }}
+            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors group-hover:text-foreground"
           >
-            <FiChevronDown aria-hidden="true" className="size-4" />
+            <ChevronDown aria-hidden="true" className="size-4" />
           </motion.span>
         </button>
       </TiltWrap>
@@ -364,20 +359,12 @@ export function UserChip({ person }) {
 
               {/* Account badges */}
               <div className="flex flex-wrap items-center gap-1.5">
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full
-                    border border-primary/20 bg-primary/5
-                    px-2.5 py-1 text-[11px] font-semibold text-primary"
-                >
-                  <FiAward aria-hidden="true" className="size-3.5" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#8B5CF6]/25 bg-[#8B5CF6]/10 px-2.5 py-1 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
+                  <Award aria-hidden="true" className="size-3.5" />
                   Student
                 </span>
 
-                <span
-                  className="inline-flex items-center rounded-full
-                    border bg-muted/50 px-2.5 py-1
-                    text-[11px] font-medium text-muted-foreground"
-                >
+                <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
                   Apni University
                 </span>
 
@@ -385,12 +372,9 @@ export function UserChip({ person }) {
                   <motion.span
                     initial={reduce ? false : { scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="inline-flex items-center gap-1 rounded-full
-                      border border-amber-500/20 bg-amber-500/10
-                      px-2.5 py-1 text-[11px] font-semibold
-                      text-amber-700 dark:text-amber-300"
+                    className="inline-flex items-center gap-1 rounded-full border border-orange-500/25 bg-orange-500/10 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:text-orange-300"
                   >
-                    <FiZap aria-hidden="true" className="size-3.5" />
+                    <Zap aria-hidden="true" className="size-3.5" />
                     {person.streak}-day streak
                   </motion.span>
                 )}
@@ -398,25 +382,21 @@ export function UserChip({ person }) {
 
               {/* XP and level progress */}
               {hasXp && (
-                <div className="rounded-lg border bg-background p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="grid size-8 place-items-center
-                          rounded-lg bg-primary/10 text-primary"
-                      >
-                        <FiAward aria-hidden="true" className="size-4" />
+                <div className="rounded-xl border border-border bg-background p-3">
+                  <div className="mb-2.5 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="grid size-8 place-items-center rounded-lg bg-[#FACC15] text-[#111318]">
+                        <Zap aria-hidden="true" className="size-4" />
                       </span>
-
                       <div>
-                        <p className="text-xs font-semibold">Level {level}</p>
+                        <p className="text-xs font-bold">Level {level}</p>
                         <p className="text-[11px] text-muted-foreground">
                           Learning progress
                         </p>
                       </div>
                     </div>
 
-                    <span className="text-xs font-semibold tabular-nums">
+                    <span className="text-xs font-bold tabular-nums">
                       {xp.toLocaleString()} XP
                     </span>
                   </div>
@@ -427,7 +407,7 @@ export function UserChip({ person }) {
                     aria-valuemin={0}
                     aria-valuemax={XP_PER_LEVEL}
                     aria-valuenow={currentLevelXp}
-                    className="h-1.5 overflow-hidden rounded-full bg-muted"
+                    className="h-1.5 overflow-hidden rounded-full bg-border"
                   >
                     <motion.div
                       initial={reduce ? false : { width: 0 }}
@@ -436,7 +416,7 @@ export function UserChip({ person }) {
                         duration: reduce ? 0 : 0.6,
                         ease: "easeOut",
                       }}
-                      className="h-full rounded-full bg-primary"
+                      className="h-full rounded-full bg-[#FACC15]"
                     />
                   </div>
 
@@ -448,7 +428,7 @@ export function UserChip({ person }) {
 
               {/* Email and copy action */}
               {email && (
-                <div className="flex items-center gap-2 rounded-lg border bg-muted/30 py-1.5 pl-3 pr-1.5">
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/30 py-1.5 pl-3 pr-1.5">
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] text-muted-foreground">
                       Signed in as
@@ -469,12 +449,12 @@ export function UserChip({ person }) {
                         transition={{ duration: 0.12 }}
                       >
                         {copied ? (
-                          <FiCheck
+                          <Check
                             aria-hidden="true"
-                            className="size-4 text-emerald-600"
+                            className="size-4 text-emerald-600 dark:text-emerald-400"
                           />
                         ) : (
-                          <FiCopy aria-hidden="true" className="size-4" />
+                          <Copy aria-hidden="true" className="size-4" />
                         )}
                       </motion.span>
                     </AnimatePresence>
@@ -491,19 +471,16 @@ export function UserChip({ person }) {
                 <Link
                   href={PROFILE_HREF}
                   onClick={closeMenu}
-                  className="group/photo flex items-start gap-2.5
-                    rounded-lg border border-dashed p-2.5
-                    transition-colors duration-200
-                    hover:border-primary/40 hover:bg-primary/5
-                    focus-visible:outline-none focus-visible:ring-2
-                    focus-visible:ring-ring"
+                  className={cn(
+                    "group/photo flex items-start gap-2.5 rounded-xl border border-dashed border-border p-2.5 transition-colors duration-200 hover:border-[#8B5CF6]/50 hover:bg-[#8B5CF6]/[0.05]",
+                    FOCUS,
+                  )}
                 >
                   <motion.span
                     whileHover={reduce ? undefined : { scale: 1.08 }}
-                    className="grid size-8 shrink-0 place-items-center
-                      rounded-lg bg-primary/10 text-primary"
+                    className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#8B5CF6]/10 text-violet-700 dark:text-violet-300"
                   >
-                    <FiCamera aria-hidden="true" className="size-4" />
+                    <Camera aria-hidden="true" className="size-4" />
                   </motion.span>
 
                   <span className="min-w-0 text-xs leading-relaxed">
@@ -524,34 +501,31 @@ export function UserChip({ person }) {
                     key={href}
                     href={href}
                     onClick={closeMenu}
-                    className="group/link flex min-w-0 items-center gap-2
-                      rounded-lg border bg-background px-2.5 py-2.5
-                      text-xs font-medium transition-all duration-200
-                      hover:-translate-y-0.5 hover:border-primary/30
-                      hover:bg-primary/5 hover:text-primary
-                      hover:shadow-sm
-                      focus-visible:outline-none focus-visible:ring-2
-                      focus-visible:ring-ring"
+                    className={cn(
+                      "group/link flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background px-2.5 py-2.5 text-xs font-medium transition-all duration-200 hover:-translate-y-0.5 hover:border-[#8B5CF6]/40 hover:bg-[#8B5CF6]/[0.06] hover:text-violet-700 dark:hover:text-violet-300 motion-reduce:hover:translate-y-0",
+                      FOCUS,
+                    )}
                   >
                     <Icon
                       aria-hidden="true"
-                      className="size-4 shrink-0 transition-transform
-                        duration-200 group-hover/link:scale-110"
+                      className="size-4 shrink-0 transition-transform duration-200 group-hover/link:scale-110"
                     />
-
                     <span className="truncate">{label}</span>
                   </Link>
                 ))}
               </div>
 
               {/* Account footer */}
-              <div className="flex items-center justify-between gap-2 border-t pt-2">
-                <span className="text-[10px] text-muted-foreground">
+              <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
+                <span className="text-[11px] text-muted-foreground">
                   Apni University
                 </span>
 
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                  <span
+                    aria-hidden="true"
+                    className="size-1.5 rounded-full bg-emerald-500"
+                  />
                   Account active
                 </span>
               </div>
@@ -562,3 +536,5 @@ export function UserChip({ person }) {
     </motion.div>
   );
 }
+
+export default UserChip;

@@ -1,7 +1,7 @@
 // components/admin/blog/BlogTable.jsx
 "use client";
 import Link from "next/link";
-import { FiFileText, FiStar } from "react-icons/fi";
+import { FiClock, FiFileText, FiStar } from "react-icons/fi";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LifecycleTable } from "@/components/admin/table/LifecycleTable";
 import { formatDate, formatDateTime } from "@/lib/utils/format";
@@ -10,6 +10,17 @@ import {
   runPostAction,
   setPostFeatured,
 } from "@/app/actions/admin/blog";
+
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+// Muted placeholder for empty cells, hidden from screen readers' flow
+// except for the label they need.
+const Empty = ({ label }) => (
+  <span className="text-muted-foreground" aria-label={label}>
+    —
+  </span>
+);
 
 export function BlogTable({ rows, perms }) {
   const columns = [
@@ -21,25 +32,36 @@ export function BlogTable({ rows, perms }) {
         <div className="min-w-0">
           <Link
             href={`/admin/blog/${r.slug}`}
-            className="line-clamp-2 font-medium hover:underline"
+            className={`line-clamp-2 rounded-sm font-medium text-foreground underline-offset-4 hover:text-primary hover:underline ${FOCUS}`}
           >
             {r.title}
           </Link>
-          <p className="font-mono text-xs text-muted-foreground">{r.slug}</p>
+          <p
+            className="mt-0.5 max-w-xs truncate font-mono text-xs text-muted-foreground"
+            title={r.slug}
+          >
+            {r.slug}
+          </p>
         </div>
       ),
     },
     {
       key: "category",
       header: "Topic",
-      className: "text-muted-foreground",
-      cell: (r) => r.category || "—",
+      cell: (r) =>
+        r.category ? (
+          <span className="inline-flex whitespace-nowrap rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground/80">
+            {r.category}
+          </span>
+        ) : (
+          <Empty label="No topic" />
+        ),
     },
     {
       key: "author",
       header: "Author",
       className: "text-muted-foreground",
-      cell: (r) => r.authorName || "—",
+      cell: (r) => r.authorName || <Empty label="No author" />,
     },
     {
       key: "status",
@@ -48,7 +70,8 @@ export function BlogTable({ rows, perms }) {
         <div className="space-y-1">
           <StatusBadge status={r.status} />
           {r.status === "scheduled" && r.scheduledFor && (
-            <p className="text-xs text-muted-foreground">
+            <p className="flex items-center gap-1 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+              <FiClock aria-hidden="true" className="size-3" />
               {formatDateTime(r.scheduledFor)}
             </p>
           )}
@@ -68,22 +91,20 @@ export function BlogTable({ rows, perms }) {
             <span className="sr-only">Featured</span>
           </>
         ) : (
-          <span className="text-muted-foreground" aria-label="Not featured">
-            —
-          </span>
+          <Empty label="Not featured" />
         ),
     },
     {
       key: "published",
       header: "Published",
-      className: "whitespace-nowrap text-muted-foreground",
-      cell: (r) => formatDate(r.publishedAt) || "—",
+      className: "whitespace-nowrap tabular-nums text-muted-foreground",
+      cell: (r) => formatDate(r.publishedAt) || <Empty label="Not published" />,
     },
     {
       key: "updated",
       header: "Updated",
-      className: "whitespace-nowrap text-muted-foreground",
-      cell: (r) => formatDate(r.updatedAt),
+      className: "whitespace-nowrap tabular-nums text-muted-foreground",
+      cell: (r) => formatDate(r.updatedAt) || <Empty label="Not updated" />,
     },
   ];
   return (
@@ -116,4 +137,3 @@ export function BlogTable({ rows, perms }) {
     />
   );
 }
-

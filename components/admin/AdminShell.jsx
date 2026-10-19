@@ -6,10 +6,14 @@ import { usePathname } from "next/navigation";
 import { ArrowUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { AdminSidebar } from "./AdminSidebar";
 
 const SIDEBAR_KEY = "admin:sidebar";
 const sidebarListeners = new Set();
+
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 function getSidebarSnapshot() {
   try {
@@ -85,12 +89,19 @@ export function AdminShell({ header, permissions, children }) {
     main?.scrollIntoView({ block: "start" });
   };
 
+  const backToTop = () => {
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  };
+
   return (
     <div className="flex min-h-dvh bg-secondary/30">
       <a
         href="#main"
         onClick={skipToMain}
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-yellow-400 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-gray-900 focus:shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-400/70 focus:ring-offset-2 focus:ring-offset-background"
       >
         Skip to content
       </a>
@@ -126,12 +137,17 @@ export function AdminShell({ header, permissions, children }) {
         aria-label="Back to top"
         tabIndex={showTop ? 0 : -1}
         aria-hidden={!showTop}
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className={`fixed bottom-4 right-4 z-30 rounded-full bg-background/90 shadow-md backdrop-blur transition-all duration-200 motion-reduce:transition-none sm:bottom-6 sm:right-6 ${
+        onClick={backToTop}
+        className={cn(
+          "fixed bottom-4 right-4 z-30 size-10 rounded-full border-border bg-background/95 text-muted-foreground shadow-md backdrop-blur",
+          "transition-[transform,opacity,background-color,color] duration-200 hover:bg-muted hover:text-foreground",
+          "active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100",
+          "sm:bottom-6 sm:right-6",
+          focusRing,
           showTop
             ? "translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-2 opacity-0"
-        }`}
+            : "pointer-events-none translate-y-2 opacity-0",
+        )}
       >
         <ArrowUp aria-hidden="true" className="size-4" />
       </Button>

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner"; // agar aap dusra toast use karte hain to badal dein
-import { FiMoreHorizontal } from "react-icons/fi";
+import { FiAlertTriangle, FiLoader, FiMoreHorizontal } from "react-icons/fi";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,10 +26,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+const pressable =
+  "transition-transform active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100";
+
 export function RowActions({ label, items }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(null); // item jis ka confirm pending hai
+
+  // Keep the last confirm item so the dialog text doesn't go blank
+  // while its close animation is still running.
+  const lastConfirming = useRef(null);
+  if (confirming) lastConfirming.current = confirming;
+  const shown = confirming ?? lastConfirming.current;
 
   const visible = items.filter((i) => !i.hidden);
   if (!visible.length) return null;
@@ -56,6 +65,8 @@ export function RowActions({ label, items }) {
     else execute(item);
   };
 
+  const destructiveDialog = Boolean(shown?.destructive);
+
   return (
     <>
       <DropdownMenu>
@@ -66,41 +77,67 @@ export function RowActions({ label, items }) {
               size="icon"
               aria-label={`Actions for ${label}`}
               disabled={pending}
+              className={cn(
+                "size-8 text-muted-foreground hover:text-foreground",
+                "focus-visible:ring-2 focus-visible:ring-yellow-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                pressable,
+              )}
             />
           }
         >
-          <FiMoreHorizontal aria-hidden="true" className="size-4" />
+          {pending ? (
+            <FiLoader
+              aria-hidden="true"
+              className="size-4 animate-spin motion-reduce:animate-none"
+            />
+          ) : (
+            <FiMoreHorizontal aria-hidden="true" className="size-4" />
+          )}
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="min-w-44">
           {visible.map((item) => {
             const Icon = item.icon;
             const content = (
               <>
-                {Icon && <Icon aria-hidden="true" className="mr-2 size-4" />}
-                {item.label}
+                {Icon && (
+                  <Icon
+                    aria-hidden="true"
+                    className={cn(
+                      "size-4 shrink-0",
+                      item.destructive
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  />
+                )}
+                <span className="truncate">{item.label}</span>
               </>
             );
 
             return (
-              <div key={item.key}>
+              <Fragment key={item.key}>
                 {item.separatorBefore && <DropdownMenuSeparator />}
                 {item.href ? (
-                  <DropdownMenuItem render={<Link href={item.href} />}>
+                  <DropdownMenuItem
+                    render={<Link href={item.href} />}
+                    className="gap-2.5 text-sm"
+                  >
                     {content}
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem
                     onClick={() => onPick(item)}
                     className={cn(
+                      "gap-2.5 text-sm",
                       item.destructive &&
-                        "text-destructive focus:text-destructive",
+                        "text-destructive focus:bg-destructive/10 focus:text-destructive",
                     )}
                   >
                     {content}
                   </DropdownMenuItem>
                 )}
-              </div>
+              </Fragment>
             );
           })}
         </DropdownMenuContent>
@@ -112,21 +149,36 @@ export function RowActions({ label, items }) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirming?.confirm?.title}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirming?.confirm?.description}
+            {destructiveDialog && (
+              <span
+                aria-hidden="true"
+                className="mb-1 flex size-10 items-center justify-center rounded-lg border border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400"
+              >
+                <FiAlertTriangle className="size-5" />
+              </span>
+            )}
+            <AlertDialogTitle className="text-lg font-semibold tracking-tight">
+              {shown?.confirm?.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="leading-6">
+              {shown?.confirm?.description}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className={pressable}>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              className={cn(
+                pressable,
+                destructiveDialog &&
+                  "bg-destructive text-white hover:bg-destructive/90",
+              )}
               onClick={() => {
                 const item = confirming;
                 setConfirming(null);
                 execute(item);
               }}
             >
-              {confirming?.confirm?.confirmLabel || "Confirm"}
+              {shown?.confirm?.confirmLabel || "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

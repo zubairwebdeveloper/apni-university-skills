@@ -46,6 +46,9 @@ const enter =
   "animate-in fade-in slide-in-from-bottom-1 fill-mode-both duration-300 motion-reduce:animate-none";
 const delay = (i) => ({ animationDelay: `${Math.min(i, 8) * 35}ms` });
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 // Icon group label se chuna jata hai (label server se aata hai).
 function iconFor(label = "") {
   const l = label.toLowerCase();
@@ -83,7 +86,10 @@ function Highlight({ text, term }) {
   const parts = String(text).split(new RegExp(`(${escapeRegExp(term)})`, "gi"));
   return parts.map((part, i) =>
     i % 2 === 1 ? (
-      <mark key={i} className="rounded-sm bg-primary/15 px-0.5 text-foreground">
+      <mark
+        key={i}
+        className="rounded-sm bg-yellow-400/25 px-0.5 font-medium text-foreground"
+      >
         {part}
       </mark>
     ) : (
@@ -98,18 +104,24 @@ function StateMessage({ icon: Icon, title, hint, spin = false, ...rest }) {
       className="flex flex-col items-center gap-2 px-6 py-10 text-center"
       {...rest}
     >
-      <span className="grid size-11 place-items-center rounded-xl bg-muted text-muted-foreground shadow-[0_3px_0_0_var(--border)] ring-1 ring-inset ring-border/60">
+      <span
+        aria-hidden="true"
+        className="grid size-11 place-items-center rounded-xl border border-violet-500/20 bg-violet-500/10 text-violet-600 dark:text-violet-300"
+      >
         <Icon
-          aria-hidden="true"
           className={cn(
             "size-5",
             spin && "animate-spin motion-reduce:animate-none",
           )}
         />
       </span>
-      <p className="text-sm font-medium">{title}</p>
+      <p className="text-sm font-semibold tracking-tight text-foreground">
+        {title}
+      </p>
       {hint ? (
-        <p className="max-w-xs text-xs text-muted-foreground">{hint}</p>
+        <p className="max-w-xs text-xs leading-5 text-muted-foreground">
+          {hint}
+        </p>
       ) : null}
     </div>
   );
@@ -211,14 +223,6 @@ export function AdminSearch() {
     if (!next) setQ("");
   };
 
-  // Spotlight: mouse ke saath chalta hai
-  function onPointerMove(e) {
-    if (reduce) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
-    e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
-  }
-
   return (
     <>
       <Button
@@ -226,9 +230,10 @@ export function AdminSearch() {
         variant="outline"
         size="sm"
         className={cn(
-          "gap-2 rounded-full text-muted-foreground hover:text-foreground sm:min-w-44 sm:justify-start",
-          "shadow-[0_2px_0_0_var(--border)] transition-[transform,box-shadow,color] duration-100",
-          "active:translate-y-[2px] active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0",
+          "gap-2 rounded-full text-muted-foreground hover:bg-muted/60 hover:text-foreground sm:min-w-44 sm:justify-start",
+          "transition-[transform,background-color,color] duration-100 active:scale-[0.98]",
+          "motion-reduce:transition-none motion-reduce:active:scale-100",
+          focusRing,
         )}
         onClick={() => handleOpenChange(true)}
         aria-label="Search the admin (Ctrl + M)"
@@ -236,7 +241,7 @@ export function AdminSearch() {
       >
         <FiSearch aria-hidden="true" className="size-4" />
         <span className="hidden sm:inline">Search…</span>
-        <kbd className="ml-auto hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium sm:inline">
+        <kbd className="ml-auto hidden rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground sm:inline">
           Ctrl M
         </kbd>
       </Button>
@@ -249,211 +254,211 @@ export function AdminSearch() {
             Enter to open a result.
           </DialogDescription>
 
-          {/* 3D entrance: halka jhuk kar seedha hota hai */}
-          <div className="[perspective:900px]">
-            <motion.div
-              initial={reduce ? false : { rotateX: 10, y: -8, opacity: 0.6 }}
-              animate={{ rotateX: 0, y: 0, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 24 }}
-              style={{ transformOrigin: "top center" }}
-              className="relative"
-              onPointerMove={onPointerMove}
-            >
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 motion-reduce:hidden"
-                style={{
-                  background:
-                    "radial-gradient(180px circle at var(--mx, 50%) var(--my, 0%), color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%)",
-                }}
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="relative"
+          >
+            <Command shouldFilter={false} className="relative">
+              <CommandInput
+                value={q}
+                onValueChange={setQ}
+                placeholder="Search courses, students, payments (pay-…), emails…"
               />
 
-              <Command shouldFilter={false} className="relative">
-                <CommandInput
-                  value={q}
-                  onValueChange={setQ}
-                  placeholder="Search courses, students, payments (pay-…), emails…"
-                />
+              {/* Group filter chips */}
+              {state === "done" && allGroups.length > 1 && (
+                <div
+                  className="flex flex-wrap gap-1.5 border-b border-border px-3 py-2.5"
+                  role="group"
+                  aria-label="Filter results"
+                >
+                  {[
+                    { label: "all", name: "All" },
+                    ...allGroups.map((g) => ({
+                      label: g.label,
+                      name: g.label,
+                    })),
+                  ].map((c) => (
+                    <button
+                      key={c.label}
+                      type="button"
+                      onClick={() => setFilter(c.label)}
+                      aria-pressed={activeFilter === c.label}
+                      className={cn(
+                        "rounded-full border px-2.5 py-0.5 text-xs transition-colors duration-150 motion-reduce:transition-none",
+                        focusRing,
+                        activeFilter === c.label
+                          ? "border-violet-500/30 bg-violet-500/10 font-medium text-violet-700 dark:text-violet-300"
+                          : "border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                      )}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-                {/* Group filter chips */}
-                {state === "done" && allGroups.length > 1 && (
-                  <div
-                    className="flex flex-wrap gap-1.5 border-b px-3 py-2"
-                    role="group"
-                    aria-label="Filter results"
-                  >
-                    {[
-                      { label: "all", name: "All" },
-                      ...allGroups.map((g) => ({
-                        label: g.label,
-                        name: g.label,
-                      })),
-                    ].map((c) => (
-                      <button
-                        key={c.label}
-                        type="button"
-                        onClick={() => setFilter(c.label)}
-                        aria-pressed={activeFilter === c.label}
-                        className={cn(
-                          "rounded-full border px-2.5 py-0.5 text-xs outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
-                          activeFilter === c.label
-                            ? "border-primary/30 bg-primary/10 font-medium text-foreground shadow-[0_2px_0_0_color-mix(in_oklab,var(--primary)_25%,transparent)]"
-                            : "text-muted-foreground hover:-translate-y-0.5 hover:text-foreground motion-reduce:hover:translate-y-0",
-                        )}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
-                  </div>
+              <CommandList className="max-h-[60vh]">
+                {state === "idle" &&
+                  (recent.length > 0 ? (
+                    <CommandGroup
+                      heading={
+                        <span className="flex items-center justify-between">
+                          <span>Recent searches</span>
+                          <button
+                            type="button"
+                            onClick={clearRecent}
+                            className={cn(
+                              "rounded-sm text-[11px] font-normal normal-case text-muted-foreground hover:text-foreground",
+                              focusRing,
+                            )}
+                          >
+                            Clear all
+                          </button>
+                        </span>
+                      }
+                    >
+                      {recent.map((s, i) => (
+                        <CommandItem
+                          key={s}
+                          value={`recent-${s}`}
+                          onSelect={() => setQ(s)}
+                          className={cn("group gap-2", enter)}
+                          style={delay(i)}
+                        >
+                          <Clock
+                            aria-hidden="true"
+                            className="size-4 text-muted-foreground"
+                          />
+                          <span className="flex-1 truncate">{s}</span>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${s} from recent searches`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeRecent(s);
+                            }}
+                            className={cn(
+                              "rounded-sm p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 group-data-[selected=true]:opacity-100 motion-reduce:transition-none",
+                              focusRing,
+                            )}
+                          >
+                            <X aria-hidden="true" className="size-3.5" />
+                          </button>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  ) : (
+                    <StateMessage
+                      icon={FiSearch}
+                      title="Search the whole admin"
+                      hint="Type at least 2 characters. Payments, enrollments and certificates match an exact reference or student email."
+                    />
+                  ))}
+
+                {state === "loading" && (
+                  <StateMessage
+                    role="status"
+                    icon={Loader2}
+                    spin
+                    title="Searching…"
+                  />
                 )}
 
-                <CommandList className="max-h-[60vh]">
-                  {state === "idle" &&
-                    (recent.length > 0 ? (
-                      <CommandGroup
-                        heading={
-                          <span className="flex items-center justify-between">
-                            <span>Recent searches</span>
-                            <button
-                              type="button"
-                              onClick={clearRecent}
-                              className="rounded-sm text-[11px] font-normal normal-case text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                              Clear all
-                            </button>
+                {state === "error" && (
+                  <StateMessage
+                    role="alert"
+                    icon={TriangleAlert}
+                    title="Search failed"
+                    hint="Something went wrong. Please try again."
+                  />
+                )}
+
+                {state === "done" && !groups.length && (
+                  <CommandEmpty>
+                    <StateMessage
+                      icon={SearchX}
+                      title="No results"
+                      hint={`Nothing matched "${term}". Check the spelling or try an email or reference.`}
+                    />
+                  </CommandEmpty>
+                )}
+
+                {groups.map((g) => {
+                  const Icon = iconFor(g.label);
+                  return (
+                    <CommandGroup key={g.label} heading={g.label}>
+                      {g.items.map((it, i) => (
+                        <CommandItem
+                          key={`${g.label}-${it.id}`}
+                          value={`${g.label}-${it.id}`}
+                          onSelect={() => go(it.href)}
+                          className={cn("group gap-3 py-2", enter)}
+                          style={delay(i)}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-muted/50 text-muted-foreground transition-colors duration-200 group-data-[selected=true]:border-violet-500/25 group-data-[selected=true]:bg-violet-500/10 group-data-[selected=true]:text-violet-600 dark:group-data-[selected=true]:text-violet-300 motion-reduce:transition-none"
+                          >
+                            <Icon className="size-4" />
                           </span>
-                        }
-                      >
-                        {recent.map((s, i) => (
-                          <CommandItem
-                            key={s}
-                            value={`recent-${s}`}
-                            onSelect={() => setQ(s)}
-                            className={cn("group gap-2", enter)}
-                            style={delay(i)}
-                          >
-                            <Clock
-                              aria-hidden="true"
-                              className="size-4 text-muted-foreground"
-                            />
-                            <span className="flex-1 truncate">{s}</span>
-                            <button
-                              type="button"
-                              aria-label={`Remove ${s} from recent searches`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeRecent(s);
-                              }}
-                              className="rounded-sm p-1 text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 group-data-[selected=true]:opacity-100"
-                            >
-                              <X aria-hidden="true" className="size-3.5" />
-                            </button>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    ) : (
-                      <StateMessage
-                        icon={FiSearch}
-                        title="Search the whole admin"
-                        hint="Type at least 2 characters. Payments, enrollments and certificates match an exact reference or student email."
-                      />
-                    ))}
 
-                  {state === "loading" && (
-                    <StateMessage
-                      role="status"
-                      icon={Loader2}
-                      spin
-                      title="Searching…"
-                    />
-                  )}
-
-                  {state === "error" && (
-                    <StateMessage
-                      role="alert"
-                      icon={TriangleAlert}
-                      title="Search failed"
-                      hint="Something went wrong. Please try again."
-                    />
-                  )}
-
-                  {state === "done" && !groups.length && (
-                    <CommandEmpty>
-                      <StateMessage
-                        icon={SearchX}
-                        title="No results"
-                        hint={`Nothing matched "${term}". Check the spelling or try an email or reference.`}
-                      />
-                    </CommandEmpty>
-                  )}
-
-                  {groups.map((g) => {
-                    const Icon = iconFor(g.label);
-                    return (
-                      <CommandGroup key={g.label} heading={g.label}>
-                        {g.items.map((it, i) => (
-                          <CommandItem
-                            key={`${g.label}-${it.id}`}
-                            value={`${g.label}-${it.id}`}
-                            onSelect={() => go(it.href)}
-                            className={cn("group gap-3 py-2", enter)}
-                            style={delay(i)}
-                          >
-                            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground shadow-sm ring-1 ring-inset ring-border/60 transition-all duration-200 group-data-[selected=true]:-translate-y-0.5 group-data-[selected=true]:bg-primary/10 group-data-[selected=true]:text-primary motion-reduce:transition-none motion-reduce:group-data-[selected=true]:translate-y-0">
-                              <Icon aria-hidden="true" className="size-4" />
-                            </span>
-
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate">
-                                <Highlight text={it.title} term={term} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium leading-5 text-foreground">
+                              <Highlight text={it.title} term={term} />
+                            </p>
+                            {it.sub && (
+                              <p className="truncate text-xs leading-5 text-muted-foreground">
+                                <Highlight text={it.sub} term={term} />
                               </p>
-                              {it.sub && (
-                                <p className="truncate text-xs text-muted-foreground">
-                                  <Highlight text={it.sub} term={term} />
-                                </p>
-                              )}
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    );
-                  })}
-                </CommandList>
-              </Command>
+                            )}
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  );
+                })}
+              </CommandList>
+            </Command>
 
-              {/* Footer: result count + keyboard hints */}
-              <div className="relative flex items-center justify-between gap-3 border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
-                <span aria-live="polite">
-                  {state === "done"
-                    ? `${totalResults} ${totalResults === 1 ? "result" : "results"}`
-                    : "Admin search"}
-                </span>
+            {/* Footer: result count + keyboard hints */}
+            <div className="relative flex items-center justify-between gap-3 border-t border-border bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground">
+              <span aria-live="polite" className="tabular-nums">
+                {state === "done"
+                  ? `${totalResults} ${totalResults === 1 ? "result" : "results"}`
+                  : "Admin search"}
+              </span>
 
-                <span
-                  className="hidden items-center gap-3 sm:flex"
-                  aria-hidden="true"
-                >
-                  <span className="flex items-center gap-1">
-                    <kbd className="rounded border bg-background px-1">↑</kbd>
-                    <kbd className="rounded border bg-background px-1">↓</kbd>
-                    navigate
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <kbd className="rounded border bg-background px-1">
-                      <CornerDownLeft className="size-3" />
-                    </kbd>
-                    open
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <kbd className="rounded border bg-background px-1">
-                      Ctrl M
-                    </kbd>
-                    toggle
-                  </span>
+              <span
+                className="hidden items-center gap-3 sm:flex"
+                aria-hidden="true"
+              >
+                <span className="flex items-center gap-1">
+                  <kbd className="rounded border border-border bg-background px-1 font-mono text-[11px] text-foreground">
+                    ↑
+                  </kbd>
+                  <kbd className="rounded border border-border bg-background px-1 font-mono text-[11px] text-foreground">
+                    ↓
+                  </kbd>
+                  navigate
                 </span>
-              </div>
-            </motion.div>
-          </div>
+                <span className="flex items-center gap-1">
+                  <kbd className="rounded border border-border bg-background px-1 py-0.5 text-foreground">
+                    <CornerDownLeft className="size-3" />
+                  </kbd>
+                  open
+                </span>
+                <span className="flex items-center gap-1">
+                  <kbd className="rounded border border-border bg-background px-1 font-mono text-[11px] text-foreground">
+                    Ctrl M
+                  </kbd>
+                  toggle
+                </span>
+              </span>
+            </div>
+          </motion.div>
         </DialogContent>
       </Dialog>
     </>

@@ -14,6 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { startServerSession } from "@/lib/firebase/client/auth";
 
 const COOLDOWN_SEC = 60;
 
@@ -86,10 +87,11 @@ export function VerifyEmailBanner() {
         return;
       }
 
-      // Force a fresh token so the server sees email_verified = true.
+      // Force a fresh token (now carrying email_verified = true) and push
+      // it to the server ourselves, instead of guessing how long it takes
+      // AuthProvider's own token-change listener to get to it first.
       await user.getIdToken(true);
-      // Give the session cookie a moment to update before refreshing pages.
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await startServerSession(user);
 
       setVerified(true);
       router.refresh();

@@ -1,5 +1,6 @@
+// app/student/progress/page.jsx
 import Link from "next/link";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, ArrowRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StudentPageHeader } from "@/components/student/StudentPageHeader";
@@ -12,6 +13,7 @@ import {
 } from "@/components/student/ProgressMotion";
 import { requireUser } from "@/lib/auth/session";
 import { enrollmentService } from "@/services/enrollmentService";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Progress" };
 
@@ -24,15 +26,29 @@ export default async function ProgressPage() {
       <MotionRoot>
         <div className="relative isolate">
           <ProgressBackdrop />
-          <StudentPageHeader title="Progress" />
+          <StudentPageHeader
+            title="Progress"
+            description="Your progress across all courses will be tracked here."
+          />
           <Reveal>
             <EmptyState
               icon={TrendingUp}
               title="No progress to show yet"
               description="Enroll in a course and your progress will be tracked here."
               action={
-                <Link href="/courses" className={buttonVariants()}>
+                <Link
+                  href="/courses"
+                  className={cn(
+                    buttonVariants(),
+                    "group gap-2 shadow-[0_3px_0_0_color-mix(in_oklab,var(--primary)_55%,black)] transition-[transform,box-shadow] duration-100",
+                    "active:translate-y-[3px] active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0",
+                  )}
+                >
                   Browse courses
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                  />
                 </Link>
               }
             />
@@ -70,7 +86,9 @@ export default async function ProgressPage() {
 
         <StudentPageHeader
           title="Progress"
-          description="How you're doing across all your courses."
+          description={`${completed} of ${total} ${
+            total === 1 ? "course" : "courses"
+          } completed. Here is how you're doing across all your courses.`}
         />
 
         <ContinueLearning
@@ -80,11 +98,15 @@ export default async function ProgressPage() {
           average={average}
         />
 
-        <div id="all-progress" className="scroll-mt-24">
+        <section
+          id="all-progress"
+          aria-label="Progress by course"
+          className="scroll-mt-24"
+        >
           <Reveal>
             <ProgressView items={items} />
           </Reveal>
-        </div>
+        </section>
       </div>
     </MotionRoot>
   );

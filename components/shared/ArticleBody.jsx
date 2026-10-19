@@ -30,25 +30,39 @@ function parse(text) {
 }
 
 export function ArticleBody({ text }) {
+  const blocks = parse(text);
+
   return (
-    <div className="text-base leading-relaxed text-foreground/85">
-      {parse(text).map((b, i) =>
+    <div className="mx-auto max-w-[68ch] text-[1.0625rem] leading-[1.8] text-foreground/85">
+      {blocks.map((b, i) =>
         b.t === "h2" ? (
-          <h2 key={i} className="mb-3 mt-10 text-2xl">
+          <h2
+            key={i}
+            className="scroll-mt-28 text-balance border-t pt-8 font-serif text-2xl font-semibold leading-snug text-foreground first:border-t-0 first:pt-0 [&:not(:first-child)]:mt-12 mb-4 sm:text-[1.75rem]"
+          >
             {b.v}
           </h2>
         ) : b.t === "h3" ? (
-          <h3 key={i} className="mb-2 mt-8 text-xl">
+          <h3
+            key={i}
+            className="scroll-mt-28 text-balance mb-3 mt-10 text-xl font-semibold leading-snug text-foreground"
+          >
             {b.v}
           </h3>
         ) : b.t === "ul" ? (
-          <ul key={i} className="my-4 list-disc space-y-2 pl-6">
+          <ul key={i} className="my-5 space-y-2.5 pl-1">
             {b.v.map((x, j) => (
-              <li key={j}>{x}</li>
+              <li key={j} className="relative pl-6">
+                <span
+                  aria-hidden="true"
+                  className="absolute left-0 top-[0.7em] size-1.5 rounded-full bg-primary/70"
+                />
+                {x}
+              </li>
             ))}
           </ul>
         ) : (
-          <p key={i} className="my-4">
+          <p key={i} className="my-5 text-pretty">
             {b.v}
           </p>
         ),
@@ -56,4 +70,3 @@ export function ArticleBody({ text }) {
     </div>
   );
 }
-

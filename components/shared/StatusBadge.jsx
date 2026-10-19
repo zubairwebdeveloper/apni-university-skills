@@ -1,33 +1,52 @@
 // components/shared/StatusBadge.jsx
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+// [label, badge variant, semantic tone]
 const MAP = {
   // components/shared/StatusBadge.jsx: extend MAP
-  paid: ["Paid", "default"],
-  cancelled: ["Cancelled", "outline"],
-  draft: ["Draft", "outline"],
-  published: ["Published", "default"],
-  archived: ["Archived", "secondary"],
-  deleted: ["Deleted", "destructive"],
-  new: ["New", "default"],
-  succeeded: ["Paid", "default"],
-  refunded: ["Refunded", "secondary"],
-  failed: ["Failed", "destructive"],
-  pending: ["Pending review", "outline"],
-  approved: ["Approved", "default"],
-  rejected: ["Rejected", "destructive"],
-  active: ["In progress", "secondary"],
-  completed: ["Completed", "default"],
-  scheduled: ["Scheduled", "outline"],
-  read: ["Read", "secondary"],
-  replied: ["Replied", "default"],
-  spam: ["Spam", "destructive"],
-  sending: ["Sending", "outline"],
-  sent: ["Sent", "default"],
-  valid: ["Valid", "default"],
-  revoked: ["Revoked", "destructive"],
+  paid: ["Paid", "default", "success"],
+  cancelled: ["Cancelled", "outline", "neutral"],
+  draft: ["Draft", "outline", "neutral"],
+  published: ["Published", "default", "success"],
+  archived: ["Archived", "secondary", "neutral"],
+  deleted: ["Deleted", "destructive", "danger"],
+  new: ["New", "default", "info"],
+  succeeded: ["Paid", "default", "success"],
+  refunded: ["Refunded", "secondary", "neutral"],
+  failed: ["Failed", "destructive", "danger"],
+  pending: ["Pending review", "outline", "warning"],
+  approved: ["Approved", "default", "success"],
+  rejected: ["Rejected", "destructive", "danger"],
+  active: ["In progress", "secondary", "info"],
+  completed: ["Completed", "default", "success"],
+  scheduled: ["Scheduled", "outline", "info"],
+  read: ["Read", "secondary", "neutral"],
+  replied: ["Replied", "default", "success"],
+  spam: ["Spam", "destructive", "danger"],
+  sending: ["Sending", "outline", "warning"],
+  sent: ["Sent", "default", "success"],
+  valid: ["Valid", "default", "success"],
+  revoked: ["Revoked", "destructive", "danger"],
 };
-export function StatusBadge({ status }) {
-  const [label, variant] = MAP[status] ?? [status, "outline"];
-  return <Badge variant={variant}>{label}</Badge>;
-}
 
+const DOT = {
+  success: "bg-emerald-500",
+  warning: "bg-amber-500",
+  danger: "bg-destructive",
+  info: "bg-primary",
+  neutral: "bg-muted-foreground/50",
+};
+
+export function StatusBadge({ status }) {
+  const [label, variant, tone = "neutral"] = MAP[status] ?? [status, "outline"];
+  return (
+    <Badge variant={variant} className="gap-1.5">
+      <span
+        aria-hidden="true"
+        className={cn("size-1.5 shrink-0 rounded-full", DOT[tone])}
+      />
+      {label}
+    </Badge>
+  );
+}

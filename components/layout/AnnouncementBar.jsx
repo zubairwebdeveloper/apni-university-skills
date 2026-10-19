@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  ArrowRight,
   ArrowUpRight,
   Check,
   ChevronLeft,
@@ -11,6 +12,7 @@ import {
   Copy,
   Pause,
   Play,
+  Sparkles,
   X,
 } from "lucide-react";
 
@@ -20,161 +22,277 @@ import { cn } from "@/lib/utils";
 
 const SLIDE_MS = 7000;
 const DISMISS_KEY = "announcement-dismissed-at";
-const DISMISS_HOURS = 24; // dismiss ke baad 24 ghante bar nahi aayegi
+const DISMISS_HOURS = 24;
 
-// Colours (yahin se badlein)
-const BG = "bg-[#0F172A]"; // deep slate
-const BRAND = "#ef07a2";
+const BRAND_YELLOW = "#FACC15";
+const BRAND_PURPLE = "#8B5CF6";
 
-const announcements = [
+const DEFAULT_ANNOUNCEMENTS = [
   {
     id: "courses",
-    status: "New",
+    status: "Explore",
     title: "Your next skill starts here.",
-    description: "Practical technology courses with real projects.",
+    description:
+      "Learn practical technology skills and build real-world projects.",
     cta: "Explore courses",
     href: "/courses",
-    accent: "#38bdf8",
+    accent: BRAND_YELLOW,
+    icon: "sparkles",
   },
   {
     id: "ai",
-    status: "Trending",
+    status: "Future ready",
     title: "Get ready for the AI era.",
-    description: "Generative AI, agents and automation, step by step.",
-    cta: "Discover AI",
-    href: "/ai",
-    accent: "#a78bfa",
+    description: "Discover AI, automation and the tools shaping tomorrow.",
+    cta: "Explore learning",
+    href: "/courses",
+    accent: BRAND_PURPLE,
+    icon: "sparkles",
   },
   {
     id: "offer",
-    status: "Limited offer",
-    title: "Start free, upgrade when you're ready.",
-    description: "Use this code on your first course.",
-    code: "WELCOME10", // copy button dikhata hai
-    endsAt: "2026-12-31T23:59:59+05:00", // countdown dikhata hai (apni date likhein)
-    cta: "Claim offer",
+    status: "Special offer",
+    title: "Your learning journey starts here.",
+    description: "Use the code below on your first course.",
+    code: "WELCOME10",
+    endsAt: "2026-12-31T23:59:59+05:00",
+    cta: "View courses",
     href: "/courses",
-    accent: "#fbbf24",
+    accent: BRAND_YELLOW,
+    icon: "sparkles",
   },
   {
     id: "signup",
-    status: "Free",
+    status: "Get started",
     title: "Make your next move count.",
-    description: "Create an account and track your progress.",
-    cta: "Get started",
+    description:
+      "Create your account and keep track of your learning progress.",
+    cta: "Join Apni University",
     href: "/register",
-    accent: "#34d399",
+    accent: BRAND_PURPLE,
+    icon: "sparkles",
   },
 ];
 
-function pad(n) {
-  return String(n).padStart(2, "0");
+function pad(value) {
+  return String(value).padStart(2, "0");
 }
 
-// Countdown: server/client mismatch na ho, isliye effect ke andar start hota hai
 function useCountdown(endsAt) {
-  const [left, setLeft] = useState(null);
+  const [remaining, setRemaining] = useState(null);
 
   useEffect(() => {
     if (!endsAt) {
-      setLeft(null);
+      setRemaining(null);
       return undefined;
     }
-    const end = new Date(endsAt).getTime();
-    const tick = () => setLeft(Math.max(0, end - Date.now()));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+
+    const endTime = new Date(endsAt).getTime();
+
+    if (!Number.isFinite(endTime)) {
+      setRemaining(null);
+      return undefined;
+    }
+
+    const update = () => {
+      setRemaining(Math.max(0, endTime - Date.now()));
+    };
+
+    update();
+
+    const interval = window.setInterval(update, 1000);
+
+    return () => window.clearInterval(interval);
   }, [endsAt]);
 
-  if (left === null || left <= 0) return null;
+  if (remaining === null || remaining <= 0) {
+    return null;
+  }
 
-  const s = Math.floor(left / 1000);
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return `${d > 0 ? `${d}d ` : ""}${pad(h)}h ${pad(m)}m ${pad(s % 60)}s`;
+  const totalSeconds = Math.floor(remaining / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return [
+    days > 0 ? `${days}d` : null,
+    `${pad(hours)}h`,
+    `${pad(minutes)}m`,
+    `${pad(seconds)}s`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
-function IconButton({ label, onClick, pressed, children }) {
+function IconButton({ label, onClick, pressed, children, className }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
       aria-pressed={pressed}
-      className="grid size-8 cursor-pointer place-items-center rounded-lg text-slate-400 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/60"
+      className={cn(
+        "inline-grid size-8 shrink-0 place-items-center rounded-lg",
+        "text-white/60 transition-all duration-200",
+        "hover:bg-white/10 hover:text-white",
+        "focus-visible:outline-none focus-visible:ring-2",
+        "focus-visible:ring-[#FACC15]",
+        "active:scale-95",
+        className,
+      )}
     >
       {children}
     </button>
   );
 }
 
-export function AnnouncementBar() {
-  const reduce = useReducedMotion();
+function StatusBadge({ status, accent }) {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]"
+      style={{
+        color: accent,
+        borderColor: `${accent}45`,
+        backgroundColor: `${accent}12`,
+      }}
+    >
+      <span className="relative flex size-1.5">
+        <span
+          className="absolute inline-flex size-full animate-ping rounded-full opacity-50"
+          style={{ backgroundColor: accent }}
+        />
+        <span
+          className="relative inline-flex size-1.5 rounded-full"
+          style={{ backgroundColor: accent }}
+        />
+      </span>
+      {status}
+    </span>
+  );
+}
 
-  const [open, setOpen] = useState(false); // mount ke baad decide hota hai
+export function AnnouncementBar() {
+  const reduceMotion = useReducedMotion();
+
+  const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const [hovered, setHovered] = useState(false);
   const [userPaused, setUserPaused] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const paused = hovered || userPaused;
-
   const cfg = siteConfig?.announcement;
-  const slides = [
-    ...(cfg?.text && cfg?.cta && cfg?.href
-      ? [
-          {
-            id: "configured",
-            status: "Update",
-            title: cfg.text,
-            description: "Discover opportunities to learn, build and grow.",
-            cta: cfg.cta,
-            href: cfg.href,
-            accent: BRAND,
-          },
-        ]
-      : []),
-    ...announcements,
-  ];
+
+  const slides = useMemo(() => {
+    const configuredSlide =
+      cfg?.text && cfg?.cta && cfg?.href
+        ? [
+            {
+              id: "configured",
+              status: "Announcement",
+              title: cfg.text,
+              description: "Discover opportunities to learn, build and grow.",
+              cta: cfg.cta,
+              href: cfg.href,
+              accent: BRAND_YELLOW,
+            },
+          ]
+        : [];
+
+    return [...configuredSlide, ...DEFAULT_ANNOUNCEMENTS];
+  }, [cfg?.text, cfg?.cta, cfg?.href]);
 
   const current = index % slides.length;
   const slide = slides[current];
   const countdown = useCountdown(slide.endsAt);
+  const paused = hovered || userPaused;
 
-  // Dismiss yaad rakho (24h)
+  const go = useCallback(
+    (direction) => {
+      setIndex((currentIndex) => {
+        return (currentIndex + direction + slides.length) % slides.length;
+      });
+      setCopied(false);
+    },
+    [slides.length],
+  );
+
+  // Read dismissal state after mount to avoid hydration mismatch.
   useEffect(() => {
     try {
-      const at = Number(window.localStorage.getItem(DISMISS_KEY) || 0);
-      const expired = !at || Date.now() - at > DISMISS_HOURS * 3600 * 1000;
-      setOpen(expired);
+      const dismissedAt = Number(window.localStorage.getItem(DISMISS_KEY) || 0);
+
+      const dismissalExpired =
+        !dismissedAt ||
+        Date.now() - dismissedAt >= DISMISS_HOURS * 60 * 60 * 1000;
+
+      setOpen(dismissalExpired);
     } catch {
       setOpen(true);
     }
   }, []);
 
-  const dismiss = () => {
+  // Auto-advance only when visible, unpaused and motion is allowed.
+  useEffect(() => {
+    if (!open || paused || reduceMotion || slides.length < 2) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      go(1);
+    }, SLIDE_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [open, paused, reduceMotion, current, go, slides.length]);
+
+  // Reset the copied state and clean up its timeout.
+  useEffect(() => {
+    if (!copied) return undefined;
+
+    const timeout = window.setTimeout(() => {
+      setCopied(false);
+    }, 1800);
+
+    return () => window.clearTimeout(timeout);
+  }, [copied]);
+
+  const dismiss = useCallback(() => {
     setOpen(false);
+
     try {
       window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
     } catch {
-      /* storage unavailable */
+      // The announcement can still be dismissed if storage is blocked.
     }
-  };
+  }, []);
 
-  const go = useCallback(
-    (dir) => setIndex((c) => (c + dir + slides.length) % slides.length),
-    [slides.length],
-  );
+  const copyCode = useCallback(async () => {
+    if (!slide.code) return;
 
-  const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(slide.code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
     } catch {
-      /* clipboard blocked */
+      // Clipboard access may be unavailable in insecure contexts.
+      setCopied(false);
+    }
+  }, [slide.code]);
+
+  const handleKeyDown = (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      go(1);
+    }
+
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      go(-1);
+    }
+
+    if (event.key === "Escape") {
+      dismiss();
     }
   };
 
@@ -182,196 +300,246 @@ export function AnnouncementBar() {
     <AnimatePresence initial={false}>
       {open && (
         <motion.aside
-          initial={reduce ? false : { height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          aria-label="Announcements"
+          key="announcement-bar"
+          initial={reduceMotion ? false : { opacity: 0, height: 0, y: -8 }}
+          animate={{ opacity: 1, height: "auto", y: 0 }}
+          exit={
+            reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, y: -8 }
+          }
+          transition={{ duration: 0.28, ease: "easeOut" }}
+          aria-label="Site announcements"
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
           onFocusCapture={() => setHovered(true)}
-          onBlurCapture={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget)) setHovered(false);
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setHovered(false);
+            }
           }}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowRight") go(1);
-            if (e.key === "ArrowLeft") go(-1);
-          }}
-          className={cn(
-            "relative z-50 overflow-hidden border-b border-white/10 font-sans text-slate-100",
-            BG,
-          )}
+          onKeyDown={handleKeyDown}
+          className="relative z-50 overflow-hidden border-b border-white/[0.08] bg-[#111318] font-sans text-white"
         >
-          <style>{`
-            @keyframes ab-fill { from { transform: scaleX(0) } to { transform: scaleX(1) } }
-          `}</style>
+          {/* Subtle brand accents, without a heavy gradient background. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 w-1"
+            style={{ backgroundColor: slide.accent }}
+          />
 
-          <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-6 lg:px-8 bg-indigo-600 text-white">
-            {/* Content (swipe on touch) */}
-            <motion.div
-              drag={reduce ? false : "x"}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.15}
-              onDragEnd={(_, info) => {
-                if (info.offset.x < -50) go(1);
-                else if (info.offset.x > 50) go(-1);
-              }}
-              className="min-w-0 flex-1 touch-pan-y "
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={slide.id}
-                  initial={reduce ? false : { opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
-                  transition={{ duration: 0.22 }}
-                  className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 "
-                >
-                  {/* Status */}
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide"
-                    style={{
-                      color: slide.accent,
-                      backgroundColor: `${slide.accent}1f`,
-                    }}
-                  >
-                    <span
-                      className="size-1.5 rounded-full"
-                      style={{ backgroundColor: slide.accent }}
-                    />
-                    {slide.status}
-                  </span>
-
-                  {/* Title */}
-                  <h2 className="text-[13px] font-semibold tracking-tight text-white sm:text-sm">
-                    {slide.title}
-                  </h2>
-
-                  {/* Description */}
-                  <p className="hidden text-[13px]  lg:block">
-                    {slide.description}
-                  </p>
-
-                  {/* Promo code (copy) */}
-                  {slide.code && (
-                    <button
-                      type="button"
-                      onClick={copyCode}
-                      aria-label={`Copy promo code ${slide.code}`}
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-white/25 bg-white/5 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-200 outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/60"
-                    >
-                      {slide.code}
-                      {copied ? (
-                        <Check
-                          aria-hidden="true"
-                          className="size-3 text-emerald-400"
-                        />
-                      ) : (
-                        <Copy
-                          aria-hidden="true"
-                          className="size-3 text-slate-400"
-                        />
-                      )}
-                      <span className="sr-only" role="status">
-                        {copied ? "Copied" : ""}
-                      </span>
-                    </button>
-                  )}
-
-                  {/* Countdown */}
-                  {countdown && (
-                    <span className="font-mono text-[11px] tabular-nums text-amber-300">
-                      Ends in {countdown}
-                    </span>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </motion.div>
-
-            {/* CTA: Link styled as a button */}
-            <Link
-              href={slide.href}
-              className={cn(
-                buttonVariants({ size: "sm" }),
-                "group hidden shrink-0 rounded-full px-4 text-xs font-semibold text-white shadow-none transition-all duration-200 hover:brightness-110 sm:inline-flex",
-              )}
-              style={{ backgroundColor: BRAND }}
-            >
-              {slide.cta}
-              <ArrowUpRight
+          <div className="mx-auto max-w-[1440px] px-3 sm:px-6 lg:px-8">
+            <div className="flex min-h-[66px] items-center gap-2.5 py-3 sm:gap-4">
+              {/* Brand mark */}
+              <div
                 aria-hidden="true"
-                className="ml-1 size-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-              />
-            </Link>
-
-            {/* Controls */}
-            <div className="flex shrink-0 items-center gap-0.5">
-              <div className="hidden items-center gap-0.5 md:flex">
-                <IconButton
-                  label="Previous announcement"
-                  onClick={() => go(-1)}
-                >
-                  <ChevronLeft size={16} />
-                </IconButton>
-
-                <span className="min-w-9 text-center font-mono text-[11px] tabular-nums text-slate-500">
-                  {current + 1}/{slides.length}
-                </span>
-
-                <IconButton label="Next announcement" onClick={() => go(1)}>
-                  <ChevronRight size={16} />
-                </IconButton>
-
-                {!reduce && (
-                  <IconButton
-                    label={userPaused ? "Play rotation" : "Pause rotation"}
-                    onClick={() => setUserPaused((p) => !p)}
-                    pressed={userPaused}
-                  >
-                    {userPaused ? <Play size={14} /> : <Pause size={14} />}
-                  </IconButton>
-                )}
+                className="hidden size-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] sm:grid"
+              >
+                <Sparkles
+                  className="size-[17px]"
+                  style={{ color: slide.accent }}
+                />
               </div>
 
-              <IconButton label="Dismiss announcements" onClick={dismiss}>
-                <X size={16} />
-              </IconButton>
+              {/* Announcement content */}
+              <div className="min-w-0 flex-1">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={slide.id}
+                    initial={reduceMotion ? false : { opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -5 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5"
+                  >
+                    <StatusBadge status={slide.status} accent={slide.accent} />
+
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <h2 className="text-[12px] font-bold leading-snug tracking-tight text-white sm:text-[13px] md:text-sm">
+                        {slide.title}
+                      </h2>
+
+                      <span className="hidden text-white/30 lg:inline">/</span>
+
+                      <p className="hidden text-xs leading-relaxed text-white/55 lg:block">
+                        {slide.description}
+                      </p>
+                    </div>
+
+                    {slide.code && (
+                      <button
+                        type="button"
+                        onClick={copyCode}
+                        aria-label={
+                          copied
+                            ? "Promo code copied"
+                            : `Copy promo code ${slide.code}`
+                        }
+                        className={cn(
+                          "inline-flex min-h-7 items-center gap-1.5 rounded-lg",
+                          "border border-dashed px-2 py-1",
+                          "font-mono text-[10px] font-bold tracking-wide",
+                          "transition-colors duration-200",
+                          "hover:bg-white/[0.08]",
+                          "focus-visible:outline-none focus-visible:ring-2",
+                          "focus-visible:ring-[#FACC15]",
+                        )}
+                        style={{
+                          color: slide.accent,
+                          borderColor: `${slide.accent}55`,
+                          backgroundColor: `${slide.accent}0D`,
+                        }}
+                      >
+                        <span>{slide.code}</span>
+                        {copied ? (
+                          <Check
+                            aria-hidden="true"
+                            className="size-3 text-emerald-400"
+                          />
+                        ) : (
+                          <Copy aria-hidden="true" className="size-3" />
+                        )}
+                      </button>
+                    )}
+
+                    {countdown && (
+                      <span className="inline-flex items-center gap-1.5 text-[10px] tabular-nums text-white/50">
+                        <span
+                          className="size-1.5 rounded-full"
+                          style={{
+                            backgroundColor: slide.accent,
+                          }}
+                        />
+                        Ends in {countdown}
+                      </span>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              {/* Desktop call to action */}
+              <Link
+                href={slide.href}
+                className={cn(
+                  buttonVariants({ size: "sm" }),
+                  "group hidden h-9 shrink-0 gap-2 rounded-xl px-3.5",
+                  "text-xs font-bold shadow-none sm:inline-flex",
+                  "transition-all duration-200 hover:-translate-y-0.5",
+                  "focus-visible:ring-2 focus-visible:ring-offset-2",
+                  "focus-visible:ring-offset-[#111318]",
+                )}
+                style={{
+                  backgroundColor: slide.accent,
+                  color: "#111318",
+                }}
+              >
+                {slide.cta}
+                <ArrowUpRight
+                  aria-hidden="true"
+                  className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                />
+              </Link>
+
+              {/* Navigation controls */}
+              <div className="flex shrink-0 items-center gap-0.5">
+                <div className="hidden items-center gap-0.5 sm:flex">
+                  <IconButton
+                    label="Previous announcement"
+                    onClick={() => go(-1)}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </IconButton>
+
+                  <span
+                    className="min-w-8 text-center font-mono text-[10px] tabular-nums text-white/40"
+                    aria-label={`Announcement ${current + 1} of ${slides.length}`}
+                  >
+                    {current + 1}/{slides.length}
+                  </span>
+
+                  <IconButton label="Next announcement" onClick={() => go(1)}>
+                    <ChevronRight className="size-4" />
+                  </IconButton>
+
+                  {!reduceMotion && (
+                    <IconButton
+                      label={
+                        userPaused
+                          ? "Resume announcement rotation"
+                          : "Pause announcement rotation"
+                      }
+                      onClick={() => setUserPaused((value) => !value)}
+                      pressed={userPaused}
+                    >
+                      {userPaused ? (
+                        <Play className="size-3.5" />
+                      ) : (
+                        <Pause className="size-3.5" />
+                      )}
+                    </IconButton>
+                  )}
+
+                  <div className="mx-1 h-5 w-px bg-white/10" />
+                </div>
+
+                <IconButton
+                  label="Dismiss announcements for 24 hours"
+                  onClick={dismiss}
+                  className="hover:bg-white/10"
+                >
+                  <X className="size-4" />
+                </IconButton>
+              </div>
+            </div>
+
+            {/* Mobile description and CTA */}
+            <div className="flex items-center justify-between gap-3 border-t border-white/[0.07] py-2.5 sm:hidden">
+              <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-white/55">
+                {slide.description}
+              </p>
+
+              <Link
+                href={slide.href}
+                className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold"
+                style={{ color: slide.accent }}
+              >
+                {slide.cta}
+                <ArrowRight aria-hidden="true" className="size-3" />
+              </Link>
             </div>
           </div>
 
-          {/* Mobile: CTA row */}
-          <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-2 sm:hidden">
-            <span className="min-w-0 truncate text-xs text-slate-400">
-              {slide.description}
-            </span>
-            <Link
-              href={slide.href}
-              className="shrink-0 text-xs font-semibold"
-              style={{ color: BRAND }}
+          {/* Progress indicator */}
+          {!reduceMotion && (
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 bottom-0 h-[2px] bg-white/[0.04]"
             >
-              {slide.cta} →
-            </Link>
-          </div>
-
-          {/* Thin progress line (auto-advance isi se hota hai) */}
-          {!reduce && (
-            <div className="absolute inset-x-0 bottom-0 h-[2px] bg-white/5">
-              <span
+              <motion.div
                 key={`${slide.id}-${index}`}
-                onAnimationEnd={() => go(1)}
-                className="block h-full origin-left"
+                initial={{ scaleX: 0 }}
+                animate={{
+                  scaleX: paused ? undefined : 1,
+                }}
+                transition={{
+                  duration: paused ? 0 : SLIDE_MS / 1000,
+                  ease: "linear",
+                }}
                 style={{
                   backgroundColor: slide.accent,
-                  animation: `ab-fill ${SLIDE_MS}ms linear forwards`,
+                  transformOrigin: "left",
                   animationPlayState: paused ? "paused" : "running",
                 }}
+                className="h-full w-full"
               />
             </div>
           )}
 
-          <p className="sr-only" aria-live="polite">
-            {slide.title} {slide.description}
-          </p>
+          <span className="sr-only" role="status" aria-live="polite">
+            {copied ? "Promo code copied to clipboard." : ""}
+          </span>
+
+          <span className="sr-only" aria-live="polite">
+            {slide.title}. {slide.description}
+          </span>
         </motion.aside>
       )}
     </AnimatePresence>

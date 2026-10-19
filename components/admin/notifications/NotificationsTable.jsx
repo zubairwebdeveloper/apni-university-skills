@@ -24,12 +24,16 @@ export function NotificationsTable({ rows }) {
     {
       key: "title",
       header: "Notification",
-      className: "min-w-64",
+      className: "min-w-72",
       cell: (r) => (
-        <div>
-          <p className="font-medium">{r.title}</p>
-          <p className="line-clamp-1 text-xs text-muted-foreground capitalize">
-            {r.type} · {r.body}
+        <div className="min-w-0">
+          <p className="line-clamp-1 text-sm font-semibold leading-snug">
+            {r.title}
+          </p>
+          <p className="mt-0.5 line-clamp-1 max-w-md text-xs text-muted-foreground">
+            <span className="font-medium capitalize">{r.type}</span>
+            <span aria-hidden="true"> · </span>
+            {r.body}
           </p>
         </div>
       ),
@@ -37,8 +41,12 @@ export function NotificationsTable({ rows }) {
     {
       key: "audience",
       header: "Audience",
-      className: "text-muted-foreground",
-      cell: (r) => audienceLabel(r.audience),
+      className: "text-sm text-muted-foreground",
+      cell: (r) => (
+        <span className="block max-w-56 truncate">
+          {audienceLabel(r.audience)}
+        </span>
+      ),
     },
     {
       key: "status",
@@ -48,13 +56,13 @@ export function NotificationsTable({ rows }) {
     {
       key: "recipients",
       header: "Delivered",
-      className: "tabular-nums",
-      cell: (r) => r.recipientCount ?? 0,
+      className: "text-sm tabular-nums",
+      cell: (r) => <span className="font-medium">{r.recipientCount ?? 0}</span>,
     },
     {
       key: "when",
       header: "When",
-      className: "whitespace-nowrap text-muted-foreground",
+      className: "whitespace-nowrap text-sm tabular-nums text-muted-foreground",
       cell: (r) => formatDateTime(r.sentAt ?? r.scheduledFor ?? r.createdAt),
     },
     {
@@ -114,4 +122,3 @@ export function NotificationsTable({ rows }) {
     />
   );
 }
-

@@ -680,7 +680,7 @@ function AccountDropdown({
         <div className="p-2">
           {isAdmin && (
             <>
-              <DropdownMenuLabel className="px-2 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+              <DropdownMenuLabel className="px-2 pb-1.5 pt-1 text-xs font-medium text-muted-foreground">
                 Administration
               </DropdownMenuLabel>
 
@@ -692,7 +692,7 @@ function AccountDropdown({
             </>
           )}
 
-          <DropdownMenuLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+          <DropdownMenuLabel className="px-2 pb-1.5 text-xs font-medium text-muted-foreground">
             Your workspace
           </DropdownMenuLabel>
 

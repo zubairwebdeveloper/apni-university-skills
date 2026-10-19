@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   motion,
   useMotionValue,
@@ -15,16 +15,20 @@ import { Card } from "@/components/ui/card";
 export function CouponTicket({ code, updatedAt, children }) {
   const reduce = useReducedMotion();
   const [copied, setCopied] = useState(false);
+  const timer = useRef(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [5, -5]), {
+  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [4, -4]), {
     stiffness: 180,
     damping: 24,
   });
-  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-7, 7]), {
+  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-6, 6]), {
     stiffness: 180,
     damping: 24,
   });
+
+  // Clear the pending reset so state is never set after unmount
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   function move(e) {
     if (reduce || e.pointerType === "touch") return;
@@ -37,7 +41,8 @@ export function CouponTicket({ code, updatedAt, children }) {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
     }
@@ -61,19 +66,25 @@ export function CouponTicket({ code, updatedAt, children }) {
         y.set(0);
       }}
     >
-      <Card className="flex-row items-stretch gap-0 overflow-hidden p-0">
-        <div className="flex items-center gap-4 p-5 sm:p-6">
+      <Card className="flex-col items-stretch gap-0 overflow-hidden p-0 shadow-sm sm:flex-row">
+        <div className="flex min-w-0 items-center gap-4 bg-primary/5 p-5 sm:p-6">
           <span
-            className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
+            className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20"
             style={{ transform: "translateZ(26px)" }}
             aria-hidden="true"
           >
             <Ticket className="size-6" />
           </span>
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Coupon code</p>
+            <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span
+                aria-hidden="true"
+                className="h-3.5 w-1 rounded-full bg-[#FACC15]"
+              />
+              Coupon code
+            </p>
             <p
-              className="break-all font-mono text-xl font-semibold tracking-wider"
+              className="mt-1 break-all font-mono text-xl font-semibold tracking-wider sm:text-2xl"
               style={{ transform: "translateZ(14px)" }}
             >
               {code}
@@ -81,14 +92,14 @@ export function CouponTicket({ code, updatedAt, children }) {
           </div>
         </div>
 
-        {/* perforated divider, like a ticket stub */}
+        {/* perforated divider, like a ticket stub (horizontal on mobile, vertical on sm+) */}
         <div
-          className="my-3 w-px self-stretch border-l border-dashed border-border"
+          className="mx-4 border-t border-dashed border-border sm:mx-0 sm:my-3 sm:w-px sm:self-stretch sm:border-l sm:border-t-0"
           aria-hidden="true"
         />
 
-        <div className="flex flex-1 flex-wrap items-center justify-between gap-3 p-5 sm:p-6">
-          <div className="flex flex-col gap-1 text-sm">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 p-5 sm:p-6">
+          <div className="flex min-w-0 flex-col gap-1 text-sm">
             {children}
             {updatedAt && (
               <span className="text-xs text-muted-foreground">
@@ -96,14 +107,26 @@ export function CouponTicket({ code, updatedAt, children }) {
               </span>
             )}
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={copy}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={copy}
+            aria-label={`Copy code ${code}`}
+          >
             {copied ? (
-              <Check className="text-emerald-600 dark:text-emerald-400" />
+              <Check
+                className="text-emerald-600 dark:text-emerald-400"
+                aria-hidden="true"
+              />
             ) : (
-              <Copy />
+              <Copy aria-hidden="true" />
             )}
             {copied ? "Copied" : "Copy code"}
           </Button>
+          <span role="status" className="sr-only">
+            {copied ? `${code} copied` : ""}
+          </span>
         </div>
       </Card>
     </motion.div>

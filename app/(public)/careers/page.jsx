@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import {
+  FiArrowRight,
   FiAward,
   FiBriefcase,
   FiChevronDown,
   FiCompass,
   FiDollarSign,
+  FiHelpCircle,
   FiLayers,
   FiMap,
   FiSearch,
@@ -27,6 +29,8 @@ import {
 } from "@/components/public/careerUtils";
 
 import { careerService } from "@/services/careerService";
+
+import { cn } from "@/lib/utils";
 
 export const revalidate = 300;
 
@@ -85,6 +89,18 @@ const faqs = [
   },
 ];
 
+// Shared class strings keep every section consistent.
+const sectionEyebrow =
+  "mb-3 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider";
+const sectionTitle =
+  "text-balance text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-4xl";
+const cardHover =
+  "transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+const iconTile =
+  "grid shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15 transition-all duration-300 group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary motion-reduce:transition-none";
+const countPill =
+  "rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary";
+
 export default async function CareersPage() {
   const raw = await careerService.getAllCareers();
 
@@ -134,7 +150,7 @@ export default async function CareersPage() {
       />
 
       <div className="relative overflow-x-clip">
-        {/* Soft background glows */}
+        {/* Soft background glow */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
@@ -142,20 +158,28 @@ export default async function CareersPage() {
 
         {/* Stats */}
         {careers.length > 0 && (
-          <Container className="relative pt-10">
-            <ul className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Container className="relative pt-8 sm:pt-10">
+            <ul
+              aria-label="Careers at a glance"
+              className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
+            >
               {stats.map(({ icon: Icon, value, label }, i) => (
                 <li key={label} className="min-w-0">
                   <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group flex h-full items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
+                    <div
+                      className={cn(
+                        "group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:p-5",
+                        cardHover,
+                      )}
+                    >
+                      <span className={cn(iconTile, "size-11 sm:size-12")}>
                         <Icon aria-hidden="true" className="size-5" />
                       </span>
-                      <div>
-                        <p className="font-serif text-3xl font-semibold leading-none text-foreground">
+                      <div className="min-w-0">
+                        <p className="font-serif text-3xl font-semibold leading-none tabular-nums text-foreground">
                           {value}
                         </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-1.5 text-sm text-muted-foreground">
                           {label}
                         </p>
                       </div>
@@ -168,40 +192,37 @@ export default async function CareersPage() {
         )}
 
         {/* Explorer */}
-        <Container className="relative py-10">
+        <Container className="relative py-8 sm:py-10 lg:py-12">
           <Reveal>
             <CareersExplorer careers={careers} />
           </Reveal>
         </Container>
 
-        {/* Categories at a glance (new, derived entirely from fetched data) */}
+        {/* Categories at a glance (derived entirely from fetched data) */}
         {topCategories.length > 0 && (
           <section
             aria-labelledby="categories-title"
-            className="border-t border-border py-12 sm:py-16"
+            className="border-t border-border py-12 sm:py-16 lg:py-20"
           >
             <Container>
               <Reveal className="mx-auto max-w-2xl text-center">
-                <Badge variant="secondary" className="mb-3">
+                <Badge variant="secondary" className={sectionEyebrow}>
                   Categories at a glance
                 </Badge>
-                <h2
-                  id="categories-title"
-                  className="text-2xl text-foreground sm:text-3xl"
-                >
+                <h2 id="categories-title" className={sectionTitle}>
                   Roles grouped by category
                 </h2>
-                <p className="mt-3 text-muted-foreground">
+                <p className="mx-auto mt-3 max-w-prose text-pretty text-muted-foreground">
                   Use the filters above to narrow the list to one of these.
                 </p>
               </Reveal>
               <Reveal delay={0.1}>
-                <ul className="mt-8 flex flex-wrap justify-center gap-2.5">
+                <ul className="mt-10 flex flex-wrap justify-center gap-2.5">
                   {topCategories.map(([category, count]) => (
                     <li key={category}>
-                      <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground">
+                      <span className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card py-2 pl-4 pr-2.5 text-sm font-medium text-foreground shadow-sm">
                         {category}
-                        <span className="rounded-full bg-primary/10 px-1.5 text-xs text-primary">
+                        <span className={countPill}>
                           {count} {count === 1 ? "path" : "paths"}
                         </span>
                       </span>
@@ -217,31 +238,28 @@ export default async function CareersPage() {
         {topSkills.length > 0 && (
           <section
             aria-labelledby="skills-title"
-            className="border-t border-border bg-muted/20 py-12 sm:py-16"
+            className="border-t border-border bg-muted/20 py-12 sm:py-16 lg:py-20"
           >
             <Container>
               <Reveal className="mx-auto max-w-2xl text-center">
-                <Badge variant="secondary" className="mb-3">
+                <Badge variant="secondary" className={sectionEyebrow}>
                   Skills in demand
                 </Badge>
-                <h2
-                  id="skills-title"
-                  className="text-2xl text-foreground sm:text-3xl"
-                >
+                <h2 id="skills-title" className={sectionTitle}>
                   Skills that appear across many roles
                 </h2>
-                <p className="mt-3 text-muted-foreground">
+                <p className="mx-auto mt-3 max-w-prose text-pretty text-muted-foreground">
                   These skills show up most often in our career guides. Learning
                   them keeps your options open.
                 </p>
               </Reveal>
               <Reveal delay={0.1}>
-                <ul className="mt-8 flex flex-wrap justify-center gap-2.5">
+                <ul className="mx-auto mt-10 flex max-w-4xl flex-wrap justify-center gap-2.5">
                   {topSkills.map(([skill, count]) => (
                     <li key={skill}>
-                      <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+                      <span className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card py-2 pl-4 pr-2.5 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0">
                         {skill}
-                        <span className="rounded-full bg-primary/10 px-1.5 text-xs text-primary">
+                        <span className={countPill}>
                           {count} {count === 1 ? "role" : "roles"}
                         </span>
                       </span>
@@ -256,38 +274,46 @@ export default async function CareersPage() {
         {/* How to use */}
         <section
           aria-labelledby="steps-title"
-          className="border-t border-border py-12 sm:py-16"
+          className="border-t border-border py-12 sm:py-16 lg:py-20"
         >
           <Container>
             <Reveal className="mx-auto max-w-2xl text-center">
-              <Badge variant="secondary" className="mb-3">
+              <Badge variant="secondary" className={sectionEyebrow}>
                 How it works
               </Badge>
-              <h2
-                id="steps-title"
-                className="text-2xl text-foreground sm:text-3xl"
-              >
+              <h2 id="steps-title" className={sectionTitle}>
                 From curious to job-ready
               </h2>
-              <p className="mt-3 text-muted-foreground">
+              <p className="mx-auto mt-3 max-w-prose text-pretty text-muted-foreground">
                 Four simple steps to turn a career guide into a real plan.
               </p>
             </Reveal>
-            <ol className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <ol className="relative mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {steps.map(({ icon: Icon, title, text }, i) => (
                 <li key={title} className="min-w-0">
                   <Reveal delay={i * 0.08} className="h-full">
-                    <div className="group relative h-full rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-                      <span className="absolute right-4 top-3 font-serif text-4xl font-semibold text-primary/10">
+                    <div
+                      className={cn(
+                        "group relative h-full overflow-hidden rounded-2xl border border-border bg-card p-6",
+                        cardHover,
+                      )}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -right-1 -top-3 select-none font-serif text-7xl font-semibold tabular-nums text-primary/5"
+                      >
                         {i + 1}
                       </span>
-                      <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none motion-reduce:group-hover:rotate-0">
+                      <span className={cn(iconTile, "relative size-11")}>
                         <Icon aria-hidden="true" className="size-5" />
                       </span>
-                      <h3 className="mt-4 font-sans text-base font-semibold text-foreground">
+                      <p className="relative mt-4 text-xs font-semibold uppercase tracking-wider text-primary">
+                        Step {i + 1}
+                      </p>
+                      <h3 className="relative mt-0.5 font-sans text-base font-semibold text-foreground">
                         {title}
                       </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="relative mt-1.5 text-sm leading-relaxed text-muted-foreground">
                         {text}
                       </p>
                     </div>
@@ -299,24 +325,28 @@ export default async function CareersPage() {
         </section>
 
         {/* Find courses banner */}
-        <section className="border-t border-border bg-muted/20 py-12 sm:py-14">
+        <section className="border-t border-border bg-muted/20 py-12 sm:py-14 lg:py-16">
           <Container>
             <Reveal>
-              <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-8 sm:p-10">
+              <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-8 shadow-sm sm:p-10 lg:p-12">
                 <span
                   aria-hidden="true"
                   className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-highlight"
                 />
-                <div className="flex flex-col items-start gap-5 md:flex-row md:items-center md:justify-between">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full bg-primary/5 blur-2xl"
+                />
+                <div className="relative flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-start gap-4">
-                    <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
                       <FiCompass aria-hidden="true" className="size-5" />
                     </span>
                     <div>
-                      <h2 className="text-xl text-foreground sm:text-2xl">
+                      <h2 className="text-balance text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                         Ready to learn the skills?
                       </h2>
-                      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                      <p className="mt-1.5 max-w-xl text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
                         Pick a role above, then find courses that teach the
                         skills it needs. Many courses are free.
                       </p>
@@ -324,9 +354,16 @@ export default async function CareersPage() {
                   </div>
                   <Link
                     href="/courses"
-                    className={buttonVariants({ variant: "default" })}
+                    className={cn(
+                      buttonVariants({ variant: "default" }),
+                      "group w-full sm:w-auto",
+                    )}
                   >
                     Browse courses
+                    <FiArrowRight
+                      aria-hidden="true"
+                      className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                    />
                   </Link>
                 </div>
               </div>
@@ -337,32 +374,42 @@ export default async function CareersPage() {
         {/* FAQ */}
         <section
           aria-labelledby="faq-title"
-          className="border-t border-border py-12 sm:py-16"
+          className="border-t border-border py-12 sm:py-16 lg:py-20"
         >
-          <Container className="max-w-3xl">
-            <Reveal className="text-center">
-              <h2
-                id="faq-title"
-                className="text-2xl text-foreground sm:text-3xl"
-              >
-                Career questions
-              </h2>
-            </Reveal>
-            <div className="mt-8 space-y-3">
-              {faqs.map(({ q, a }, i) => (
-                <Reveal key={q} delay={i * 0.06}>
-                  <details className="group rounded-xl border border-border bg-card px-4 py-3 open:shadow-md">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
-                      {q}
-                      <FiChevronDown
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-primary transition-transform duration-300 group-open:rotate-180 motion-reduce:transition-none"
-                      />
-                    </summary>
-                    <p className="mt-3 text-sm text-muted-foreground">{a}</p>
-                  </details>
-                </Reveal>
-              ))}
+          <Container className="max-w-5xl">
+            <div className="grid gap-10 lg:grid-cols-12 lg:gap-12">
+              <Reveal className="lg:col-span-4">
+                <div className="lg:sticky lg:top-24">
+                  <span className="mb-4 grid size-11 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
+                    <FiHelpCircle aria-hidden="true" className="size-5" />
+                  </span>
+                  <h2 id="faq-title" className={sectionTitle}>
+                    Career questions
+                  </h2>
+                  <p className="mt-3 text-pretty text-muted-foreground">
+                    Common questions about choosing and following a career path.
+                  </p>
+                </div>
+              </Reveal>
+
+              <div className="space-y-3 lg:col-span-8">
+                {faqs.map(({ q, a }, i) => (
+                  <Reveal key={q} delay={i * 0.06}>
+                    <details className="group rounded-xl border border-border bg-card px-4 py-3.5 transition-colors duration-200 hover:border-primary/30 open:border-primary/30 open:shadow-md motion-reduce:transition-none sm:px-5">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
+                        {q}
+                        <FiChevronDown
+                          aria-hidden="true"
+                          className="size-4 shrink-0 text-primary transition-transform duration-300 group-open:rotate-180 motion-reduce:transition-none"
+                        />
+                      </summary>
+                      <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground sm:text-base">
+                        {a}
+                      </p>
+                    </details>
+                  </Reveal>
+                ))}
+              </div>
             </div>
           </Container>
         </section>

@@ -32,4 +32,3 @@ export function CategoryIcon({ name, ...props }) {
   const Icon = icons[name] ?? FiFolder;
   return <Icon aria-hidden="true" {...props} />;
 }
-

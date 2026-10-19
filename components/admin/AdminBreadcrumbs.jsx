@@ -71,16 +71,15 @@ const enter =
 const delay = (i) => ({ animationDelay: `${i * 60}ms` });
 
 const focusRing =
-  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-// 3D chip: hover par perspective tilt + uthna, press par dabna
+// Quiet chip: hover par halka background, press par chhota scale
 const chip = cn(
   "rounded-lg border border-transparent px-2 py-1 text-muted-foreground",
-  "transition-[transform,background-color,color,box-shadow,border-color] duration-200",
-  "hover:border-border hover:bg-background hover:text-foreground hover:shadow-sm",
-  "hover:[transform:perspective(420px)_rotateX(10deg)_translateY(-1px)]",
-  "active:[transform:perspective(420px)_rotateX(0deg)_translateY(1px)]",
-  "motion-reduce:transition-none motion-reduce:hover:[transform:none] motion-reduce:active:[transform:none]",
+  "transition-[transform,background-color,color,border-color] duration-200",
+  "hover:border-border hover:bg-muted/60 hover:text-foreground",
+  "active:scale-[0.98]",
+  "motion-reduce:transition-none motion-reduce:active:scale-100",
   focusRing,
 );
 
@@ -110,16 +109,20 @@ function CopyLink() {
         title="Copy link to this page"
         aria-label="Copy link to this page"
         className={cn(
-          "ml-1 grid size-7 shrink-0 place-items-center rounded-md border bg-background text-muted-foreground shadow-sm",
-          "transition-all duration-150 hover:-translate-y-0.5 hover:text-primary active:translate-y-px motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+          "ml-1 inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-2 text-xs font-medium transition-colors active:scale-[0.97]",
+          "motion-reduce:transition-none motion-reduce:active:scale-100",
+          copied
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            : "border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground",
           focusRing,
         )}
       >
         {copied ? (
-          <Check aria-hidden="true" className="size-3.5 text-primary" />
+          <Check aria-hidden="true" className="size-3.5" />
         ) : (
           <Link2 aria-hidden="true" className="size-3.5" />
         )}
+        {copied && <span className="hidden sm:inline">Copied</span>}
       </button>
       <span role="status" aria-live="polite" className="sr-only">
         {copied ? "Link copied" : ""}
@@ -131,13 +134,13 @@ function CopyLink() {
 function HomeTile({ className }) {
   return (
     <span
+      aria-hidden="true"
       className={cn(
-        "grid size-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary",
-        "shadow-[0_2px_0_0_color-mix(in_oklab,var(--primary)_25%,transparent)] ring-1 ring-inset ring-primary/20",
+        "grid size-7 shrink-0 place-items-center rounded-lg border border-violet-500/20 bg-violet-500/10 text-violet-600 dark:text-violet-300",
         className,
       )}
     >
-      <LayoutDashboard aria-hidden="true" className="size-4" />
+      <LayoutDashboard className="size-4" />
     </span>
   );
 }
@@ -156,7 +159,7 @@ export function AdminBreadcrumbs() {
 
   if (crumbs.length <= 1) {
     return (
-      <p className="flex items-center gap-2 text-sm font-semibold">
+      <p className="flex items-center gap-2.5 text-sm font-semibold tracking-tight text-foreground">
         <HomeTile />
         Dashboard
       </p>
@@ -174,19 +177,11 @@ export function AdminBreadcrumbs() {
 
   const renderCrumb = (c, { isHome, isLast, index }) => (
     <BreadcrumbItem
-      className={cn(
-        "max-w-[10rem] [perspective:420px] sm:max-w-[16rem]",
-        enter,
-      )}
+      className={cn("max-w-[10rem] sm:max-w-[16rem]", enter)}
       style={delay(index)}
     >
       {isLast ? (
-        <BreadcrumbPage
-          className={cn(
-            "flex items-center truncate rounded-lg border border-primary/20 bg-gradient-to-b from-primary/15 to-primary/5 px-2.5 py-1 font-semibold text-foreground",
-            "shadow-[0_2px_0_0_color-mix(in_oklab,var(--primary)_22%,transparent)]",
-          )}
-        >
+        <BreadcrumbPage className="flex items-center truncate rounded-lg border border-violet-500/25 bg-violet-500/10 px-2.5 py-1 font-semibold text-foreground">
           <span className="truncate">{c.label}</span>
         </BreadcrumbPage>
       ) : (
@@ -208,8 +203,9 @@ export function AdminBreadcrumbs() {
         <Link
           href={parent.href}
           className={cn(
-            "flex shrink-0 items-center gap-1 rounded-lg border bg-background px-2 py-1 text-muted-foreground shadow-[0_2px_0_0_var(--border)]",
-            "transition-[transform,box-shadow] duration-100 active:translate-y-[2px] active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0",
+            "flex min-h-8 shrink-0 items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-muted-foreground",
+            "transition-[transform,background-color,color] duration-100 hover:bg-muted/60 hover:text-foreground active:scale-[0.97]",
+            "motion-reduce:transition-none motion-reduce:active:scale-100",
             focusRing,
           )}
         >
@@ -218,7 +214,7 @@ export function AdminBreadcrumbs() {
         </Link>
         <span
           aria-current="page"
-          className="min-w-0 truncate rounded-lg bg-primary/10 px-2 py-1 font-semibold text-foreground"
+          className="min-w-0 truncate rounded-lg border border-violet-500/25 bg-violet-500/10 px-2.5 py-1 font-semibold text-foreground"
         >
           {current.label}
         </span>
@@ -250,11 +246,12 @@ export function AdminBreadcrumbs() {
                     >
                       <BreadcrumbEllipsis className="size-4" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
+                    <DropdownMenuContent align="start" className="min-w-40">
                       {hidden.map((c) => (
                         <DropdownMenuItem
                           key={c.href}
                           onSelect={() => router.push(c.href)}
+                          className="text-sm"
                         >
                           {c.label}
                         </DropdownMenuItem>

@@ -1,7 +1,6 @@
 // app/layout.jsx
 
 import { cache } from "react";
-import { DM_Sans, Source_Serif_4 } from "next/font/google";
 
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth/AuthProvider";
@@ -16,17 +15,12 @@ import { settingsService } from "@/services/settingsService";
 import "./globals.css";
 import { SnakeScrollAuto } from "@/components/layout/SnakeScrollbar";
 
-const sans = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-dm-sans",
-  display: "swap",
-});
-
-const serif = Source_Serif_4({
-  subsets: ["latin"],
-  variable: "--font-source-serif",
-  display: "swap",
-});
+// Fonts are loaded via a <link> tag below (browser-fetched at runtime,
+// cached by the CDN) instead of next/font/google, so the build never needs
+// to reach fonts.googleapis.com itself. Font families are mapped to
+// --font-dm-sans / --font-source-serif in globals.css.
+const GOOGLE_FONTS_HREF =
+  "https://fonts.googleapis.com/css2?family=DM+Sans:wght@100..1000&family=Source+Serif+4:opsz,wght@8..60,200..900&display=swap";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -126,9 +120,18 @@ export default async function RootLayout({ children }) {
   return (
     <html
       lang="en"
-      className={`${sans.variable} ${serif.variable} scroll-smooth motion-reduce:scroll-auto`}
+      className="scroll-smooth motion-reduce:scroll-auto"
       suppressHydrationWarning
     >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link rel="stylesheet" href={GOOGLE_FONTS_HREF} />
+      </head>
       <body className="relative flex min-h-dvh flex-col overflow-x-clip bg-background font-sans text-[15px] leading-relaxed text-foreground antialiased selection:bg-primary/20 selection:text-foreground sm:text-base lg:text-[17px] dark:selection:bg-primary/30">
         <Providers>
           <AuthProvider>

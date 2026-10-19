@@ -2,10 +2,18 @@
 
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
+import { AdditiveBlending } from "three";
 
-const BLUE = "#4F8CFF";
-const ICE = "#8DCBFF";
-const YELLOW = "#FFC857";
+/* ------------------------------------------------------------------ */
+/* Palette (matches the page tokens)                                   */
+/* ------------------------------------------------------------------ */
+// WebGL can't read CSS variables, so the same values are kept here.
+// Violet is the structure (rings, wireframe, dust); yellow is the single
+// accent (core and one highlighted node per ring), like the buttons.
+const VIOLET = "#8B5CF6";
+const VIOLET_SOFT = "#C4B5FD";
+const YELLOW = "#FACC15";
+const SURFACE = "#171A21";
 
 const RINGS = [
   { radius: 1.75, tilt: [1.15, 0.25, 0], speed: 0.16, nodes: 5, accent: -1 },
@@ -22,43 +30,104 @@ function seeded(seed) {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Core                                                                */
+/* ------------------------------------------------------------------ */
 function Core({ animate }) {
-  const ref = useRef(null);
+  const shell = useRef(null);
+  const outer = useRef(null);
+  const glow = useRef(null);
 
-  useFrame((_, delta) => {
-    if (!animate || !ref.current) return;
-    ref.current.rotation.y += delta * 0.15;
-    ref.current.rotation.x += delta * 0.05;
+  useFrame((state, delta) => {
+    if (!animate) return;
+
+    if (shell.current) {
+      shell.current.rotation.y += delta * 0.15;
+      shell.current.rotation.x += delta * 0.05;
+    }
+    // The wireframe turns the other way, so the two layers feel separate.
+    if (outer.current) {
+      outer.current.rotation.y -= delta * 0.08;
+      outer.current.rotation.z += delta * 0.03;
+    }
+    // A slow, very small breathing of the glowing centre.
+    if (glow.current) {
+      const t = state.clock.elapsedTime;
+      glow.current.scale.setScalar(1 + Math.sin(t * 1.4) * 0.05);
+    }
   });
 
   return (
-    <group ref={ref}>
-      <mesh>
+    <group>
+      <mesh ref={shell}>
         <icosahedronGeometry args={[0.9, 1]} />
         <meshStandardMaterial
-          color="#0D121C"
-          emissive={BLUE}
-          emissiveIntensity={0.25}
+          color={SURFACE}
+          emissive={VIOLET}
+          emissiveIntensity={0.22}
           roughness={0.35}
           metalness={0.6}
           flatShading
           transparent
-          opacity={0.78}
+          opacity={0.85}
         />
       </mesh>
-      <mesh>
+      <mesh ref={outer}>
         <icosahedronGeometry args={[1.04, 1]} />
-        <meshBasicMaterial color={BLUE} wireframe transparent opacity={0.4} />
-      </mesh>
-      <mesh>
-        <sphereGeometry args={[0.36, 32, 32]} />
-        <meshStandardMaterial
-          color={YELLOW}
-          emissive={YELLOW}
-          emissiveIntensity={0.9}
+        <meshBasicMaterial
+          color={VIOLET}
+          wireframe
+          transparent
+          opacity={0.45}
         />
       </mesh>
+      <group ref={glow}>
+        <mesh>
+          <sphereGeometry args={[0.36, 32, 32]} />
+          <meshStandardMaterial
+            color={YELLOW}
+            emissive={YELLOW}
+            emissiveIntensity={0.8}
+          />
+        </mesh>
+        {/* Soft halo around the accent core */}
+        <mesh>
+          <sphereGeometry args={[0.58, 24, 24]} />
+          <meshBasicMaterial
+            color={YELLOW}
+            transparent
+            opacity={0.1}
+            depthWrite={false}
+            blending={AdditiveBlending}
+          />
+        </mesh>
+      </group>
     </group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Rings                                                               */
+/* ------------------------------------------------------------------ */
+function Node({ point, isAccent, animate }) {
+  const ref = useRef(null);
+
+  useFrame((state) => {
+    if (!animate || !isAccent || !ref.current) return;
+    ref.current.scale.setScalar(
+      1 + Math.sin(state.clock.elapsedTime * 2) * 0.14,
+    );
+  });
+
+  return (
+    <mesh ref={ref} position={point}>
+      <sphereGeometry args={[isAccent ? 0.1 : 0.065, 16, 16]} />
+      <meshStandardMaterial
+        color={isAccent ? YELLOW : VIOLET}
+        emissive={isAccent ? YELLOW : VIOLET_SOFT}
+        emissiveIntensity={isAccent ? 1.2 : 0.9}
+      />
+    </mesh>
   );
 }
 
@@ -88,9 +157,19 @@ function Ring({ radius, tilt, speed, nodes, accent, animate }) {
   return (
     <group rotation={tilt}>
       <group ref={spin}>
+        {/* Wide, faint band under the thin ring gives it a soft edge */}
+        <mesh>
+          <torusGeometry args={[radius, 0.022, 8, 128]} />
+          <meshBasicMaterial
+            color={VIOLET}
+            transparent
+            opacity={0.08}
+            depthWrite={false}
+          />
+        </mesh>
         <mesh>
           <torusGeometry args={[radius, 0.006, 8, 128]} />
-          <meshBasicMaterial color={BLUE} transparent opacity={0.5} />
+          <meshBasicMaterial color={VIOLET} transparent opacity={0.55} />
         </mesh>
 
         <lineSegments>
@@ -100,33 +179,38 @@ function Ring({ radius, tilt, speed, nodes, accent, animate }) {
               args={[linePositions, 3]}
             />
           </bufferGeometry>
-          <lineBasicMaterial color={BLUE} transparent opacity={0.3} />
+          <lineBasicMaterial color={VIOLET} transparent opacity={0.3} />
         </lineSegments>
 
-        {nodePoints.map((point, index) => {
-          const isAccent = index === accent;
-
-          return (
-            <mesh key={index} position={point}>
-              <sphereGeometry args={[isAccent ? 0.1 : 0.065, 16, 16]} />
-              <meshStandardMaterial
-                color={isAccent ? YELLOW : BLUE}
-                emissive={isAccent ? YELLOW : ICE}
-                emissiveIntensity={isAccent ? 1.4 : 1.1}
-              />
-            </mesh>
-          );
-        })}
+        {nodePoints.map((point, index) => (
+          <Node
+            key={index}
+            point={point}
+            isAccent={index === accent}
+            animate={animate}
+          />
+        ))}
       </group>
     </group>
   );
 }
 
-function Particles({ count, animate }) {
+/* ------------------------------------------------------------------ */
+/* Dust                                                                */
+/* ------------------------------------------------------------------ */
+function Particles({
+  count,
+  animate,
+  seed = 42,
+  color = VIOLET,
+  size = 0.035,
+  opacity = 0.5,
+  speed = 0.02,
+}) {
   const ref = useRef(null);
 
   const positions = useMemo(() => {
-    const random = seeded(42);
+    const random = seeded(seed);
     const array = new Float32Array(count * 3);
 
     for (let index = 0; index < count; index += 1) {
@@ -139,10 +223,10 @@ function Particles({ count, animate }) {
     }
 
     return array;
-  }, [count]);
+  }, [count, seed]);
 
   useFrame((_, delta) => {
-    if (animate && ref.current) ref.current.rotation.y += delta * 0.02;
+    if (animate && ref.current) ref.current.rotation.y += delta * speed;
   });
 
   return (
@@ -151,17 +235,20 @@ function Particles({ count, animate }) {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        color={BLUE}
-        size={0.035}
+        color={color}
+        size={size}
         sizeAttenuation
         transparent
-        opacity={0.5}
+        opacity={opacity}
         depthWrite={false}
       />
     </points>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Rig                                                                 */
+/* ------------------------------------------------------------------ */
 // Moves the whole composition in response to scroll and (optionally) pointer.
 function Rig({ scrollProgress, pointerEnabled, animate, children }) {
   const group = useRef(null);
@@ -175,10 +262,12 @@ function Rig({ scrollProgress, pointerEnabled, animate, children }) {
     const py = pointerEnabled ? state.pointer.y : 0;
     const ease = 1 - Math.exp(-delta * 3);
     const scale = 1 - progress * 0.18;
+    // A barely-there float keeps the scene alive while the page is idle.
+    const float = animate ? Math.sin(state.clock.elapsedTime * 0.6) * 0.06 : 0;
 
     node.rotation.y += (px * 0.25 + progress * 1.1 - node.rotation.y) * ease;
     node.rotation.x += (-py * 0.15 + progress * 0.25 - node.rotation.x) * ease;
-    node.position.y += (progress * 0.9 - node.position.y) * ease;
+    node.position.y += (progress * 0.9 + float - node.position.y) * ease;
     node.scale.x += (scale - node.scale.x) * ease;
     node.scale.y += (scale - node.scale.y) * ease;
     node.scale.z += (scale - node.scale.z) * ease;
@@ -187,6 +276,9 @@ function Rig({ scrollProgress, pointerEnabled, animate, children }) {
   return <group ref={group}>{children}</group>;
 }
 
+/* ------------------------------------------------------------------ */
+/* Scene                                                               */
+/* ------------------------------------------------------------------ */
 export default function HeroScene({
   scrollProgress,
   reduce = false,
@@ -208,8 +300,8 @@ export default function HeroScene({
       }}
       frameloop={reduce ? "demand" : active ? "always" : "never"}
     >
-      <ambientLight intensity={0.5} />
-      <pointLight position={[4, 3, 5]} intensity={40} color={BLUE} />
+      <ambientLight intensity={0.55} />
+      <pointLight position={[4, 3, 5]} intensity={40} color={VIOLET} />
       <pointLight position={[-4, -2, 3]} intensity={14} color={YELLOW} />
 
       <Rig
@@ -222,6 +314,18 @@ export default function HeroScene({
           <Ring key={ring.radius} {...ring} animate={animate} />
         ))}
         <Particles count={compact ? 50 : 120} animate={animate} />
+        {/* Sparse, larger, lighter dust adds depth on desktop only */}
+        {!compact && (
+          <Particles
+            count={28}
+            animate={animate}
+            seed={7}
+            color={VIOLET_SOFT}
+            size={0.06}
+            opacity={0.35}
+            speed={-0.012}
+          />
+        )}
       </Rig>
     </Canvas>
   );

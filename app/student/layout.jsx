@@ -13,12 +13,15 @@ export const metadata = {
 
 export default async function StudentLayout({ children }) {
   const user = await requireUser();
-const profile = await userService.ensureProfile(
-  user.uid,
-  user.email,
-  user.name,
-  user.photoURL,
-); const cookieStore = await cookies();
+
+  const profile = await userService.ensureProfile(
+    user.uid,
+    user.email,
+    user.name,
+    user.photoURL,
+  );
+
+  const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("student-sidebar")?.value !== "0";
 
   const person = {
@@ -29,12 +32,23 @@ const profile = await userService.ensureProfile(
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
+      <a
+        href="#student-content"
+        className="sr-only z-[100] rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        Skip to main content
+      </a>
+
       <StudentShell
         sidebar={<StudentSidebar person={person} />}
         header={<StudentHeader person={person} />}
       >
-        <div>
-        {children}
+        <div
+          id="student-content"
+          tabIndex={-1}
+          className="mx-auto w-full min-w-0 max-w-7xl px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8"
+        >
+          {children}
         </div>
       </StudentShell>
     </SidebarProvider>

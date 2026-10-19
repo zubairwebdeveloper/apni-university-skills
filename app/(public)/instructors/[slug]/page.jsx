@@ -2,7 +2,14 @@
 import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FiArrowRight } from "react-icons/fi";
+import {
+  FiArrowRight,
+  FiAward,
+  FiBookOpen,
+  FiStar,
+  FiUser,
+  FiZap,
+} from "react-icons/fi";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -22,6 +29,7 @@ import { courseService } from "@/services/courseService";
 import { reviewService } from "@/services/reviewService";
 import { safe } from "@/lib/utils/safe";
 import { formatCompact } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
 
 export const revalidate = 300;
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -49,6 +57,24 @@ export async function generateMetadata({ params }) {
     twitter: { card: "summary", title: i.name, description },
   };
 }
+
+const iconTile =
+  "grid shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15";
+
+// Section heading with an icon tile that reinforces what the block is about.
+const SectionTitle = ({ id, icon: Icon, children }) => (
+  <div className="mb-6 flex items-center gap-3">
+    <span className={cn(iconTile, "size-10")}>
+      <Icon aria-hidden="true" className="size-[18px]" />
+    </span>
+    <h2
+      id={id}
+      className="text-balance text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+    >
+      {children}
+    </h2>
+  </div>
+);
 
 export default async function InstructorPage({ params }) {
   const { slug } = await params;
@@ -92,8 +118,12 @@ export default async function InstructorPage({ params }) {
       <JsonLd data={jsonLd} />
 
       {/* Profile header */}
-      <div className="overflow-x-clip border-b bg-secondary/40">
-        <Container className="py-10 sm:py-14 lg:py-16">
+      <div className="relative overflow-x-clip border-b border-border bg-secondary/40">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-24 right-0 size-[28rem] rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
+        />
+        <Container className="relative py-10 sm:py-14 lg:py-16">
           <PageBreadcrumbs
             items={[
               { label: "Home", href: "/" },
@@ -104,31 +134,41 @@ export default async function InstructorPage({ params }) {
 
           <div className="mt-8 grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-16">
             <div className="min-w-0 lg:order-first">
-              <h1 className="text-balance text-3xl tracking-tight sm:text-4xl lg:text-5xl">
+              <Badge
+                variant="secondary"
+                className="mb-4 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider"
+              >
+                Instructor
+              </Badge>
+              <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
                 {instructor.name}
               </h1>
               {instructor.designation && (
-                <p className="mt-2 text-lg text-muted-foreground">
+                <p className="mt-2 text-lg font-medium text-primary">
                   {instructor.designation}
                 </p>
               )}
               {instructor.shortBio && (
-                <p className="mt-4 max-w-2xl text-foreground/90 sm:text-lg">
+                <p className="mt-4 max-w-2xl text-pretty leading-relaxed text-foreground/90 sm:text-lg">
                   {instructor.shortBio}
                 </p>
               )}
 
-              <dl className="mt-6 inline-grid grid-flow-col divide-x divide-border border-y border-border">
+              <dl className="mt-6 grid w-full grid-cols-3 divide-x divide-border overflow-hidden rounded-2xl border border-border bg-card/80 shadow-sm backdrop-blur sm:inline-grid sm:w-auto sm:grid-flow-col sm:grid-cols-none">
                 {stats.map((s) => (
-                  <div key={s.label} className="px-5 py-3 first:pl-0 sm:px-7">
-                    <dt className="text-xs text-muted-foreground">{s.label}</dt>
+                  <div key={s.label} className="px-4 py-3.5 sm:px-7">
+                    <dt className="text-xs font-medium text-muted-foreground">
+                      {s.label}
+                    </dt>
                     <dd className="font-serif text-2xl font-semibold tabular-nums text-foreground sm:text-3xl">
                       {s.value}
                     </dd>
                   </div>
                 ))}
-                <div className="px-5 py-3 sm:px-7">
-                  <dt className="text-xs text-muted-foreground">Rating</dt>
+                <div className="px-4 py-3.5 sm:px-7">
+                  <dt className="text-xs font-medium text-muted-foreground">
+                    Rating
+                  </dt>
                   <dd className="mt-1.5">
                     <Rating
                       value={instructor.rating}
@@ -151,7 +191,7 @@ export default async function InstructorPage({ params }) {
                     <li key={s.id}>
                       <a
                         href={`#${s.id}`}
-                        className="inline-flex min-h-9 items-center rounded-full border bg-card px-4 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                        className="inline-flex min-h-9 items-center rounded-full border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm outline-none transition-colors duration-200 hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
                       >
                         {s.label}
                       </a>
@@ -187,9 +227,10 @@ export default async function InstructorPage({ params }) {
       </div>
 
       <Container
-        className={`grid gap-12 py-10 sm:py-14 ${
-          hasSidebar ? "lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-14" : ""
-        }`}
+        className={cn(
+          "grid gap-12 py-10 sm:py-14",
+          hasSidebar && "lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-14",
+        )}
       >
         <div className="min-w-0 space-y-12">
           {instructor.bio && (
@@ -198,10 +239,10 @@ export default async function InstructorPage({ params }) {
               aria-labelledby="about-title"
               className="scroll-mt-24"
             >
-              <h2 id="about-title" className="mb-5 text-2xl sm:text-3xl">
+              <SectionTitle id="about-title" icon={FiUser}>
                 About
-              </h2>
-              <div className="max-w-3xl">
+              </SectionTitle>
+              <div className="max-w-3xl leading-relaxed text-muted-foreground">
                 <Paragraphs text={instructor.bio} />
               </div>
             </section>
@@ -210,26 +251,34 @@ export default async function InstructorPage({ params }) {
           <section
             id="courses-i"
             aria-labelledby="courses-title"
-            className={`scroll-mt-24 ${instructor.bio ? "border-t pt-12" : ""}`}
+            className={cn(
+              "scroll-mt-24",
+              instructor.bio && "border-t border-border pt-12",
+            )}
           >
-            <h2 id="courses-title" className="mb-5 text-2xl sm:text-3xl">
+            <SectionTitle id="courses-title" icon={FiBookOpen}>
               Courses by {instructor.name}
               {courses.length > 0 && (
-                <span className="ml-2 align-middle font-sans text-base font-medium text-muted-foreground">
+                <span className="ml-2 align-middle font-sans text-base font-medium tabular-nums text-muted-foreground">
                   ({courses.length})
                 </span>
               )}
-            </h2>
+            </SectionTitle>
             {courses.length ? (
-              <Reveal>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  {courses.map((c) => (
-                    <CourseCard key={c.id} course={c} />
-                  ))}
-                </div>
-              </Reveal>
+              <div className="grid gap-5 sm:grid-cols-2">
+                {courses.map((c, i) => (
+                  <Reveal
+                    key={c.id}
+                    delay={Math.min(i * 0.05, 0.25)}
+                    className="h-full min-w-0"
+                  >
+                    <CourseCard course={c} />
+                  </Reveal>
+                ))}
+              </div>
             ) : (
               <EmptyState
+                icon={FiBookOpen}
                 title="No published courses yet"
                 description="Check back soon."
               />
@@ -240,28 +289,38 @@ export default async function InstructorPage({ params }) {
             <section
               id="reviews-i"
               aria-labelledby="reviews-title"
-              className="scroll-mt-24 border-t pt-12"
+              className="scroll-mt-24 border-t border-border pt-12"
             >
-              <h2 id="reviews-title" className="mb-5 text-2xl sm:text-3xl">
+              <SectionTitle id="reviews-title" icon={FiStar}>
                 Student reviews
-              </h2>
-              <Reveal>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {reviews.map((r) => (
-                    <ReviewCard key={r.id} review={r} />
-                  ))}
-                </div>
-              </Reveal>
+              </SectionTitle>
+              <div className="grid gap-4 md:grid-cols-2">
+                {reviews.map((r, i) => (
+                  <Reveal
+                    key={r.id}
+                    delay={Math.min(i * 0.05, 0.25)}
+                    className="h-full min-w-0"
+                  >
+                    <ReviewCard review={r} />
+                  </Reveal>
+                ))}
+              </div>
             </section>
           )}
 
-          <div className="border-t pt-8">
+          <div className="border-t border-border pt-8">
             <Link
               href="/instructors"
-              className={buttonVariants({ variant: "outline", size: "lg" })}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "group",
+              )}
             >
               Meet more instructors
-              <FiArrowRight aria-hidden="true" />
+              <FiArrowRight
+                aria-hidden="true"
+                className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+              />
             </Link>
           </div>
         </div>
@@ -271,16 +330,32 @@ export default async function InstructorPage({ params }) {
             aria-labelledby="skills-i"
             className="lg:sticky lg:top-24 lg:self-start"
           >
-            <h2 id="skills-i" className="mb-4 text-lg">
-              Skills &amp; expertise
-            </h2>
-            <ul className="flex flex-wrap gap-2">
-              {skills.map((s) => (
-                <li key={s}>
-                  <Badge variant="secondary">{s}</Badge>
-                </li>
-              ))}
-            </ul>
+            <Reveal>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2.5">
+                  <span className={cn(iconTile, "size-8 rounded-lg")}>
+                    {skills.length > 6 ? (
+                      <FiAward aria-hidden="true" className="size-4" />
+                    ) : (
+                      <FiZap aria-hidden="true" className="size-4" />
+                    )}
+                  </span>
+                  <h2
+                    id="skills-i"
+                    className="text-lg font-semibold tracking-tight text-foreground"
+                  >
+                    Skills &amp; expertise
+                  </h2>
+                </div>
+                <ul className="flex flex-wrap gap-2">
+                  {skills.map((s) => (
+                    <li key={s}>
+                      <Badge variant="secondary">{s}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
           </aside>
         )}
       </Container>

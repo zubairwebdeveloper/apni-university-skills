@@ -1,16 +1,23 @@
+// app/(auth)/register/page.jsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AuthCard } from "@/components/auth/AuthCard";
 import { RegisterForm } from "@/components/auth/RegisterForm";
+import { getSessionUser } from "@/lib/auth/session";
+import { safeNext } from "@/lib/utils/url";
 
 export const metadata = {
   title: "Create account",
   description: "Create your Apni University account and start learning.",
 };
 
-export default async function RegisterPage() {
- 
+export default async function RegisterPage({ searchParams }) {
+  const { next } = await searchParams;
+  const target = safeNext(next);
+
+  const user = await getSessionUser(); // sirf valid token par user
+  if (user) redirect(target);
 
   return (
     <AuthCard

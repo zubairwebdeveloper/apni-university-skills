@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { motion } from "framer-motion";
 
 // WebGL code is browser-only and loaded lazily.
 const Canvas3D = dynamic(() => import("./TechSceneCanvas"), {
@@ -20,14 +21,31 @@ function hasWebGL() {
   }
 }
 
-function Fallback() {
+/** Static CSS orb shown when WebGL is unavailable. Animates gently unless reduceMotion is set. */
+function Fallback({ reduceMotion = false }) {
   return (
     <div className="absolute inset-0 grid place-items-center">
       <div className="relative size-40 sm:size-56">
-        <div className="absolute inset-0 rounded-full border border-primary/30" />
-        <div className="absolute inset-6 rounded-full border border-primary/20" />
-        <div className="absolute inset-[22%] rounded-full bg-primary/20 blur-xl" />
-        <div className="absolute inset-[38%] rounded-full bg-primary" />
+        <motion.div
+          className="absolute inset-0 rounded-full border border-primary/30"
+          animate={reduceMotion ? undefined : { rotate: 360 }}
+          transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+        />
+        <motion.div
+          className="absolute inset-6 rounded-full border border-primary/20"
+          animate={reduceMotion ? undefined : { rotate: -360 }}
+          transition={{ duration: 46, repeat: Infinity, ease: "linear" }}
+        />
+        <motion.div
+          className="absolute inset-[22%] rounded-full bg-primary/20 blur-xl"
+          animate={
+            reduceMotion
+              ? undefined
+              : { opacity: [0.5, 0.85, 0.5], scale: [1, 1.06, 1] }
+          }
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <div className="absolute inset-[38%] rounded-full bg-primary shadow-[0_0_24px_var(--primary)]" />
       </div>
     </div>
   );
@@ -56,7 +74,7 @@ export function TechScene({
   });
 
   useEffect(() => {
-    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const small = window.matchMedia("(max-width: 767px)");
     const wide = minWidth
       ? window.matchMedia(`(min-width: ${minWidth}px)`)
@@ -67,7 +85,7 @@ export function TechScene({
         ready: true,
         webgl: hasWebGL(),
         lite: small.matches,
-        reduce: motion.matches,
+        reduce: motionQuery.matches,
         dark: root.classList.contains("dark"),
         wide: wide ? wide.matches : true,
       });
@@ -79,12 +97,12 @@ export function TechScene({
     );
     observer.observe(root, { attributes: true, attributeFilter: ["class"] });
 
-    motion.addEventListener("change", update);
+    motionQuery.addEventListener("change", update);
     small.addEventListener("change", update);
     wide?.addEventListener("change", update);
     return () => {
       observer.disconnect();
-      motion.removeEventListener("change", update);
+      motionQuery.removeEventListener("change", update);
       small.removeEventListener("change", update);
       wide?.removeEventListener("change", update);
     };
@@ -104,7 +122,7 @@ export function TechScene({
           scrollLinked={scrollLinked}
         />
       ) : (
-        <Fallback />
+        <Fallback reduceMotion={env.reduce} />
       )}
     </div>
   );

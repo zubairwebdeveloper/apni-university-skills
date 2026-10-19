@@ -1,7 +1,25 @@
+// app/(public)/courses/[slug]/page.jsx
+
 import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FiCheck, FiUsers } from "react-icons/fi";
+import {
+  FiArrowRight,
+  FiBarChart2,
+  FiCheck,
+  FiCheckCircle,
+  FiClock,
+  FiFileText,
+  FiGlobe,
+  FiHelpCircle,
+  FiInfo,
+  FiList,
+  FiRefreshCw,
+  FiStar,
+  FiTarget,
+  FiUser,
+  FiUsers,
+} from "react-icons/fi";
 import {
   Accordion,
   AccordionContent,
@@ -20,6 +38,7 @@ import { SectionHeader } from "@/components/shared/SectionHeader";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { CourseCard } from "@/components/public/CourseCard";
 import { ReviewCard } from "@/components/public/ReviewCard";
+import { Reveal } from "@/components/public/PricingMotion";
 import { Curriculum } from "@/components/public/courses/Curriculum";
 import { EnrollmentCard } from "@/components/public/courses/EnrollmentCard";
 import { courseService } from "@/services/courseService";
@@ -29,6 +48,7 @@ import { reviewService } from "@/services/reviewService";
 import { safe } from "@/lib/utils/safe";
 import { formatCompact, formatDate, formatDuration } from "@/lib/utils/format";
 import { levelLabel } from "@/config/courses";
+import { cn } from "@/lib/utils";
 
 export const revalidate = 300;
 
@@ -64,8 +84,23 @@ export async function generateMetadata({ params }) {
 }
 
 // Shared section styling: hairline between sections, consistent heading scale
-const sectionClass = "border-t pt-10 first:border-t-0 first:pt-0";
-const headingClass = "mb-5 text-balance text-2xl sm:text-3xl";
+const sectionClass =
+  "scroll-mt-24 border-t border-border pt-10 first:border-t-0 first:pt-0";
+
+// Section heading with an icon tile that reinforces what the block is about.
+const SectionTitle = ({ id, icon: Icon, children }) => (
+  <div className="mb-6 flex items-center gap-3">
+    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
+      <Icon aria-hidden="true" className="size-[18px]" />
+    </span>
+    <h2
+      id={id}
+      className="text-balance text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+    >
+      {children}
+    </h2>
+  </div>
+);
 
 export default async function CoursePage({ params }) {
   const { slug } = await params;
@@ -106,13 +141,24 @@ export default async function CoursePage({ params }) {
     },
   };
 
+  // Only facts that exist on the course record are shown.
+  const facts = [
+    { icon: FiBarChart2, label: levelLabel(course.level) },
+    { icon: FiGlobe, label: course.language },
+    { icon: FiClock, label: formatDuration(course.duration) },
+  ].filter((f) => Boolean(f.label));
+
   return (
     <>
       <JsonLd data={jsonLd} />
 
       {/* Course header */}
-      <div className="border-b bg-secondary/40">
-        <Container className="py-8 sm:py-12 lg:py-14">
+      <div className="relative overflow-hidden border-b border-border bg-secondary/40">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-24 right-0 size-[28rem] rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
+        />
+        <Container className="relative py-8 sm:py-12 lg:py-16">
           <PageBreadcrumbs
             items={[
               { label: "Home", href: "/" },
@@ -131,36 +177,58 @@ export default async function CoursePage({ params }) {
           <div className="mt-6 max-w-3xl">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               {course.category && (
-                <Badge variant="secondary">{course.category}</Badge>
+                <Badge
+                  variant="secondary"
+                  className="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider"
+                >
+                  {course.category}
+                </Badge>
               )}
               {course.isFree && (
-                <Badge className="bg-highlight text-highlight-foreground">
+                <Badge className="rounded-full bg-highlight px-3 py-1 text-xs font-semibold uppercase tracking-wider text-highlight-foreground">
                   Free
                 </Badge>
               )}
             </div>
 
-            <h1 className="text-balance text-3xl tracking-tight sm:text-4xl lg:text-5xl">
+            <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
               {course.title}
             </h1>
-            <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
+            <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
               {course.shortDescription}
             </p>
 
-            <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-foreground/80">
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-foreground/80">
               <Rating value={course.rating} count={course.reviewCount} />
               <span className="inline-flex items-center gap-1.5">
-                <FiUsers aria-hidden="true" className="text-primary" />
-                {formatCompact(course.studentsCount ?? 0)} students
+                <FiUsers aria-hidden="true" className="size-4 text-primary" />
+                <span className="font-semibold tabular-nums text-foreground">
+                  {formatCompact(course.studentsCount ?? 0)}
+                </span>{" "}
+                students
               </span>
-              <span>{levelLabel(course.level)}</span>
-              <span>{course.language}</span>
-              <span>{formatDuration(course.duration)}</span>
             </div>
 
-            <p className="mt-4 text-sm text-muted-foreground">
+            {facts.length > 0 && (
+              <ul className="mt-4 flex flex-wrap gap-2">
+                {facts.map(({ icon: Icon, label }) => (
+                  <li
+                    key={label}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-3 py-1 text-sm font-medium text-foreground shadow-sm backdrop-blur"
+                  >
+                    <Icon
+                      aria-hidden="true"
+                      className="size-3.5 text-primary"
+                    />
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               {course.instructor && (
-                <>
+                <span>
                   Created by{" "}
                   {course.instructorSlug ? (
                     <Link
@@ -170,12 +238,20 @@ export default async function CoursePage({ params }) {
                       {course.instructor}
                     </Link>
                   ) : (
-                    course.instructor
+                    <span className="font-medium text-foreground">
+                      {course.instructor}
+                    </span>
                   )}
-                </>
+                </span>
+              )}
+              {course.instructor && course.updatedAt && (
+                <span aria-hidden="true">·</span>
               )}
               {course.updatedAt && (
-                <> · Last updated {formatDate(course.updatedAt)}</>
+                <span className="inline-flex items-center gap-1.5">
+                  <FiRefreshCw aria-hidden="true" className="size-3.5" />
+                  Last updated {formatDate(course.updatedAt)}
+                </span>
               )}
             </p>
           </div>
@@ -184,7 +260,7 @@ export default async function CoursePage({ params }) {
 
       <Container className="grid gap-10 py-10 sm:py-14 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-14 xl:grid-cols-[minmax(0,1fr)_24rem]">
         {/* order-first lifts the purchase card above the long content on mobile; it's sticky on desktop */}
-        <aside className="order-first lg:order-last">
+        <aside aria-label="Enrollment" className="order-first lg:order-last">
           <div className="lg:sticky lg:top-24">
             <EnrollmentCard
               course={course}
@@ -196,108 +272,140 @@ export default async function CoursePage({ params }) {
 
         <div className="min-w-0 space-y-10">
           {course.outcomes?.length > 0 && (
-            <section aria-labelledby="learn-title" className={sectionClass}>
-              <h2 id="learn-title" className={headingClass}>
-                What you&apos;ll learn
-              </h2>
-              <ul className="grid gap-x-8 gap-y-3.5 rounded-2xl border bg-card p-5 sm:grid-cols-2 sm:p-6">
-                {course.outcomes.map((o) => (
-                  <li key={o} className="flex gap-3 text-sm sm:text-base">
-                    <span
-                      aria-hidden="true"
-                      className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"
-                    >
-                      <FiCheck className="size-3" />
-                    </span>
-                    <span className="text-foreground/90">{o}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <Reveal>
+              <section aria-labelledby="learn-title" className={sectionClass}>
+                <SectionTitle id="learn-title" icon={FiCheckCircle}>
+                  What you&apos;ll learn
+                </SectionTitle>
+                <ul className="grid gap-x-8 gap-y-3.5 rounded-2xl border border-border bg-card p-5 shadow-sm sm:grid-cols-2 sm:p-6">
+                  {course.outcomes.map((o) => (
+                    <li key={o} className="flex gap-3 text-sm sm:text-base">
+                      <span
+                        aria-hidden="true"
+                        className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"
+                      >
+                        <FiCheck className="size-3" />
+                      </span>
+                      <span className="leading-relaxed text-foreground/90">
+                        {o}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </Reveal>
           )}
 
-          <section aria-labelledby="about-title" className={sectionClass}>
-            <h2 id="about-title" className={headingClass}>
-              About this course
-            </h2>
-            <div className="max-w-3xl">
-              <Paragraphs text={course.description} />
-            </div>
-          </section>
+          <Reveal>
+            <section aria-labelledby="about-title" className={sectionClass}>
+              <SectionTitle id="about-title" icon={FiInfo}>
+                About this course
+              </SectionTitle>
+              <div className="max-w-3xl leading-relaxed text-muted-foreground">
+                <Paragraphs text={course.description} />
+              </div>
+            </section>
+          </Reveal>
 
-          <section aria-labelledby="curriculum-title" className={sectionClass}>
-            <h2 id="curriculum-title" className={headingClass}>
-              Curriculum
-            </h2>
-            <Curriculum sections={curriculum} courseTitle={course.title} />
-          </section>
+          <Reveal>
+            <section
+              aria-labelledby="curriculum-title"
+              className={sectionClass}
+            >
+              <SectionTitle id="curriculum-title" icon={FiList}>
+                Curriculum
+              </SectionTitle>
+              <Curriculum sections={curriculum} courseTitle={course.title} />
+            </section>
+          </Reveal>
 
           {course.requirements?.length > 0 && (
-            <section aria-labelledby="req-title" className={sectionClass}>
-              <h2 id="req-title" className={headingClass}>
-                Requirements
-              </h2>
-              <ul className="max-w-3xl space-y-2.5 text-sm text-muted-foreground sm:text-base">
-                {course.requirements.map((r) => (
-                  <li key={r} className="flex gap-3">
-                    <span
-                      aria-hidden="true"
-                      className="mt-2.5 size-1.5 shrink-0 rounded-full bg-primary"
-                    />
-                    {r}
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <Reveal>
+              <section aria-labelledby="req-title" className={sectionClass}>
+                <SectionTitle id="req-title" icon={FiTarget}>
+                  Requirements
+                </SectionTitle>
+                <ul className="max-w-3xl space-y-2.5 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                  {course.requirements.map((r) => (
+                    <li key={r} className="flex gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="mt-2.5 size-1.5 shrink-0 rounded-full bg-primary"
+                      />
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </Reveal>
           )}
 
           {instructor && (
-            <section
-              aria-labelledby="instructor-title"
-              className={sectionClass}
-            >
-              <h2 id="instructor-title" className={headingClass}>
-                Your instructor
-              </h2>
-              <Card className="flex-row items-start gap-4 p-5 sm:gap-5 sm:p-6">
-                <Avatar className="size-16 sm:size-20">
-                  <AvatarImage src={instructor.avatar} alt="" />
-                  <AvatarFallback className="font-serif text-xl">
-                    {instructor.name?.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <Link
-                    href={`/instructors/${instructor.slug}`}
-                    className="font-serif text-lg font-semibold underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {instructor.name}
-                  </Link>
-                  <p className="text-sm text-muted-foreground">
-                    {instructor.designation}
-                  </p>
-                  {instructor.shortBio && (
-                    <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
-                      {instructor.shortBio}
+            <Reveal>
+              <section
+                aria-labelledby="instructor-title"
+                className={sectionClass}
+              >
+                <SectionTitle id="instructor-title" icon={FiUser}>
+                  Your instructor
+                </SectionTitle>
+                <Card className="flex-row items-start gap-4 p-5 shadow-sm sm:gap-5 sm:p-6">
+                  <Avatar className="size-16 ring-2 ring-primary/15 sm:size-20">
+                    <AvatarImage src={instructor.avatar} alt="" />
+                    <AvatarFallback className="font-serif text-xl">
+                      {instructor.name?.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <Link
+                      href={`/instructors/${instructor.slug}`}
+                      className="font-serif text-lg font-semibold underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-xl"
+                    >
+                      {instructor.name}
+                    </Link>
+                    <p className="text-sm text-muted-foreground">
+                      {instructor.designation}
                     </p>
-                  )}
-                </div>
-              </Card>
-            </section>
+                    {instructor.shortBio && (
+                      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                        {instructor.shortBio}
+                      </p>
+                    )}
+                    <Link
+                      href={`/instructors/${instructor.slug}`}
+                      className="group mt-3 inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      View profile
+                      <FiArrowRight
+                        aria-hidden="true"
+                        className="size-4 transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                      />
+                    </Link>
+                  </div>
+                </Card>
+              </section>
+            </Reveal>
           )}
 
           <section aria-labelledby="reviews-title" className={sectionClass}>
-            <h2 id="reviews-title" className={headingClass}>
+            <SectionTitle id="reviews-title" icon={FiStar}>
               Student reviews
-            </h2>
+            </SectionTitle>
             {reviews.length ? (
               <div className="grid gap-4 md:grid-cols-2">
-                {reviews.map((r) => (
-                  <ReviewCard key={r.id} review={r} />
+                {reviews.map((r, i) => (
+                  <Reveal
+                    key={r.id}
+                    delay={Math.min(i * 0.05, 0.25)}
+                    className="h-full min-w-0"
+                  >
+                    <ReviewCard review={r} />
+                  </Reveal>
                 ))}
               </div>
             ) : (
               <EmptyState
+                icon={FiFileText}
                 title="No reviews yet"
                 description="Enrolled students can review this course from their dashboard. Approved reviews appear here."
               />
@@ -305,23 +413,25 @@ export default async function CoursePage({ params }) {
           </section>
 
           {course.faqs?.length > 0 && (
-            <section aria-labelledby="cfaq-title" className={sectionClass}>
-              <h2 id="cfaq-title" className={headingClass}>
-                Frequently asked questions
-              </h2>
-              <Accordion type="single" >
-                {course.faqs.map((f, i) => (
-                  <AccordionItem key={f.q} value={`f-${i}`}>
-                    <AccordionTrigger className="min-h-12 text-left text-base">
-                      {f.q}
-                    </AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground sm:text-base">
-                      {f.a}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </section>
+            <Reveal>
+              <section aria-labelledby="cfaq-title" className={sectionClass}>
+                <SectionTitle id="cfaq-title" icon={FiHelpCircle}>
+                  Frequently asked questions
+                </SectionTitle>
+                <Accordion type="single" collapsible>
+                  {course.faqs.map((f, i) => (
+                    <AccordionItem key={f.q} value={`f-${i}`}>
+                      <AccordionTrigger className="min-h-12 text-left text-base transition-colors hover:text-primary">
+                        {f.q}
+                      </AccordionTrigger>
+                      <AccordionContent className="leading-relaxed text-muted-foreground sm:text-base">
+                        {f.a}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </section>
+            </Reveal>
           )}
         </div>
       </Container>
@@ -329,7 +439,7 @@ export default async function CoursePage({ params }) {
       {related.length > 0 && (
         <Section
           labelledBy="related-title"
-          className="border-t bg-secondary/40"
+          className="border-t border-border bg-secondary/40"
         >
           <SectionHeader
             id="related-title"
@@ -342,8 +452,14 @@ export default async function CoursePage({ params }) {
             hrefLabel="See more"
           />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {related.map((c) => (
-              <CourseCard key={c.id} course={c} />
+            {related.map((c, i) => (
+              <Reveal
+                key={c.id}
+                delay={Math.min(i * 0.06, 0.24)}
+                className="h-full min-w-0"
+              >
+                <CourseCard course={c} />
+              </Reveal>
             ))}
           </div>
         </Section>

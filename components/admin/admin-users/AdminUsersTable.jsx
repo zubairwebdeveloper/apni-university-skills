@@ -346,7 +346,10 @@ function RoleBadge({ role }) {
   const m = roleMeta(role);
   const Icon = m.icon;
   return (
-    <Badge variant="outline" className={cn("gap-1.5 font-medium", m.badge)}>
+    <Badge
+      variant="outline"
+      className={cn("gap-1.5 rounded-full font-medium", m.badge)}
+    >
       <Icon aria-hidden="true" className="size-3" />
       {m.label}
     </Badge>
@@ -370,12 +373,12 @@ function PersonCell({ admin, isMe, size = "size-10", onOpen }) {
             <button
               type="button"
               onClick={onOpen}
-              className="truncate rounded text-left text-sm font-semibold leading-tight text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+              className="truncate rounded text-left text-sm font-semibold leading-tight tracking-tight text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
             >
               {name}
             </button>
           ) : (
-            <span className="truncate text-sm font-semibold leading-tight">
+            <span className="truncate text-sm font-semibold leading-tight tracking-tight">
               {name}
             </span>
           )}
@@ -445,12 +448,12 @@ function Overview({ counts, recent, roleFilter, onPick }) {
 
   return (
     <Card className="gap-0 overflow-hidden py-0">
-      <div className="flex flex-wrap items-end justify-between gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
+      <div className="flex flex-wrap items-end justify-between gap-3 px-5 pt-5 sm:px-6 sm:pt-6">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">
+          <h2 className="text-xl font-semibold tracking-tight">
             Who has access
           </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {counts.total === 0
               ? "No one has been added yet."
               : recent > 0
@@ -459,12 +462,12 @@ function Overview({ counts, recent, roleFilter, onPick }) {
           </p>
         </div>
         <p className="text-xs text-muted-foreground">
-          Select a role to filter the list.
+          Select a role to filter the list
         </p>
       </div>
 
       <div
-        className="mx-4 mt-4 flex h-2.5 overflow-hidden rounded-full bg-muted sm:mx-5"
+        className="mx-5 mt-5 flex h-2 overflow-hidden rounded-full bg-muted sm:mx-6"
         role="img"
         aria-label={`Admins ${counts.admin}, editors ${counts.editor}, instructors ${counts.instructor}`}
       >
@@ -479,7 +482,7 @@ function Overview({ counts, recent, roleFilter, onPick }) {
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-px border-t bg-border lg:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-px border-t bg-border lg:grid-cols-4">
         {items.map((it) => (
           <OverviewTile
             key={it.key}
@@ -506,7 +509,7 @@ function OverviewTile({ item, share, active, onClick, reduce }) {
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "flex items-center gap-3 bg-card p-3.5 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:p-4",
+        "flex items-center gap-3 bg-card p-4 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:p-5",
         active &&
           "bg-primary/5 shadow-[inset_0_-2px_0_0_var(--color-primary,theme(colors.primary.DEFAULT))]",
       )}
@@ -520,7 +523,7 @@ function OverviewTile({ item, share, active, onClick, reduce }) {
         <Icon aria-hidden="true" className="size-5" />
       </span>
       <span className="min-w-0">
-        <span className="block text-xl font-semibold tabular-nums leading-none tracking-tight sm:text-2xl">
+        <span className="block text-2xl font-semibold tabular-nums leading-none tracking-tight">
           {shown}
         </span>
         <span className="mt-1.5 block truncate text-xs font-medium text-muted-foreground">
@@ -535,7 +538,7 @@ function OverviewTile({ item, share, active, onClick, reduce }) {
 function LoadingState() {
   return (
     <div className="space-y-5">
-      <Skeleton className="h-[188px] rounded-xl" />
+      <Skeleton className="h-[196px] rounded-xl" />
       <Skeleton className="h-10 w-full rounded-lg" />
       <div className="space-y-2">
         {Array.from({ length: 5 }).map((_, i) => (
@@ -548,7 +551,7 @@ function LoadingState() {
 
 function EmptyState({ filtered, onClear }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-4 py-14 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
       <div className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
         {filtered ? (
           <Search className="size-6" />
@@ -556,7 +559,7 @@ function EmptyState({ filtered, onClear }) {
           <Users className="size-6" />
         )}
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <h3 className="text-base font-semibold tracking-tight">
           {filtered ? "No admins match these filters" : "No admins yet"}
         </h3>
@@ -592,7 +595,7 @@ function RowMenu({
 }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger >
+      <DropdownMenuTrigger>
         <Button
           variant="ghost"
           size="icon"
@@ -610,7 +613,7 @@ function RowMenu({
         <DropdownMenuItem onClick={() => onOpen(admin)}>
           <Eye className="mr-2 size-4" /> View details
         </DropdownMenuItem>
-        <DropdownMenuItem >
+        <DropdownMenuItem>
           <Link
             href={`/admin/admin-users/${encodeURIComponent(admin.id)}/edit`}
           >
@@ -620,10 +623,10 @@ function RowMenu({
         <DropdownMenuItem onClick={() => onCopy(admin.id)}>
           <Copy className="mr-2 size-4" /> Copy email
         </DropdownMenuItem>
-        <DropdownMenuItem >
-          <a href={`mailto:${admin.id}`}>
+        <DropdownMenuItem>
+          <Link href={`mailto:${admin.id}`}>
             <Mail className="mr-2 size-4" /> Send email
-          </a>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -664,7 +667,7 @@ function DetailSheet({ admin, isMe, del, onClose, onCopy, onDelete }) {
       <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-md">
         {admin ? (
           <>
-            <SheetHeader className="border-b bg-muted/30 p-5 pr-12">
+            <SheetHeader className="border-b bg-muted/30 p-6 pr-12">
               <div className="flex items-center gap-4">
                 <Avatar className="size-14 shrink-0 ring-2 ring-background">
                   {admin.image ? (
@@ -680,7 +683,7 @@ function DetailSheet({ admin, isMe, del, onClose, onCopy, onDelete }) {
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <SheetTitle className="truncate text-lg">
+                  <SheetTitle className="truncate text-lg tracking-tight">
                     {admin.name || "Unnamed admin"}
                     {isMe ? (
                       <span className="ml-2 text-xs font-medium text-emerald-600">
@@ -698,7 +701,7 @@ function DetailSheet({ admin, isMe, del, onClose, onCopy, onDelete }) {
               </div>
             </SheetHeader>
 
-            <div className="space-y-6 p-5">
+            <div className="space-y-6 p-6">
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <dt className="text-xs text-muted-foreground">Added on</dt>
@@ -718,8 +721,10 @@ function DetailSheet({ admin, isMe, del, onClose, onCopy, onDelete }) {
               </dl>
 
               <div>
-                <h3 className="text-sm font-semibold">What this role can do</h3>
-                <p className="mt-0.5 text-sm text-muted-foreground">
+                <h3 className="text-sm font-semibold tracking-tight">
+                  What this role can do
+                </h3>
+                <p className="mt-0.5 text-sm leading-6 text-muted-foreground">
                   {m.summary}
                 </p>
                 {key ? (
@@ -730,7 +735,7 @@ function DetailSheet({ admin, isMe, del, onClose, onCopy, onDelete }) {
                       return (
                         <li
                           key={p.area}
-                          className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
+                          className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm"
                         >
                           <span>{p.area}</span>
                           <span
@@ -771,9 +776,9 @@ function DetailSheet({ admin, isMe, del, onClose, onCopy, onDelete }) {
                 </a>
               </div>
 
-              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3.5">
                 <p className="text-sm font-medium">Remove access</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
                   {del.ok
                     ? "This person will lose dashboard access immediately."
                     : `${del.reason}.`}
@@ -871,6 +876,10 @@ export function AdminUsersTable() {
   const [pending, setPending] = useState([]);
   const [deleting, setDeleting] = useState(false);
   const [detail, setDetail] = useState(null);
+
+  // Tracks whether the list has already played its one entrance animation,
+  // so paging, sorting, and refreshing never re-trigger it.
+  const hasEnteredRef = useRef(false);
 
   // Remember view, density and page size between visits
   useEffect(() => {
@@ -975,6 +984,13 @@ export function AdminUsersTable() {
   const from = filtered.length ? (safePage - 1) * pageSize + 1 : 0;
   const to = Math.min(safePage * pageSize, filtered.length);
   const hasFilters = query.trim() !== "" || roleFilter !== "all";
+
+  // Play the row entrance once, the first time real rows land on screen.
+  const playEntrance =
+    !reduce && !hasEnteredRef.current && pageItems.length > 0;
+  useEffect(() => {
+    if (pageItems.length > 0) hasEnteredRef.current = true;
+  }, [pageItems.length]);
 
   // Protect yourself and the last admin
   const deleteState = useCallback(
@@ -1111,7 +1127,7 @@ export function AdminUsersTable() {
   /* ---------- render ---------- */
 
   return (
-    <div className="min-w-0 space-y-5 pb-28 sm:space-y-6 sm:pb-24">
+    <div className="min-w-0 space-y-6 pb-28 sm:pb-24">
       <Overview
         counts={counts}
         recent={recent}
@@ -1396,13 +1412,21 @@ export function AdminUsersTable() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pageItems.map((a) => {
+                  {pageItems.map((a, i) => {
                     const isMe = a.id === me;
                     const del = deleteState(a);
                     return (
-                      <TableRow
+                      <motion.tr
                         key={a.id}
                         data-state={selected.has(a.id) ? "selected" : undefined}
+                        initial={playEntrance ? { opacity: 0, y: 6 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          duration: 0.28,
+                          delay: playEntrance ? Math.min(i, 10) * 0.035 : 0,
+                          ease: [0.22, 1, 0.36, 1],
+                        }}
+                        className="border-b transition-colors last:border-b-0 hover:bg-muted/40 data-[state=selected]:bg-muted/50"
                       >
                         <TableCell className="pl-4">
                           <TapTarget disabled={!del.ok}>
@@ -1465,7 +1489,7 @@ export function AdminUsersTable() {
                             />
                           </div>
                         </TableCell>
-                      </TableRow>
+                      </motion.tr>
                     );
                   })}
                 </TableBody>
@@ -1479,15 +1503,22 @@ export function AdminUsersTable() {
                 showTable && "md:hidden",
               )}
             >
-              {pageItems.map((a) => {
+              {pageItems.map((a, i) => {
                 const isMe = a.id === me;
                 const del = deleteState(a);
                 const isSel = selected.has(a.id);
                 return (
-                  <div
+                  <motion.div
                     key={a.id}
+                    initial={playEntrance ? { opacity: 0, y: 8 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.28,
+                      delay: playEntrance ? Math.min(i, 10) * 0.035 : 0,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
                     className={cn(
-                      "relative min-w-0 overflow-hidden rounded-xl border bg-card p-3.5 transition-colors hover:border-primary/40 motion-reduce:transition-none sm:p-4",
+                      "relative min-w-0 overflow-hidden rounded-xl border bg-card p-3.5 transition-all duration-200 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none sm:p-4",
                       isSel && "border-primary ring-1 ring-primary/40",
                     )}
                   >
@@ -1534,7 +1565,7 @@ export function AdminUsersTable() {
                           : "Added date unknown"}
                       </span>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
@@ -1640,7 +1671,7 @@ export function AdminUsersTable() {
           <div className="space-y-1">
             <h2
               id="role-guide"
-              className="text-base font-semibold tracking-tight"
+              className="text-lg font-semibold tracking-tight"
             >
               Choosing a role
             </h2>
@@ -1665,7 +1696,7 @@ export function AdminUsersTable() {
             return (
               <div
                 key={r}
-                className="flex items-start gap-3 rounded-xl border bg-card p-4 md:block"
+                className="flex items-start gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/30 md:block"
               >
                 <span
                   className={cn(
@@ -1719,10 +1750,10 @@ export function AdminUsersTable() {
       <AnimatePresence>
         {selected.size > 0 && (
           <motion.div
-            initial={reduce ? false : { opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            transition={{ duration: 0.25 }}
+            initial={reduce ? false : { opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 right-[4.75rem] z-40 mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card/95 p-3 shadow-xl backdrop-blur sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] md:right-3"
             role="region"
             aria-label="Bulk actions"

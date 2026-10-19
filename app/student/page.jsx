@@ -45,7 +45,11 @@ export const metadata = {
 
 const VISIBLE_COURSES = 4;
 
+const focusRing =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 function SectionHeading({
+  id,
   eyebrow,
   title,
   description,
@@ -57,18 +61,24 @@ function SectionHeading({
     <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
         {eyebrow && (
-          <p className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#ef07a2]">
-            <span className="size-1.5 rounded-full bg-[#ef07a2]" />
+          <p className="mb-2 flex items-center gap-2 text-xs font-medium text-primary">
+            <span
+              aria-hidden="true"
+              className="size-1.5 rounded-full bg-primary"
+            />
             {eyebrow}
           </p>
         )}
 
-        <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+        <h2
+          id={id}
+          className="text-balance text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+        >
           {title}
         </h2>
 
         {description && (
-          <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
+          <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-muted-foreground">
             {description}
           </p>
         )}
@@ -77,15 +87,18 @@ function SectionHeading({
       {href && (
         <Link
           href={href}
-          className="group inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground transition-colors hover:bg-[#ef07a2]/[0.06] hover:text-[#ef07a2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ef07a2]"
+          className={`group inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-primary/[0.06] hover:text-primary ${focusRing}`}
         >
           {linkLabel}
           {count !== undefined && (
-            <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-muted-foreground group-hover:border-[#ef07a2]/30 group-hover:text-[#ef07a2]">
+            <span className="rounded-md border border-border px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground group-hover:border-primary/30 group-hover:text-primary">
               {count}
             </span>
           )}
-          <FiArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" />
+          <FiArrowRight
+            aria-hidden="true"
+            className="size-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+          />
         </Link>
       )}
     </div>
@@ -97,14 +110,14 @@ function DashboardShortcut({ href, icon: Icon, title, description }) {
     <Tilt3D className="rounded-xl" max={6}>
       <Link
         href={href}
-        className="group flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border border-border bg-card p-3.5 transition-colors duration-200 hover:border-[#ef07a2]/40 hover:bg-[#ef07a2]/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ef07a2]"
+        className={`group flex min-w-0 items-center gap-3.5 rounded-xl border border-border bg-card p-4 transition-colors duration-200 hover:border-primary/40 hover:bg-primary/[0.035] ${focusRing}`}
       >
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-border bg-muted/60 text-muted-foreground transition-colors group-hover:border-[#ef07a2]/25 group-hover:bg-[#ef07a2]/10 group-hover:text-[#ef07a2]">
-          <Icon className="size-[18px]" />
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-muted/60 text-muted-foreground transition-colors group-hover:border-primary/25 group-hover:bg-primary/10 group-hover:text-primary">
+          <Icon aria-hidden="true" className="size-[18px]" />
         </span>
 
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-bold text-foreground transition-colors group-hover:text-[#ef07a2]">
+          <span className="block truncate text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
             {title}
           </span>
           <span className="mt-0.5 block truncate text-xs text-muted-foreground">
@@ -112,7 +125,10 @@ function DashboardShortcut({ href, icon: Icon, title, description }) {
           </span>
         </span>
 
-        <FiChevronRight className="size-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#ef07a2]" />
+        <FiChevronRight
+          aria-hidden="true"
+          className="size-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-primary motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+        />
       </Link>
     </Tilt3D>
   );
@@ -135,7 +151,7 @@ export default async function StudentDashboard() {
   const rest = active.slice(1, VISIBLE_COURSES);
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8 pb-8 sm:space-y-10">
+    <div className="mx-auto w-full max-w-7xl space-y-10 pb-8 sm:space-y-12">
       {/* 3D Hero */}
       <Reveal>
         <HeroScene3D
@@ -160,22 +176,23 @@ export default async function StudentDashboard() {
         <QuickActions />
       </Reveal>
 
-      <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_21rem]">
-        <div className="min-w-0 space-y-8">
+      <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_21rem] xl:gap-10">
+        <div className="min-w-0 space-y-10">
           {/* Resume learning */}
           {resume && (
             <section aria-labelledby="resume-title" className="scroll-mt-24">
               <SectionHeading
+                id="resume-title"
                 eyebrow="Jump back in"
                 title="Resume learning"
-                description="Aap ka sab se pehla active course, ek click door."
+                description="Your first active course, one click away."
               />
 
               <Reveal>
                 <Tilt3D className="rounded-2xl" max={5}>
-                  <div className="relative overflow-hidden rounded-2xl border border-[#ef07a2]/30 bg-gradient-to-br from-[#ef07a2]/[0.07] via-card to-card p-4 sm:p-5">
-                    <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-[#ef07a2] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
-                      <FiPlay className="size-3" />
+                  <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-primary/[0.05] p-4 sm:p-5">
+                    <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
+                      <FiPlay aria-hidden="true" className="size-3" />
                       Up next
                     </span>
                     <EnrolledCourseCard item={resume} />
@@ -192,6 +209,7 @@ export default async function StudentDashboard() {
             className="scroll-mt-24"
           >
             <SectionHeading
+              id="continue-title"
               eyebrow="Your learning space"
               title="Continue learning"
               description="Pick up where you left off and keep making progress."
@@ -216,7 +234,7 @@ export default async function StudentDashboard() {
               </StaggerGrid>
             ) : active.length > 0 ? (
               <p className="rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
-                Abhi sirf ek active course hai. Upar se resume karein.
+                You have just one active course. Resume it above.
               </p>
             ) : items.length > 0 ? (
               <Reveal>
@@ -227,7 +245,10 @@ export default async function StudentDashboard() {
                   action={
                     <Link href="/courses" className={buttonVariants()}>
                       Browse courses
-                      <FiArrowRight className="ml-2 size-4" />
+                      <FiArrowRight
+                        aria-hidden="true"
+                        className="ml-2 size-4"
+                      />
                     </Link>
                   }
                 />
@@ -244,7 +265,10 @@ export default async function StudentDashboard() {
                       className={buttonVariants()}
                     >
                       Explore free courses
-                      <FiArrowRight className="ml-2 size-4" />
+                      <FiArrowRight
+                        aria-hidden="true"
+                        className="ml-2 size-4"
+                      />
                     </Link>
                   }
                 />
@@ -255,6 +279,7 @@ export default async function StudentDashboard() {
           {/* Quick navigation */}
           <section aria-labelledby="explore-title">
             <SectionHeading
+              id="explore-title"
               eyebrow="Keep moving forward"
               title="Explore your workspace"
               description="Jump straight to the next part of your learning journey."
@@ -290,7 +315,10 @@ export default async function StudentDashboard() {
         </div>
 
         {/* Sidebar */}
-        <aside className="min-w-0 space-y-5 xl:sticky xl:top-6 xl:self-start">
+        <aside
+          aria-label="Your progress summary"
+          className="min-w-0 space-y-5 xl:sticky xl:top-6 xl:self-start"
+        >
           <Reveal>
             <CompletionOrb total={items.length} completed={completed.length} />
           </Reveal>

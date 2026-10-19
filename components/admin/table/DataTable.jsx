@@ -31,18 +31,19 @@ export function DataTable({
   const toggleAll = (v) => onSelectedChange(new Set(v === true ? ids : []));
   const toggleOne = (id, v) => {
     const n = new Set(selected);
-    v === true ? n.add(id) : n.delete(id);
+    if (v === true) n.add(id);
+    else n.delete(id);
     onSelectedChange(n);
   };
 
   return (
-    <div className="rounded-xl border bg-card">
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <Table className={minWidth}>
         <TableCaption className="sr-only">{caption}</TableCaption>
         <TableHeader>
-          <TableRow>
+          <TableRow className="border-b border-border bg-muted/40 hover:bg-muted/40">
             {selectable && (
-              <TableHead scope="col" className="w-10">
+              <TableHead scope="col" className="h-11 w-12 pl-4 pr-0">
                 <Checkbox
                   checked={
                     allSelected ? true : someSelected ? "indeterminate" : false
@@ -53,7 +54,14 @@ export function DataTable({
               </TableHead>
             )}
             {columns.map((c) => (
-              <TableHead key={c.key} scope="col" className={c.headerClassName}>
+              <TableHead
+                key={c.key}
+                scope="col"
+                className={cn(
+                  "h-11 whitespace-nowrap px-4 text-xs font-medium uppercase tracking-wide text-muted-foreground",
+                  c.headerClassName,
+                )}
+              >
                 {c.srOnlyHeader ? (
                   <span className="sr-only">{c.header}</span>
                 ) : (
@@ -68,18 +76,28 @@ export function DataTable({
             <TableRow
               key={row.id}
               data-state={selected?.has(row.id) ? "selected" : undefined}
+              className="border-border transition-colors hover:bg-muted/40 data-[state=selected]:bg-violet-500/[0.07] data-[state=selected]:hover:bg-violet-500/10 motion-reduce:transition-none"
             >
               {selectable && (
-                <TableCell>
+                <TableCell className="w-12 pl-4 pr-0 align-middle">
                   <Checkbox
                     checked={selected?.has(row.id) ?? false}
                     onCheckedChange={(v) => toggleOne(row.id, v)}
-                    aria-label={`Select ${row.title ?? row.name ?? row.slug}`}
+                    aria-label={`Select ${
+                      row.title ||
+                      row.name ||
+                      row.displayName ||
+                      row.slug ||
+                      "row"
+                    }`}
                   />
                 </TableCell>
               )}
               {columns.map((c) => (
-                <TableCell key={c.key} className={cn(c.className)}>
+                <TableCell
+                  key={c.key}
+                  className={cn("px-4 py-3.5 align-middle", c.className)}
+                >
                   {c.cell(row)}
                 </TableCell>
               ))}
@@ -90,4 +108,3 @@ export function DataTable({
     </div>
   );
 }
-

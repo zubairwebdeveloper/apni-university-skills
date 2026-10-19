@@ -9,7 +9,6 @@ import {
   motion,
   useMotionValue,
   useReducedMotion,
-  useSpring,
   useTransform,
 } from "framer-motion";
 import {
@@ -24,7 +23,6 @@ import {
   Lightbulb,
   PlayCircle,
   Search,
-  Sparkles,
   Target,
   Trophy,
   X,
@@ -82,8 +80,6 @@ const ICONS = {
   globe: Globe,
 };
 
-const SPRING = { stiffness: 200, damping: 18, mass: 0.6 };
-
 const listVariants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.06 } },
@@ -97,47 +93,44 @@ const isEditable = (t) =>
   t instanceof HTMLElement &&
   (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
 
+// Shared interactive-surface styles
+const CHUNKY = "shadow-[0_3px_0_0_var(--border)]";
+const CARD_HOVER =
+  "transition-colors hover:border-primary/40 motion-reduce:transition-none";
+
 /* ---------------- Building blocks ---------------- */
 
-// Mouse ke saath halka 3D tilt. Reduced motion mein sirf wrapper rehta hai.
-function Tilt({ children, className, max = 6, lift = true }) {
+// Staggered reveal. Renders statically when reduced motion is requested.
+function Stagger({ className, children, inView = true }) {
   const reduce = useReducedMotion();
-  const px = useMotionValue(0);
-  const py = useMotionValue(0);
-  const sx = useSpring(px, SPRING);
-  const sy = useSpring(py, SPRING);
-  const rotateY = useTransform(sx, [-0.5, 0.5], [-max, max]);
-  const rotateX = useTransform(sy, [-0.5, 0.5], [max, -max]);
-
-  function onMove(e) {
-    if (reduce) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    px.set((e.clientX - r.left) / r.width - 0.5);
-    py.set((e.clientY - r.top) / r.height - 0.5);
-  }
-  function onLeave() {
-    px.set(0);
-    py.set(0);
-  }
-
+  const trigger = inView
+    ? { whileInView: "show", viewport: { once: true, margin: "-60px" } }
+    : { animate: "show" };
   return (
-    <div
-      className="h-full [perspective:900px]"
-      onPointerMove={onMove}
-      onPointerLeave={onLeave}
+    <motion.div
+      variants={listVariants}
+      initial={reduce ? false : "hidden"}
+      {...trigger}
+      className={className}
     >
-      <motion.div
-        style={reduce ? undefined : { rotateX, rotateY }}
-        whileHover={reduce || !lift ? undefined : { y: -3 }}
-        className={cn("h-full [transform-style:preserve-3d]", className)}
-      >
-        {children}
-      </motion.div>
-    </div>
+      {children}
+    </motion.div>
   );
 }
 
-function AnimatedNumber({ value, suffix = "" }) {
+function StaggerItem({ children, className }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      variants={reduce ? undefined : itemVariants}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function AnimatedNumber({ value }) {
   const reduce = useReducedMotion();
   const mv = useMotionValue(reduce ? value : 0);
   const rounded = useTransform(mv, (v) => Math.round(v));
@@ -151,58 +144,19 @@ function AnimatedNumber({ value, suffix = "" }) {
     return () => controls.stop();
   }, [value, mv, reduce]);
 
-  return (
-    <>
-      <motion.span>{rounded}</motion.span>
-      {suffix}
-    </>
-  );
+  return <motion.span>{rounded}</motion.span>;
 }
 
-// 3D coin: ghoomta hua, depth ke saath
-function AwardCoin({ count }) {
-  const reduce = useReducedMotion();
+// Static medal: the hero's focal point. Only the number counts up, once.
+function AwardMedal({ count }) {
   return (
-    <div className="relative flex size-36 shrink-0 items-center justify-center sm:size-44 [perspective:700px]">
-      {!reduce && (
-        <motion.div
-          aria-hidden="true"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-0 rounded-full border-2 border-dashed border-primary/30"
-        />
-      )}
-      <div
-        aria-hidden="true"
-        className="absolute inset-6 translate-y-3 rounded-full bg-primary/30 blur-xl"
-      />
-
-      {!reduce &&
-        ["-right-1 top-6", "-left-2 bottom-8", "right-4 -bottom-1"].map(
-          (pos, i) => (
-            <motion.span
-              key={pos}
-              aria-hidden="true"
-              animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 3, repeat: Infinity, delay: i * 0.8 }}
-              className={cn("absolute", pos)}
-            >
-              <Sparkles className="size-4 text-primary" />
-            </motion.span>
-          ),
-        )}
-
-      <motion.div
-        animate={reduce ? undefined : { rotateY: [-18, 18, -18] }}
-        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-        className="relative grid size-28 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_0_0_color-mix(in_oklab,var(--primary)_55%,black)] ring-4 ring-inset ring-white/20 sm:size-32 [transform-style:preserve-3d]"
-      >
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-white/35 via-transparent to-black/15"
-        />
-        <div className="relative flex flex-col items-center [transform:translateZ(18px)]">
-          <Award className="size-8 sm:size-9" aria-hidden="true" />
+    <div
+      className="shrink-0 rounded-full border-2 border-dashed border-primary/30 p-3"
+      aria-hidden="true"
+    >
+      <div className="relative grid size-28 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_0_0_color-mix(in_oklab,var(--primary)_55%,black)] ring-4 ring-inset ring-white/20 sm:size-32">
+        <div className="flex flex-col items-center">
+          <Award className="size-8 sm:size-9" />
           <span className="text-3xl font-bold leading-none sm:text-4xl">
             <AnimatedNumber value={count} />
           </span>
@@ -210,7 +164,7 @@ function AwardCoin({ count }) {
             {count === 1 ? "Certificate" : "Certificates"}
           </span>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -251,72 +205,86 @@ function ProgressRing({ value }) {
   );
 }
 
+function SectionHeading({ id, icon: Icon, title, description }) {
+  return (
+    <div className="mb-5 flex items-start gap-2.5">
+      {Icon && (
+        <Icon
+          aria-hidden="true"
+          className="mt-1 size-5 shrink-0 text-primary"
+        />
+      )}
+      <div>
+        <h2 id={id} className="text-xl font-semibold tracking-tight">
+          {title}
+        </h2>
+        {description && (
+          <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Almost there (real in-progress courses) ---------------- */
 function AlmostThere({ inProgress }) {
   if (!inProgress?.length) return null;
   return (
     <section aria-labelledby="almost-title">
-      <div className="mb-5 flex items-center gap-2">
-        <Target aria-hidden="true" className="size-5 text-primary" />
-        <div>
-          <h2
-            id="almost-title"
-            className="text-xl font-semibold tracking-tight"
-          >
-            Almost there
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Finish these courses to earn your next certificates.
-          </p>
-        </div>
-      </div>
+      <SectionHeading
+        id="almost-title"
+        icon={Target}
+        title="Almost there"
+        description="Finish these courses to earn your next certificates."
+      />
 
-      <motion.div
-        variants={listVariants}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: "-60px" }}
-        className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-      >
+      <Stagger className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {inProgress.map((c) => (
-          <motion.div key={c.id} variants={itemVariants}>
-            <Tilt max={5}>
-              <div className="group h-full rounded-xl border bg-card p-5 shadow-[0_3px_0_0_var(--border)] transition-colors hover:border-primary/40">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <ProgressRing value={c.progress} />
-                    <span className="absolute inset-0 grid place-items-center text-[10px] font-semibold tabular-nums">
-                      {c.progress}%
-                    </span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-semibold transition-colors group-hover:text-primary">
-                      {c.courseTitle}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Finish every lesson to earn it
-                    </p>
-                  </div>
+          <StaggerItem key={c.id}>
+            <div
+              className={cn(
+                "group h-full rounded-xl border bg-card p-5",
+                CHUNKY,
+                CARD_HOVER,
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <ProgressRing value={c.progress} />
+                  <span className="absolute inset-0 grid place-items-center text-[10px] font-semibold tabular-nums">
+                    {c.progress}%
+                  </span>
                 </div>
-
-                <Link
-                  href={`/student/learning/${c.courseSlug}`}
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "group/btn mt-4 w-full",
-                  )}
-                >
-                  Continue course
-                  <ArrowRight
-                    aria-hidden="true"
-                    className="size-4 transition-transform group-hover/btn:translate-x-1 motion-reduce:transition-none"
-                  />
-                </Link>
+                <div className="min-w-0 flex-1">
+                  <h3
+                    className="truncate font-semibold transition-colors group-hover:text-primary motion-reduce:transition-none"
+                    title={c.courseTitle}
+                  >
+                    {c.courseTitle}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Finish every lesson to earn it
+                  </p>
+                </div>
               </div>
-            </Tilt>
-          </motion.div>
+
+              <Link
+                href={`/student/learning/${c.courseSlug}`}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "group/btn mt-4 w-full",
+                )}
+              >
+                Continue course
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-4 transition-transform group-hover/btn:translate-x-1 motion-reduce:transition-none"
+                />
+              </Link>
+            </div>
+          </StaggerItem>
         ))}
-      </motion.div>
+      </Stagger>
     </section>
   );
 }
@@ -328,92 +296,74 @@ export function CertificatesExtras({ inProgress = [] }) {
       <AlmostThere inProgress={inProgress} />
 
       <section aria-labelledby="steps-title">
-        <h2
-          id="steps-title"
-          className="mb-5 text-xl font-semibold tracking-tight"
-        >
-          How you earn a certificate
-        </h2>
-        <motion.div
-          variants={listVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-60px" }}
-          className="grid gap-4 md:grid-cols-3"
-        >
+        <SectionHeading id="steps-title" title="How you earn a certificate" />
+        <Stagger className="grid gap-4 md:grid-cols-3">
           {CERT_STEPS.map((s, i) => {
             const Icon = ICONS[s.icon] ?? Award;
             return (
-              <motion.div key={s.title} variants={itemVariants}>
-                <Tilt max={5}>
-                  <div className="h-full rounded-xl border bg-card p-5 transition-colors hover:border-primary/40">
-                    <div className="mb-3 flex items-center gap-3">
-                      <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary shadow-[0_2px_0_0_color-mix(in_oklab,var(--primary)_25%,transparent)] [transform:translateZ(12px)]">
-                        {i + 1}
-                      </span>
-                      <Icon
-                        aria-hidden="true"
-                        className="size-5 text-muted-foreground"
-                      />
-                    </div>
-                    <h3 className="font-semibold">{s.title}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {s.description}
-                    </p>
+              <StaggerItem key={s.title}>
+                <div
+                  className={cn(
+                    "h-full rounded-xl border bg-card p-5",
+                    CARD_HOVER,
+                  )}
+                >
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                      {i + 1}
+                    </span>
+                    <Icon
+                      aria-hidden="true"
+                      className="size-5 text-muted-foreground"
+                    />
                   </div>
-                </Tilt>
-              </motion.div>
+                  <h3 className="font-semibold">{s.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {s.description}
+                  </p>
+                </div>
+              </StaggerItem>
             );
           })}
-        </motion.div>
+        </Stagger>
       </section>
 
       <section aria-labelledby="share-title">
-        <div className="mb-5 flex items-center gap-2">
-          <Lightbulb aria-hidden="true" className="size-5 text-primary" />
-          <h2 id="share-title" className="text-xl font-semibold tracking-tight">
-            Show off your achievement
-          </h2>
-        </div>
-        <motion.div
-          variants={listVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-60px" }}
-          className="grid gap-4 md:grid-cols-3"
-        >
+        <SectionHeading
+          id="share-title"
+          icon={Lightbulb}
+          title="Show off your achievement"
+        />
+        <Stagger className="grid gap-4 md:grid-cols-3">
           {SHARE_TIPS.map((t) => {
             const Icon = ICONS[t.icon] ?? Award;
             return (
-              <motion.div key={t.title} variants={itemVariants}>
-                <Tilt max={5}>
-                  <div className="h-full rounded-xl border bg-gradient-to-br from-muted/60 to-transparent p-5">
-                    <Icon
-                      aria-hidden="true"
-                      className="mb-3 size-5 text-primary"
-                    />
-                    <h3 className="font-semibold">{t.title}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {t.description}
-                    </p>
-                  </div>
-                </Tilt>
-              </motion.div>
+              <StaggerItem key={t.title}>
+                <div className="h-full rounded-xl bg-muted/50 p-5">
+                  <Icon
+                    aria-hidden="true"
+                    className="mb-3 size-5 text-primary"
+                  />
+                  <h3 className="font-semibold">{t.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {t.description}
+                  </p>
+                </div>
+              </StaggerItem>
             );
           })}
-        </motion.div>
+        </Stagger>
       </section>
 
       <section aria-labelledby="faq-title">
-        <div className="mb-3 flex items-center gap-2">
-          <HelpCircle aria-hidden="true" className="size-5 text-primary" />
-          <h2 id="faq-title" className="text-xl font-semibold tracking-tight">
-            Frequently asked questions
-          </h2>
-        </div>
+        <SectionHeading
+          id="faq-title"
+          icon={HelpCircle}
+          title="Frequently asked questions"
+        />
         <Accordion
           type="single"
-          
+          collapsible
           className="rounded-xl border bg-card px-5"
         >
           {CERT_FAQ.map((f, i) => (
@@ -421,7 +371,7 @@ export function CertificatesExtras({ inProgress = [] }) {
               <AccordionTrigger className="text-left hover:text-primary hover:no-underline">
                 {f.q}
               </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
+              <AccordionContent className="leading-relaxed text-muted-foreground">
                 {f.a}
               </AccordionContent>
             </AccordionItem>
@@ -434,14 +384,14 @@ export function CertificatesExtras({ inProgress = [] }) {
 
 /* ---------------- Main view ---------------- */
 // meta:  [{ id, title, issuedAt(ms) }]   cards: { [id]: <CertificateCard /> rendered on the server }
-export function CertificatesView({ meta, cards, inProgress }) {
+export function CertificatesView({ meta, cards, inProgress = [] }) {
   const reduce = useReducedMotion();
   const searchRef = useRef(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
   const [year, setYear] = useState("all");
 
-  // "/" se search par focus
+  // Press "/" to focus the search field
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -502,106 +452,104 @@ export function CertificatesView({ meta, cards, inProgress }) {
         initial={reduce ? false : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
+        className="rounded-2xl border bg-primary/5 p-5 shadow-[0_4px_0_0_var(--border)] sm:p-8"
       >
-        <Tilt max={2.5} lift={false}>
-          <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5 shadow-[0_4px_0_0_var(--border)] sm:p-8">
-            {!reduce && (
-              <motion.div
-                aria-hidden="true"
-                animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
-                transition={{ duration: 6, repeat: Infinity }}
-                className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/20 blur-3xl"
-              />
-            )}
-            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <Badge variant="secondary" className="gap-1">
-                  <Trophy aria-hidden="true" className="size-3" /> Your
-                  achievements
-                </Badge>
-                <h2
-                  id="cert-hero-title"
-                  className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl"
-                >
-                  {stats.total === 1
-                    ? "You've earned your first certificate"
-                    : `You've earned ${stats.total} certificates`}
-                </h2>
-                <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">
-                  Each certificate is proof of the skills you built. Download
-                  them, share them and keep adding more.
-                </p>
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <Badge variant="secondary" className="gap-1">
+              <Trophy aria-hidden="true" className="size-3" />
+              Your achievements
+            </Badge>
+            <h2
+              id="cert-hero-title"
+              className="mt-3 text-balance text-2xl font-bold tracking-tight sm:text-3xl"
+            >
+              {stats.total === 1
+                ? "You've earned your first certificate"
+                : `You've earned ${stats.total} certificates`}
+            </h2>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Each certificate is proof of the skills you built. Download them,
+              share them and keep adding more.
+            </p>
 
-                {stats.latest && (
-                  <div className="mt-5 flex max-w-xl items-center gap-4 rounded-xl border bg-background/80 p-4 shadow-[0_3px_0_0_var(--border)] backdrop-blur">
-                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
-                      <Award aria-hidden="true" className="size-6" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Latest certificate
-                      </p>
-                      <p className="truncate text-sm font-semibold sm:text-base">
-                        {stats.latest.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Issued {fmtDate(stats.latest.issuedAt)}
-                      </p>
-                    </div>
-                  </div>
+            {stats.latest && (
+              <div
+                className={cn(
+                  "mt-5 flex max-w-xl items-center gap-4 rounded-xl border bg-background p-4",
+                  CHUNKY,
                 )}
-
-                <Link
-                  href="/courses"
-                  className={cn(
-                    buttonVariants({ variant: "outline" }),
-                    "group mt-5 shadow-[0_3px_0_0_var(--border)] transition-[transform,box-shadow] duration-100",
-                    "active:translate-y-[3px] active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0",
-                  )}
-                >
-                  Earn another certificate
-                  <ArrowRight
-                    aria-hidden="true"
-                    className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none"
-                  />
-                </Link>
-              </div>
-
-              <div className="flex justify-center lg:justify-end">
-                <AwardCoin count={stats.total} />
-              </div>
-            </div>
-          </div>
-        </Tilt>
-      </motion.section>
-
-      {/* Stats */}
-      <motion.div
-        variants={listVariants}
-        initial={reduce ? false : "hidden"}
-        animate="show"
-        className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4"
-      >
-        {statCards.map((s) => (
-          <motion.div key={s.label} variants={itemVariants}>
-            <Tilt max={7}>
-              <div className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-[0_3px_0_0_var(--border)] transition-colors hover:border-primary/40">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-[0_3px_0_0_color-mix(in_oklab,var(--primary)_25%,transparent)] ring-1 ring-inset ring-primary/20 [transform:translateZ(14px)]">
-                  <s.icon aria-hidden="true" className="size-5" />
+              >
+                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
+                  <Award aria-hidden="true" className="size-6" />
                 </span>
-                <div>
-                  <p className="text-2xl font-bold leading-none tabular-nums">
-                    <AnimatedNumber value={s.value} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Latest certificate
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {s.label}
+                  <p
+                    className="truncate text-sm font-semibold sm:text-base"
+                    title={stats.latest.title}
+                  >
+                    {stats.latest.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Issued {fmtDate(stats.latest.issuedAt)}
                   </p>
                 </div>
               </div>
-            </Tilt>
-          </motion.div>
+            )}
+
+            <Link
+              href="/courses"
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "group mt-5 bg-background transition-[transform,box-shadow] duration-100",
+                CHUNKY,
+                "active:translate-y-[3px] active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0",
+              )}
+            >
+              Earn another certificate
+              <ArrowRight
+                aria-hidden="true"
+                className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none"
+              />
+            </Link>
+          </div>
+
+          <div className="flex justify-center lg:justify-end">
+            <AwardMedal count={stats.total} />
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Stats */}
+      <Stagger
+        inView={false}
+        className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4"
+      >
+        {statCards.map((s) => (
+          <StaggerItem key={s.label}>
+            <div
+              className={cn(
+                "flex items-center gap-3 rounded-xl border bg-card p-4",
+                CHUNKY,
+                CARD_HOVER,
+              )}
+            >
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
+                <s.icon aria-hidden="true" className="size-5" />
+              </span>
+              <div>
+                <p className="text-2xl font-bold leading-none tabular-nums">
+                  <AnimatedNumber value={s.value} />
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
+              </div>
+            </div>
+          </StaggerItem>
         ))}
-      </motion.div>
+      </Stagger>
 
       {/* Toolbar + certificates */}
       <section aria-labelledby="your-certs-title" className="space-y-4">
@@ -709,7 +657,9 @@ export function CertificatesView({ meta, cards, inProgress }) {
                     delay: reduce ? 0 : Math.min(i * 0.04, 0.3),
                   }}
                 >
-                  <Tilt max={5}>{cards[m.id]}</Tilt>
+                  <div className="h-full transition-transform duration-200 motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none">
+                    {cards[m.id]}
+                  </div>
                 </motion.div>
               ))}
             </AnimatePresence>

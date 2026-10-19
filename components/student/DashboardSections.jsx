@@ -7,7 +7,9 @@ import {
   AnimatePresence,
   animate,
   motion,
+  useMotionValue,
   useReducedMotion,
+  useTransform,
 } from "framer-motion";
 import {
   FiArrowRight,
@@ -27,7 +29,7 @@ import {
 } from "react-icons/fi";
 
 // ---------------------------------------------------------------
-// Routes: apne project ke hisaab se yahan badal lein.
+// Routes: adjust these to match your project.
 // ---------------------------------------------------------------
 const ROUTES = {
   browse: "/courses",
@@ -65,8 +67,11 @@ const TIPS = [
   },
 ];
 
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 // ---------------------------------------------------------------
-// Animation helpers (children server se aate hain)
+// Animation helpers (children are rendered on the server)
 // ---------------------------------------------------------------
 const container = {
   hidden: {},
@@ -82,7 +87,7 @@ export function Reveal({ children, className, delay = 0 }) {
   return (
     <motion.div
       className={className}
-      initial={reduce ? false : { opacity: 0, y: 20 }}
+      initial={reduce ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
       transition={{ duration: 0.4, delay, ease: "easeOut" }}
@@ -107,13 +112,14 @@ export function StaggerGrid({ children, className }) {
   );
 }
 
-export function StaggerItem({ children, className }) {
+// `lift` adds a small hover rise. Turn it off for non-interactive items.
+export function StaggerItem({ children, className, lift = true }) {
   const reduce = useReducedMotion();
   return (
     <motion.div
       className={className}
       variants={reduce ? undefined : item}
-      whileHover={reduce ? undefined : { y: -4 }}
+      whileHover={reduce || !lift ? undefined : { y: -4 }}
       transition={{ type: "spring", stiffness: 300, damping: 24 }}
     >
       {children}
@@ -121,27 +127,22 @@ export function StaggerItem({ children, className }) {
   );
 }
 
+// Counts up once via a motion value, so React doesn't re-render every frame.
 function AnimatedNumber({ value, suffix = "" }) {
   const reduce = useReducedMotion();
-  const [n, setN] = useState(reduce ? value : 0);
+  const mv = useMotionValue(reduce ? value : 0);
+  const text = useTransform(mv, (v) => `${Math.round(v)}${suffix}`);
+
   useEffect(() => {
     if (reduce) {
-      setN(value);
+      mv.set(value);
       return;
     }
-    const controls = animate(0, value, {
-      duration: 0.9,
-      ease: "easeOut",
-      onUpdate: (v) => setN(Math.round(v)),
-    });
+    const controls = animate(mv, value, { duration: 0.9, ease: "easeOut" });
     return () => controls.stop();
-  }, [value, reduce]);
-  return (
-    <>
-      {n}
-      {suffix}
-    </>
-  );
+  }, [value, mv, reduce]);
+
+  return <motion.span>{text}</motion.span>;
 }
 
 // ---------------------------------------------------------------
@@ -150,8 +151,19 @@ function AnimatedNumber({ value, suffix = "" }) {
 function ProgressRing({ pct }) {
   const reduce = useReducedMotion();
   return (
-    <div className="relative size-28 shrink-0 sm:size-36">
-      <svg viewBox="0 0 100 100" className="size-full -rotate-90">
+    <div
+      className="relative size-28 shrink-0 sm:size-36"
+      role="progressbar"
+      aria-label="Courses completed"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+    >
+      <svg
+        viewBox="0 0 100 100"
+        className="size-full -rotate-90"
+        aria-hidden="true"
+      >
         <circle
           cx="50"
           cy="50"
@@ -170,9 +182,13 @@ function ProgressRing({ pct }) {
           strokeLinecap="round"
           stroke="currentColor"
           className="text-primary-foreground"
-          initial={reduce ? false : { pathLength: 0 }}
+          initial={{ pathLength: reduce ? pct / 100 : 0 }}
           animate={{ pathLength: pct / 100 }}
-          transition={{ duration: 1.1, ease: "easeOut", delay: 0.2 }}
+          transition={{
+            duration: reduce ? 0 : 1.1,
+            ease: "easeOut",
+            delay: reduce ? 0 : 0.2,
+          }}
         />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
@@ -223,6 +239,8 @@ export function DashboardHero({ first, total, active, completed }) {
       ? "You have finished every course. Pick your next one and keep growing."
       : "Start your journey at Apni University with a free course today.";
 
+  const primaryBtn = `inline-flex items-center justify-center gap-2 rounded-xl bg-primary-foreground px-5 py-2.5 text-sm font-semibold text-primary transition-transform motion-safe:hover:scale-[1.03] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-primary`;
+
   return (
     <motion.section
       initial={reduce ? false : { opacity: 0, y: 16 }}
@@ -249,26 +267,23 @@ export function DashboardHero({ first, total, active, completed }) {
           <p className="text-sm font-medium text-primary-foreground/75">
             {today || "Apni University"}
           </p>
-          <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-4xl">
+          <h1 className="mt-1 text-balance text-2xl font-bold leading-tight sm:text-4xl">
             {greeting}, {first}
           </h1>
-          <p className="mt-2 text-sm text-primary-foreground/85 sm:text-base">
+          <p className="mt-2 text-sm leading-relaxed text-primary-foreground/85 sm:text-base">
             {message}
           </p>
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             {active ? (
-              <a
-                href="#continue"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-foreground px-5 py-2.5 text-sm font-semibold text-primary transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
-              >
+              <a href="#continue" className={primaryBtn}>
                 Continue learning
                 <FiArrowRight aria-hidden="true" />
               </a>
             ) : (
               <Link
                 href={total ? ROUTES.browse : ROUTES.free}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-foreground px-5 py-2.5 text-sm font-semibold text-primary transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+                className={primaryBtn}
               >
                 {total ? "Browse courses" : "Explore free courses"}
                 <FiArrowRight aria-hidden="true" />
@@ -276,7 +291,7 @@ export function DashboardHero({ first, total, active, completed }) {
             )}
             <Link
               href={ROUTES.browse}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-primary-foreground/30 px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-primary-foreground/10"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-primary-foreground/30 px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-primary-foreground/10 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
             >
               <FiCompass aria-hidden="true" />
               Discover courses
@@ -312,10 +327,14 @@ export function StatsRow({ total, active, completed }) {
       {stats.map(({ label, value, suffix, icon: Icon }) => (
         <StaggerItem
           key={label}
-          className="rounded-2xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5"
+          lift={false}
+          className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5"
         >
-          <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
-            <Icon aria-hidden="true" className="size-5" />
+          <span
+            className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <Icon className="size-5" />
           </span>
           <p className="mt-3 text-3xl font-bold tabular-nums">
             <AnimatedNumber value={value} suffix={suffix} />
@@ -363,17 +382,20 @@ export function QuickActions() {
         <StaggerItem key={title}>
           <Link
             href={href}
-            className="group flex h-full items-start gap-3 rounded-2xl border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={`group flex h-full items-start gap-3 rounded-2xl border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-primary/5 motion-reduce:transition-none ${FOCUS_RING}`}
           >
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-              <Icon aria-hidden="true" className="size-5" />
+            <span
+              className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none"
+              aria-hidden="true"
+            >
+              <Icon className="size-5" />
             </span>
             <span className="min-w-0">
               <span className="flex items-center gap-1 text-sm font-semibold">
                 {title}
                 <FiArrowRight
                   aria-hidden="true"
-                  className="size-3.5 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+                  className="size-3.5 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
                 />
               </span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -388,7 +410,7 @@ export function QuickActions() {
 }
 
 // ---------------------------------------------------------------
-// Milestones (data se automatically unlock hote hain)
+// Milestones (unlock automatically from the data)
 // ---------------------------------------------------------------
 export function Milestones({ total, completed }) {
   const reduce = useReducedMotion();
@@ -413,12 +435,13 @@ export function Milestones({ total, completed }) {
     },
   ];
   const doneCount = list.filter((m) => m.done).length;
+  const barWidth = `${(doneCount / list.length) * 100}%`;
 
   return (
     <div className="rounded-2xl border bg-card p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Your milestones</h2>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm tabular-nums text-muted-foreground">
           {doneCount}/{list.length}
         </span>
       </div>
@@ -433,10 +456,10 @@ export function Milestones({ total, completed }) {
       >
         <motion.div
           className="h-full rounded-full bg-primary"
-          initial={reduce ? false : { width: 0 }}
-          whileInView={{ width: `${(doneCount / list.length) * 100}%` }}
+          initial={{ width: reduce ? barWidth : 0 }}
+          whileInView={{ width: barWidth }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: reduce ? 0 : 0.8, ease: "easeOut" }}
         />
       </div>
 
@@ -444,14 +467,14 @@ export function Milestones({ total, completed }) {
         {list.map(({ title, hint, done, icon: Icon }, i) => (
           <motion.li
             key={title}
-            initial={reduce ? false : { opacity: 0, x: -10 }}
+            initial={reduce ? { opacity: 1, x: 0 } : { opacity: 0, x: -10 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 * i, duration: 0.3 }}
             className="flex items-center gap-3"
           >
             <span
-              className={`relative grid size-10 shrink-0 place-items-center rounded-full transition-colors ${
+              className={`relative grid size-10 shrink-0 place-items-center rounded-full transition-colors motion-reduce:transition-none ${
                 done
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground"
@@ -474,6 +497,9 @@ export function Milestones({ total, completed }) {
                 className={`text-sm font-medium ${done ? "" : "text-foreground/80"}`}
               >
                 {title}
+                <span className="sr-only">
+                  {done ? " (unlocked)" : " (locked)"}
+                </span>
               </p>
               <p className="text-xs text-muted-foreground">{hint}</p>
             </div>
@@ -485,29 +511,39 @@ export function Milestones({ total, completed }) {
 }
 
 // ---------------------------------------------------------------
-// Study tip (roz badalta hai, button se agla tip)
+// Study tip (changes daily; the button shows the next one)
 // ---------------------------------------------------------------
 export function TipCard() {
   const reduce = useReducedMotion();
-  const [index, setIndex] = useState(() => {
-    const day = Math.floor(Date.now() / 86_400_000);
-    return day % TIPS.length;
-  });
+  const [offset, setOffset] = useState(0);
 
+  // The server renders the first tip; the client switches to today's tip
+  // after hydration. This avoids a text mismatch on statically rendered pages.
+  const day = useSyncExternalStore(
+    () => () => {},
+    () => Math.floor(Date.now() / 86_400_000),
+    () => 0,
+  );
+
+  const index = (day + offset) % TIPS.length;
   const tip = TIPS[index];
+
   return (
     <div className="rounded-2xl border bg-card p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-base font-semibold">
-          <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
-            <FiZap aria-hidden="true" className="size-4" />
+          <span
+            className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <FiZap className="size-4" />
           </span>
           Study tip
         </h2>
         <button
           type="button"
-          onClick={() => setIndex((i) => (i + 1) % TIPS.length)}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          onClick={() => setOffset((o) => o + 1)}
+          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground motion-reduce:transition-none ${FOCUS_RING}`}
         >
           <FiRefreshCw aria-hidden="true" className="size-3.5" />
           Next tip
@@ -541,14 +577,17 @@ export function HelpCard() {
   return (
     <div className="flex flex-col gap-4 rounded-2xl border bg-primary/5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
       <div className="flex items-start gap-4">
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
-          <FiMessageSquare aria-hidden="true" className="size-5" />
+        <span
+          className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"
+          aria-hidden="true"
+        >
+          <FiMessageSquare className="size-5" />
         </span>
         <div>
           <h2 className="text-base font-semibold sm:text-lg">
             Need help with your courses?
           </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
             Check the help center first. If you still need us, the Apni
             University team is one message away.
           </p>
@@ -557,13 +596,13 @@ export function HelpCard() {
       <div className="flex flex-col gap-2 sm:flex-row">
         <Link
           href={ROUTES.faq}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+          className={`inline-flex items-center justify-center gap-2 rounded-lg border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted motion-reduce:transition-none ${FOCUS_RING}`}
         >
           Help center
         </Link>
         <Link
           href={ROUTES.contact}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+          className={`inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 motion-reduce:transition-none ${FOCUS_RING}`}
         >
           Contact us
           <FiArrowRight aria-hidden="true" />

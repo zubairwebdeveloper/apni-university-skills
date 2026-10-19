@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -49,6 +49,7 @@ function FormSkeleton() {
 }
 
 export function EditAdminLoader({ email }) {
+  const reduce = useReducedMotion();
   const [state, setState] = useState({ loading: true, admin: null, error: "" });
 
   useEffect(() => {
@@ -91,8 +92,9 @@ export function EditAdminLoader({ email }) {
   if (state.error) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
+        initial={reduce ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
         className="max-w-2xl"
       >
         <Alert variant="destructive" role="alert">
@@ -104,5 +106,13 @@ export function EditAdminLoader({ email }) {
     );
   }
 
-  return <AdminUserForm mode="edit" initial={state.admin} />;
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <AdminUserForm mode="edit" initial={state.admin} />
+    </motion.div>
+  );
 }

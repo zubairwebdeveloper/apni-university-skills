@@ -1,8 +1,16 @@
+// components/student/WishlistView.jsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { animate, motion, useMotionValue, useTransform } from "framer-motion";
+import {
+  MotionConfig,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+} from "framer-motion";
 import {
   ArrowRight,
   BookOpen,
@@ -18,6 +26,7 @@ import {
   Sparkles,
   Target,
   Wallet,
+  X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +58,12 @@ import {
 
 /* ---------------- Config + helpers (edit to match your data) ---------------- */
 const CURRENCY = "USD";
+
+/* Design tokens: yellow #FACC15 = highlights, violet #8B5CF6 = selected / brand */
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const SELECTED_TEXT = "text-violet-700 dark:text-violet-300";
+const YELLOW_TEXT = "text-amber-700 dark:text-[#FACC15]";
 
 const toMs = (v) => {
   if (!v) return 0;
@@ -104,54 +119,77 @@ const itemVariants = {
 
 /* ---------------- Building blocks ---------------- */
 function AnimatedNumber({ value }) {
-  const mv = useMotionValue(0);
+  const reduce = useReducedMotion();
+  const mv = useMotionValue(reduce ? value : 0);
   const rounded = useTransform(mv, (v) => Math.round(v));
 
   useEffect(() => {
+    if (reduce) {
+      mv.set(value);
+      return undefined;
+    }
     const controls = animate(mv, value, { duration: 0.9, ease: "easeOut" });
     return () => controls.stop();
-  }, [value, mv]);
+  }, [value, mv, reduce]);
 
   return <motion.span>{rounded}</motion.span>;
 }
 
-function HeartBadge({ count }) {
+function SectionHeading({ icon: Icon, iconClass, children }) {
   return (
-    <div className="relative flex size-36 shrink-0 items-center justify-center sm:size-44">
+    <div className="mb-5 flex items-center gap-2.5">
+      {Icon && (
+        <span className="grid size-8 place-items-center rounded-lg border border-border bg-muted/50">
+          <Icon className={cn("size-4", iconClass)} aria-hidden="true" />
+        </span>
+      )}
+      <h2 className="text-xl font-bold tracking-tight">{children}</h2>
+    </div>
+  );
+}
+
+function HeartBadge({ count }) {
+  const reduce = useReducedMotion();
+
+  return (
+    <div
+      aria-hidden="true"
+      className="relative flex size-36 shrink-0 items-center justify-center sm:size-44"
+    >
       <motion.div
-        aria-hidden
-        animate={{ rotate: 360 }}
+        animate={reduce ? undefined : { rotate: 360 }}
         transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-0 rounded-full border-2 border-dashed border-primary/30"
+        className="absolute inset-0 rounded-full border-2 border-dashed border-[#8B5CF6]/35"
       />
-      <div className="absolute inset-4 rounded-full bg-gradient-to-br from-primary/25 to-primary/5" />
+      <div className="absolute inset-4 rounded-full border border-border bg-background shadow-sm" />
 
       {["-right-1 top-6", "-left-2 bottom-8", "right-4 -bottom-1"].map(
         (pos, i) => (
           <motion.span
             key={pos}
-            aria-hidden
-            animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
+            animate={
+              reduce ? undefined : { y: [0, -8, 0], opacity: [0.5, 1, 0.5] }
+            }
             transition={{ duration: 3, repeat: Infinity, delay: i * 0.8 }}
             className={cn("absolute", pos)}
           >
-            <Sparkles className="size-4 text-primary" />
+            <Sparkles className="size-4 fill-[#FACC15] text-[#FACC15]" />
           </motion.span>
         ),
       )}
 
       <div className="relative flex flex-col items-center">
         <motion.span
-          animate={{ scale: [1, 1.15, 1] }}
+          animate={reduce ? undefined : { scale: [1, 1.15, 1] }}
           transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 0.8 }}
           className="inline-flex"
         >
-          <Heart className="size-10 fill-primary/20 text-primary sm:size-12" />
+          <Heart className="size-10 fill-[#8B5CF6] text-[#8B5CF6] sm:size-12" />
         </motion.span>
-        <span className="mt-1 text-3xl font-bold sm:text-4xl">
+        <span className="mt-1 text-3xl font-extrabold tabular-nums sm:text-4xl">
           <AnimatedNumber value={count} />
         </span>
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[11px] font-medium text-muted-foreground">
           {count === 1 ? "Saved course" : "Saved courses"}
         </span>
       </div>
@@ -163,13 +201,13 @@ function HeartBadge({ count }) {
 export function WishlistExtras() {
   return (
     <div className="mt-10 space-y-12">
-      <section>
-        <div className="mb-5 flex items-center gap-2">
-          <Lightbulb className="size-5 text-yellow-500" />
-          <h2 className="text-xl font-semibold tracking-tight">
-            Why build a wishlist?
-          </h2>
-        </div>
+      <section aria-labelledby="why-wishlist">
+        <SectionHeading
+          icon={Lightbulb}
+          iconClass="text-amber-600 dark:text-[#FACC15]"
+        >
+          <span id="why-wishlist">Why build a wishlist?</span>
+        </SectionHeading>
         <motion.div
           variants={listVariants}
           initial="hidden"
@@ -178,19 +216,19 @@ export function WishlistExtras() {
           className="grid gap-4 md:grid-cols-3"
         >
           {WHY_WISHLIST.map((w) => {
-            const Icon = ICONS[w.icon];
+            const Icon = ICONS[w.icon] ?? Bookmark;
             return (
               <motion.div
                 key={w.title}
                 variants={itemVariants}
                 whileHover={{ y: -3 }}
-                className="group rounded-xl border bg-gradient-to-br from-muted/60 to-transparent p-5 transition-colors hover:border-primary/40"
+                className="group rounded-2xl border border-border bg-card p-5 transition-colors hover:border-[#8B5CF6]/40"
               >
-                <span className="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-all group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground">
-                  <Icon className="size-5" />
+                <span className="mb-3 flex size-10 items-center justify-center rounded-xl border border-border bg-muted/50 text-muted-foreground transition-all group-hover:scale-105 group-hover:border-[#8B5CF6] group-hover:bg-[#8B5CF6] group-hover:text-white">
+                  <Icon className="size-5" aria-hidden="true" />
                 </span>
-                <h3 className="font-semibold">{w.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <h3 className="font-bold tracking-tight">{w.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                   {w.description}
                 </p>
               </motion.div>
@@ -199,10 +237,10 @@ export function WishlistExtras() {
         </motion.div>
       </section>
 
-      <section>
-        <h2 className="mb-5 text-xl font-semibold tracking-tight">
-          From saved to started
-        </h2>
+      <section aria-labelledby="saved-to-started">
+        <SectionHeading>
+          <span id="saved-to-started">From saved to started</span>
+        </SectionHeading>
         <motion.div
           variants={listVariants}
           initial="hidden"
@@ -211,22 +249,25 @@ export function WishlistExtras() {
           className="grid gap-4 md:grid-cols-3"
         >
           {WISHLIST_STEPS.map((s, i) => {
-            const Icon = ICONS[s.icon];
+            const Icon = ICONS[s.icon] ?? Bookmark;
             return (
               <motion.div
                 key={s.title}
                 variants={itemVariants}
                 whileHover={{ y: -3 }}
-                className="rounded-xl border bg-card p-5 transition-colors hover:border-primary/40"
+                className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-[#8B5CF6]/40"
               >
-                <div className="mb-3 flex items-center gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="flex size-9 items-center justify-center rounded-full border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 text-sm font-bold tabular-nums text-violet-700 dark:text-violet-300">
                     {i + 1}
                   </span>
-                  <Icon className="size-5 text-muted-foreground" />
+                  <Icon
+                    className="size-5 text-muted-foreground"
+                    aria-hidden="true"
+                  />
                 </div>
-                <h3 className="font-semibold">{s.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <h3 className="font-bold tracking-tight">{s.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                   {s.description}
                 </p>
               </motion.div>
@@ -237,24 +278,25 @@ export function WishlistExtras() {
 
       <ExploreSection />
 
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <HelpCircle className="size-5 text-primary" />
-          <h2 className="text-xl font-semibold tracking-tight">
-            Frequently asked questions
-          </h2>
-        </div>
+      <section aria-labelledby="wishlist-faq">
+        <SectionHeading icon={HelpCircle} iconClass="text-[#8B5CF6]">
+          <span id="wishlist-faq">Frequently asked questions</span>
+        </SectionHeading>
         <Accordion
           type="single"
-          
-          className="rounded-xl border bg-card px-5"
+          className="rounded-2xl border border-border bg-card px-5"
         >
           {WISHLIST_FAQ.map((f, i) => (
             <AccordionItem key={f.q} value={`faq-${i}`}>
-              <AccordionTrigger className="text-left hover:text-primary hover:no-underline">
+              <AccordionTrigger
+                className={cn(
+                  "text-left font-semibold hover:no-underline hover:text-violet-700 dark:hover:text-violet-300",
+                  FOCUS,
+                )}
+              >
                 {f.q}
               </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
+              <AccordionContent className="leading-relaxed text-muted-foreground">
                 {f.a}
               </AccordionContent>
             </AccordionItem>
@@ -267,20 +309,22 @@ export function WishlistExtras() {
         initial={{ opacity: 0, y: 16 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary to-primary/70 p-6 text-primary-foreground sm:p-8"
+        className="relative overflow-hidden rounded-2xl bg-[#111318] p-6 text-[#F8FAFC] sm:p-8"
       >
-        <motion.div
-          aria-hidden
-          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
-          transition={{ duration: 5, repeat: Infinity }}
-          className="pointer-events-none absolute -right-10 -top-10 size-48 rounded-full bg-white/30 blur-3xl"
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-12 -top-12 size-52 rounded-full bg-[#8B5CF6]/25 blur-3xl"
+        />
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 w-1 bg-[#FACC15]"
         />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-bold sm:text-2xl">
+            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
               Ready to learn something new?
             </h2>
-            <p className="mt-1 text-sm opacity-90">
+            <p className="mt-1 text-sm text-[#94A3B8]">
               Discover tech courses in AI, web, cloud, security and more.
             </p>
           </div>
@@ -288,11 +332,15 @@ export function WishlistExtras() {
             href="/courses"
             className={cn(
               buttonVariants({ variant: "secondary" }),
-              "group shrink-0",
+              "group shrink-0 gap-1.5 bg-[#FACC15] font-bold text-[#111318] hover:bg-[#EAB308]",
+              FOCUS,
             )}
           >
             Browse all courses
-            <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+            <ArrowRight
+              className="size-4 transition-transform group-hover:translate-x-1"
+              aria-hidden="true"
+            />
           </Link>
         </div>
       </motion.section>
@@ -325,6 +373,14 @@ export function WishlistView({ courses }) {
     () => [...new Set(enriched.map((e) => e.cat).filter(Boolean))].sort(),
     [enriched],
   );
+
+  const categoryCounts = useMemo(() => {
+    const counts = {};
+    enriched.forEach((e) => {
+      if (e.cat) counts[e.cat] = (counts[e.cat] || 0) + 1;
+    });
+    return counts;
+  }, [enriched]);
 
   const stats = useMemo(() => {
     const paid = enriched.filter((e) => e.price !== null && !e.free);
@@ -359,33 +415,39 @@ export function WishlistView({ courses }) {
       label: "Saved courses",
       value: stats.total,
       icon: Bookmark,
-      tone: "text-primary bg-primary/10",
+      tone: "text-violet-700 bg-[#8B5CF6]/10 dark:text-violet-300",
     },
     stats.free > 0 && {
       label: "Free courses",
       value: stats.free,
       icon: Gift,
-      tone: "text-green-600 bg-green-500/10",
+      tone: "text-emerald-700 bg-emerald-500/10 dark:text-emerald-300",
     },
     hasPrices &&
       stats.value > 0 && {
         label: "Total value",
         text: money(stats.value),
         icon: Wallet,
-        tone: "text-orange-500 bg-orange-500/10",
+        tone: "text-amber-700 bg-[#FACC15]/15 dark:text-[#FACC15]",
       },
     stats.categories > 0 && {
       label: "Categories",
       value: stats.categories,
       icon: Layers,
-      tone: "text-violet-500 bg-violet-500/10",
+      tone: "text-sky-700 bg-sky-500/10 dark:text-sky-300",
     },
   ].filter(Boolean);
 
   const chips = [
-    { value: "all", label: "All" },
-    ...categories.map((c) => ({ value: c, label: c })),
+    { value: "all", label: "All", count: stats.total },
+    ...categories.map((c) => ({
+      value: c,
+      label: c,
+      count: categoryCounts[c],
+    })),
   ];
+
+  const filtersActive = Boolean(q) || category !== "all";
 
   const clearFilters = () => {
     setQuery("");
@@ -393,209 +455,323 @@ export function WishlistView({ courses }) {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Hero */}
-      <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5 sm:p-8"
-      >
-        <motion.div
-          aria-hidden
-          animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
-          transition={{ duration: 6, repeat: Infinity }}
-          className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/20 blur-3xl"
-        />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <Badge variant="secondary" className="gap-1">
-              <Heart className="size-3" /> Your wishlist
-            </Badge>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-              {stats.total === 1
-                ? "You've saved 1 course for later"
-                : `You've saved ${stats.total} courses for later`}
-            </h2>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">
-              Great learning starts with a plan. Review your saved courses and
-              pick the one you want to start next.
-            </p>
-
-            {featured && (
-              <motion.div
-                whileHover={{ y: -2 }}
-                className="mt-5 flex max-w-xl flex-col gap-3 rounded-xl border bg-background/80 p-4 backdrop-blur sm:flex-row sm:items-center"
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <BookOpen className="size-9 shrink-0 text-primary" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Up next on your list
-                    </p>
-                    <p className="truncate text-sm font-semibold sm:text-base">
-                      {featured.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {[
-                        featured.cat,
-                        featured.free
-                          ? "Free"
-                          : featured.price !== null
-                            ? money(featured.price)
-                            : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href={getHref(featured.c)}
-                  className={cn(
-                    buttonVariants({ size: "sm" }),
-                    "group shrink-0",
-                  )}
-                >
-                  View course
-                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </motion.div>
-            )}
-
-            <Link
-              href="/courses"
-              className={cn(
-                buttonVariants({ variant: "outline" }),
-                "group mt-5",
-              )}
-            >
-              Browse more courses
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </div>
-
-          <div className="flex justify-center lg:justify-end">
-            <HeartBadge count={stats.total} />
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Stats */}
-      <motion.div
-        variants={listVariants}
-        initial="hidden"
-        animate="show"
-        className={cn(
-          "grid grid-cols-2 gap-3 sm:gap-4",
-          statCards.length > 3 ? "lg:grid-cols-4" : "lg:grid-cols-3",
-        )}
-      >
-        {statCards.map((s) => (
-          <motion.div
-            key={s.label}
-            variants={itemVariants}
-            whileHover={{ y: -3 }}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40"
-          >
-            <span
-              className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                s.tone,
-              )}
-            >
-              <s.icon className="size-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-2xl font-bold leading-none">
-                {s.text ?? <AnimatedNumber value={s.value} />}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
-            </div>
-          </motion.div>
-        ))}
-      </motion.div>
-
-      {/* Toolbar */}
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-xl font-semibold tracking-tight">
-            Saved courses
-          </h2>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative sm:w-64">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search your wishlist..."
-                className="pl-9"
-              />
-            </div>
-            <Select value={sort} onValueChange={setSort}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                {sortOptions.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {categories.length > 1 && (
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-            {chips.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                onClick={() => setCategory(c.value)}
-                aria-pressed={category === c.value}
-                className={cn(
-                  "relative shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                  category === c.value
-                    ? "border-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:border-primary/40 hover:text-primary",
-                )}
-              >
-                {category === c.value && (
-                  <motion.span
-                    layoutId="wishlist-chip-pill"
-                    className="absolute inset-0 rounded-full bg-primary"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10">{c.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          Showing {filtered.length} of {stats.total} courses
-        </p>
-
-        {filtered.length ? (
-          <WishlistGrid courses={filtered.map((e) => e.c)} />
-        ) : (
-          <EmptyState
-            icon={Search}
-            title="No matching courses"
-            description="Try a different keyword or category."
-            action={
-              <Button variant="outline" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            }
+    <MotionConfig reducedMotion="user">
+      <div className="space-y-8">
+        {/* Hero */}
+        <motion.section
+          aria-labelledby="wishlist-title"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 sm:p-8"
+        >
+          <span
+            aria-hidden="true"
+            className="absolute inset-y-0 left-0 w-1 bg-[#FACC15]"
           />
-        )}
-      </section>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-[#8B5CF6]/10 blur-3xl"
+          />
 
-      <WishlistExtras />
-    </div>
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <Badge
+                variant="secondary"
+                className="gap-1.5 border border-border"
+              >
+                <Heart
+                  className="size-3 fill-[#8B5CF6] text-[#8B5CF6]"
+                  aria-hidden="true"
+                />
+                Your wishlist
+              </Badge>
+              <h2
+                id="wishlist-title"
+                className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl"
+              >
+                {stats.total === 1 ? (
+                  <>
+                    You&apos;ve saved{" "}
+                    <span className={cn("tabular-nums", YELLOW_TEXT)}>1</span>{" "}
+                    course for later
+                  </>
+                ) : (
+                  <>
+                    You&apos;ve saved{" "}
+                    <span className={cn("tabular-nums", YELLOW_TEXT)}>
+                      {stats.total}
+                    </span>{" "}
+                    courses for later
+                  </>
+                )}
+              </h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                Great learning starts with a plan. Review your saved courses and
+                pick the one you want to start next.
+              </p>
+
+              {featured && (
+                <motion.div
+                  whileHover={{ y: -2 }}
+                  className="mt-5 flex max-w-xl flex-col gap-3 rounded-2xl border border-border bg-background p-4 sm:flex-row sm:items-center"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#8B5CF6] text-white">
+                      <BookOpen className="size-5" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                        Up next on your list
+                      </p>
+                      <p className="truncate text-sm font-bold sm:text-base">
+                        {featured.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {[
+                          featured.cat,
+                          featured.free
+                            ? "Free"
+                            : featured.price !== null
+                              ? money(featured.price)
+                              : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    href={getHref(featured.c)}
+                    className={cn(
+                      buttonVariants({ size: "sm" }),
+                      "group shrink-0 gap-1.5",
+                      FOCUS,
+                    )}
+                  >
+                    View course
+                    <ArrowRight
+                      className="size-4 transition-transform group-hover:translate-x-1"
+                      aria-hidden="true"
+                    />
+                  </Link>
+                </motion.div>
+              )}
+
+              <Link
+                href="/courses"
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "group mt-5 gap-1.5",
+                  FOCUS,
+                )}
+              >
+                Browse more courses
+                <ArrowRight
+                  className="size-4 transition-transform group-hover:translate-x-1"
+                  aria-hidden="true"
+                />
+              </Link>
+            </div>
+
+            <div className="flex justify-center lg:justify-end">
+              <HeartBadge count={stats.total} />
+            </div>
+          </div>
+        </motion.section>
+
+        {/* Stats */}
+        <motion.div
+          variants={listVariants}
+          initial="hidden"
+          animate="show"
+          className={cn(
+            "grid grid-cols-2 gap-3 sm:gap-4",
+            statCards.length > 3 ? "lg:grid-cols-4" : "lg:grid-cols-3",
+          )}
+        >
+          {statCards.map((s) => (
+            <motion.div
+              key={s.label}
+              variants={itemVariants}
+              whileHover={{ y: -3 }}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-[#8B5CF6]/40"
+            >
+              <span
+                className={cn(
+                  "flex size-10 shrink-0 items-center justify-center rounded-xl",
+                  s.tone,
+                )}
+              >
+                <s.icon className="size-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-2xl font-extrabold leading-none tabular-nums">
+                  {s.text ?? <AnimatedNumber value={s.value} />}
+                </p>
+                <p className="mt-1 text-xs font-medium text-muted-foreground">
+                  {s.label}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Toolbar + grid (id is the target of the hero's "View saved courses" link) */}
+        <section
+          id="saved-courses"
+          aria-labelledby="saved-courses-title"
+          className="scroll-mt-24 space-y-4"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2
+              id="saved-courses-title"
+              className="text-xl font-bold tracking-tight"
+            >
+              Saved courses
+            </h2>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div role="search" className="relative sm:w-64">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search your wishlist..."
+                  aria-label="Search your wishlist"
+                  className="pl-9 pr-9"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    aria-label="Clear search"
+                    className={cn(
+                      "absolute right-1.5 top-1/2 grid size-7 -translate-y-1/2 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                      FOCUS,
+                    )}
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+              <Select value={sort} onValueChange={setSort}>
+                <SelectTrigger
+                  className="w-full sm:w-48"
+                  aria-label="Sort saved courses"
+                >
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {categories.length > 1 && (
+            <div
+              role="group"
+              aria-label="Filter by category"
+              className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none]"
+            >
+              {chips.map((c) => {
+                const selected = category === c.value;
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setCategory(c.value)}
+                    aria-pressed={selected}
+                    className={cn(
+                      "relative inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                      FOCUS,
+                      selected
+                        ? "border-[#8B5CF6] text-white"
+                        : "border-border bg-muted/50 text-muted-foreground hover:border-[#8B5CF6]/40 hover:text-foreground",
+                    )}
+                  >
+                    {selected && (
+                      <motion.span
+                        layoutId="wishlist-chip-pill"
+                        className="absolute inset-0 rounded-full bg-[#8B5CF6]"
+                        transition={{
+                          type: "spring",
+                          stiffness: 380,
+                          damping: 30,
+                        }}
+                      />
+                    )}
+                    <span className="relative z-10">{c.label}</span>
+                    <span
+                      className={cn(
+                        "relative z-10 rounded-full px-1.5 py-px text-[10px] font-bold tabular-nums leading-none",
+                        selected
+                          ? "bg-white/20 text-white"
+                          : "bg-background text-muted-foreground",
+                      )}
+                    >
+                      {c.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              Showing{" "}
+              <span className="font-semibold tabular-nums text-foreground">
+                {filtered.length}
+              </span>{" "}
+              of {stats.total} courses
+            </p>
+            {filtersActive && filtered.length > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className={cn(
+                  "cursor-pointer rounded-md px-2 py-1 text-xs font-semibold hover:underline",
+                  SELECTED_TEXT,
+                  FOCUS,
+                )}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {filtered.length ? (
+            /* key: WishlistGrid copies `courses` into state once, so it must remount
+               whenever the filtered list changes, otherwise search/sort/category
+               changes would never show up in the grid. */
+            <WishlistGrid
+              key={filtered.map((e) => e.c.id).join("|")}
+              courses={filtered.map((e) => e.c)}
+            />
+          ) : (
+            <EmptyState
+              icon={Search}
+              title="No matching courses"
+              description="Try a different keyword or category."
+              action={
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              }
+            />
+          )}
+        </section>
+
+        <WishlistExtras />
+      </div>
+    </MotionConfig>
   );
 }

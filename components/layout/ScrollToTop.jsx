@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  memo,
   useCallback,
   useEffect,
   useRef,
@@ -11,42 +12,90 @@ import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const ACCENT = "#eb0aa0"; // ring / border / progress accent
-const ICON_COLOR = "#ffffff"; // arrow color
-const TEXT_COLOR = "#ffffff"; // label / tooltip text color
-const GRAY = "#374151"; // circle background (gray-700)
-const GRAY_HOVER = "#4b5563"; // circle background on hover (gray-600)
+/* -------------------------------------------------------
+   Theme
+------------------------------------------------------- */
+
+const ACCENT = "#eb0aa0";
+const ICON_COLOR = "#ffffff";
+const TEXT_COLOR = "#ffffff";
+const GRAY = "#374151";
+const GRAY_HOVER = "#4b5563";
 
 const noopSubscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 function useIsClient() {
   return useSyncExternalStore(
     noopSubscribe,
-    () => true,
-    () => false,
+    getClientSnapshot,
+    getServerSnapshot,
   );
 }
 
-function findScrollParent(node) {
-  let el = node?.parentElement;
+/* -------------------------------------------------------
+   Helpers
+------------------------------------------------------- */
 
-  while (el && el !== document.body && el !== document.documentElement) {
-    const overflowY = getComputedStyle(el).overflowY;
+function findScrollParent(node) {
+  let element = node?.parentElement;
+
+  while (
+    element &&
+    element !== document.body &&
+    element !== document.documentElement
+  ) {
+    const overflowY = window.getComputedStyle(element).overflowY;
 
     if (
       ["auto", "scroll", "overlay"].includes(overflowY) &&
-      el.scrollHeight > el.clientHeight + 1
+      element.scrollHeight > element.clientHeight + 1
     ) {
-      return el;
+      return element;
     }
 
-    el = el.parentElement;
+    element = element.parentElement;
   }
 
   return null;
 }
 
-export function ScrollToTop({
+function getScrollMetrics(element) {
+  const root = document.scrollingElement || document.documentElement;
+
+  const scroller = element?.isConnected ? element : null;
+
+  const scrollable = scroller
+    ? Math.max(scroller.scrollHeight - scroller.clientHeight, 0)
+    : Math.max(root.scrollHeight - window.innerHeight, 0);
+
+  const scrollY = scroller
+    ? Math.max(scroller.scrollTop, 0)
+    : Math.max(window.scrollY || root.scrollTop || 0, 0);
+
+  const ratio =
+    scrollable > 0 ? Math.min(Math.max(scrollY / scrollable, 0), 1) : 0;
+
+  return {
+    scrollable,
+    scrollY,
+    ratio,
+    percentage: Math.round(ratio * 100),
+    atTop: scrollY <= 2,
+    atEnd: scrollable > 0 && ratio >= 0.985,
+  };
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/* -------------------------------------------------------
+   Scroll to top / bottom
+------------------------------------------------------- */
+
+export const ScrollToTop = memo(function ScrollToTop({
   side = "right",
   bottom = 24,
   showPercent = true,
@@ -73,127 +122,157 @@ export function ScrollToTop({
   const buttonRef = useRef(null);
   const ringRef = useRef(null);
   const barRef = useRef(null);
+
   const scrollerRef = useRef(null);
   const frameRef = useRef(0);
   const timerRef = useRef(null);
   const lastProgressRef = useRef(-1);
+  const lastVisibleRef = useRef(null);
+  const lastAtTopRef = useRef(null);
+  const lastAtEndRef = useRef(null);
   const loggedRef = useRef(false);
+
+  /* -----------------------------------------------------
+     Track scroll position
+  ----------------------------------------------------- */
 
   const updateProgress = useCallback(() => {
     frameRef.current = 0;
 
-    let el = scrollerRef.current;
+    if (!anchorRef.current?.isConnected) return;
 
-    if (!el?.isConnected) {
-      el = null;
+    let scroller = scrollerRef.current;
 
-      const root = document.scrollingElement || document.documentElement;
-
-      if (root.scrollHeight - window.innerHeight <= 50) {
-        el = findScrollParent(anchorRef.current);
-      }
-
-      scrollerRef.current = el;
+    if (scroller && !scroller.isConnected) {
+      scrollerRef.current = null;
+      scroller = null;
     }
 
-    const root = document.scrollingElement || document.documentElement;
+    // Fall back to an ancestor scroll container for short
+    // document layouts with an independently scrolling page.
+    if (!scroller) {
+      const root = document.scrollingElement || document.documentElement;
+      const documentScrollable = root.scrollHeight - window.innerHeight;
 
-    const scrollable = el
-      ? Math.max(el.scrollHeight - el.clientHeight, 0)
-      : Math.max(root.scrollHeight - window.innerHeight, 0);
+      if (documentScrollable <= 50) {
+        scroller = findScrollParent(anchorRef.current);
+        scrollerRef.current = scroller;
+      }
+    }
 
-    const scrollY = el
-      ? Math.max(el.scrollTop, 0)
-      : Math.max(window.scrollY || root.scrollTop || 0, 0);
-
-    const ratio =
-      scrollable > 0 ? Math.min(Math.max(scrollY / scrollable, 0), 1) : 0;
-
-    const percentage = Math.round(ratio * 100);
+    const metrics = getScrollMetrics(scroller);
+    const shouldShow =
+      metrics.scrollable > 100 && (!hideAtTop || metrics.scrollY > threshold);
 
     if (ringRef.current) {
-      ringRef.current.style.strokeDashoffset = String(100 - ratio * 100);
+      ringRef.current.style.strokeDashoffset = String(
+        100 - metrics.ratio * 100,
+      );
     }
 
     if (barRef.current) {
-      barRef.current.style.transform = `scaleX(${ratio})`;
+      barRef.current.style.transform = `scaleX(${metrics.ratio})`;
     }
 
-    if (lastProgressRef.current !== percentage) {
-      lastProgressRef.current = percentage;
-      setProgress(percentage);
+    if (lastProgressRef.current !== metrics.percentage) {
+      lastProgressRef.current = metrics.percentage;
+      setProgress(metrics.percentage);
     }
 
-    setAtTop(scrollY <= 2);
-    setAtEnd(scrollable > 0 && ratio >= 0.985);
+    if (lastAtTopRef.current !== metrics.atTop) {
+      lastAtTopRef.current = metrics.atTop;
+      setAtTop(metrics.atTop);
+    }
 
-    setVisible(scrollable > 100 && (!hideAtTop || scrollY > threshold));
+    if (lastAtEndRef.current !== metrics.atEnd) {
+      lastAtEndRef.current = metrics.atEnd;
+      setAtEnd(metrics.atEnd);
+    }
+
+    if (lastVisibleRef.current !== shouldShow) {
+      lastVisibleRef.current = shouldShow;
+      setVisible(shouldShow);
+
+      if (!shouldShow) {
+        setTooltipOpen(false);
+      }
+    }
 
     if (debug && !loggedRef.current) {
       loggedRef.current = true;
-      console.info("[ScrollToTop] Tracking:", el || "window");
+      console.info("[ScrollToTop] Tracking:", scroller || "document");
     }
   }, [debug, hideAtTop, threshold]);
+
+  const scheduleUpdate = useCallback(() => {
+    if (frameRef.current) return;
+
+    frameRef.current = window.requestAnimationFrame(updateProgress);
+  }, [updateProgress]);
+
+  /* -----------------------------------------------------
+     Event listeners — no polling interval
+  ----------------------------------------------------- */
 
   useEffect(() => {
     if (!mounted) return;
 
-    frameRef.current = 0;
-
-    const schedule = () => {
-      if (!frameRef.current) {
-        frameRef.current = window.requestAnimationFrame(updateProgress);
-      }
-    };
-
     const handleScroll = (event) => {
       const target = event.target;
 
-      const isRoot =
+      if (
         target === document ||
         target === document.documentElement ||
-        target === document.body;
-
-      if (isRoot) {
-        scrollerRef.current =
-          target === document.body &&
-          window.scrollY === 0 &&
-          document.body.scrollTop > 0
-            ? document.body
-            : null;
+        target === document.body
+      ) {
+        // Keep an existing non-window scroller if the document
+        // also dispatches scroll events.
+        if (!scrollerRef.current?.isConnected) {
+          scrollerRef.current = null;
+        }
       } else if (
         target instanceof HTMLElement &&
-        target.scrollHeight - target.clientHeight > 200 &&
+        target.scrollHeight - target.clientHeight > 100 &&
         target.clientHeight >= window.innerHeight * 0.5
       ) {
         scrollerRef.current = target;
-      } else {
-        return;
       }
 
-      schedule();
+      scheduleUpdate();
     };
 
-    schedule();
+    const handleResize = () => {
+      const current = scrollerRef.current;
 
-    const interval = window.setInterval(schedule, 500);
+      if (current && !current.isConnected) {
+        scrollerRef.current = null;
+      }
+
+      scheduleUpdate();
+    };
 
     document.addEventListener("scroll", handleScroll, {
       capture: true,
       passive: true,
     });
 
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule, { passive: true });
-    window.addEventListener("pageshow", schedule);
+    window.addEventListener("scroll", scheduleUpdate, {
+      passive: true,
+    });
+
+    window.addEventListener("resize", handleResize, {
+      passive: true,
+    });
+
+    window.addEventListener("pageshow", scheduleUpdate);
+
+    scheduleUpdate();
 
     return () => {
-      window.clearInterval(interval);
-
       document.removeEventListener("scroll", handleScroll, true);
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-      window.removeEventListener("pageshow", schedule);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("pageshow", scheduleUpdate);
 
       if (frameRef.current) {
         window.cancelAnimationFrame(frameRef.current);
@@ -202,30 +281,31 @@ export function ScrollToTop({
 
       if (timerRef.current) {
         window.clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
-  }, [mounted, updateProgress]);
+  }, [mounted, scheduleUpdate]);
 
-  // ONE button, ONE circle, dynamic direction.
-  // Top/upper page = down. Lower page/footer = up.
+  /* -----------------------------------------------------
+     Dynamic direction
+  ----------------------------------------------------- */
+
   const direction = atEnd || (!atTop && progress >= 50) ? "up" : "down";
 
   const isUp = direction === "up";
   const Icon = isUp ? ArrowUp : ArrowDown;
-  const accent = ACCENT;
+
+  /* -----------------------------------------------------
+     Scroll action
+  ----------------------------------------------------- */
 
   const go = useCallback(() => {
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-
-    const root = document.scrollingElement || document.documentElement;
-
-    const el = scrollerRef.current;
+    const scroller = scrollerRef.current;
+    const reduceMotion = prefersReducedMotion();
 
     const targetDirection = atEnd || (!atTop && progress >= 50) ? "up" : "down";
 
-    const targetTop = targetDirection === "up" ? 0 : Infinity;
+    const scrollToTop = targetDirection === "up";
     const behavior = reduceMotion ? "auto" : "smooth";
 
     setTooltipOpen(false);
@@ -240,100 +320,118 @@ export function ScrollToTop({
 
       timerRef.current = window.setTimeout(() => {
         setLaunch(false);
+        timerRef.current = null;
       }, 650);
     } else {
       setLaunch(false);
     }
 
-    if (el?.isConnected) {
-      el.scrollTo({
-        top: targetTop === 0 ? 0 : el.scrollHeight - el.clientHeight,
+    // Scroll exactly one target: the detected container OR
+    // the document, never both for the same click.
+    if (scroller?.isConnected) {
+      scroller.scrollTo({
+        top: scrollToTop ? 0 : scroller.scrollHeight - scroller.clientHeight,
+        behavior,
+      });
+    } else {
+      const root = document.scrollingElement || document.documentElement;
+
+      window.scrollTo({
+        top: scrollToTop ? 0 : root.scrollHeight,
         behavior,
       });
     }
 
-    window.scrollTo({
-      top: targetTop === 0 ? 0 : root.scrollHeight,
-      behavior,
-    });
-
-    if (targetDirection === "up") {
+    if (scrollToTop) {
       onScrollToTop?.();
     } else {
       onScrollToBottom?.();
     }
   }, [atEnd, atTop, progress, onScrollToTop, onScrollToBottom]);
 
+  /* -----------------------------------------------------
+     Pointer tilt
+  ----------------------------------------------------- */
+
   const handlePointerMove = useCallback((event) => {
-    if (
-      event.pointerType !== "mouse" ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (event.pointerType !== "mouse" || prefersReducedMotion()) {
       return;
     }
 
-    const el = buttonRef.current;
-    if (!el) return;
+    const button = buttonRef.current;
+    if (!button) return;
 
-    const rect = el.getBoundingClientRect();
+    const rect = button.getBoundingClientRect();
+
     if (!rect.width || !rect.height) return;
 
     const x = (event.clientX - rect.left) / rect.width - 0.5;
     const y = (event.clientY - rect.top) / rect.height - 0.5;
 
-    el.style.setProperty("--tilt-x", `${-y * 14}deg`);
-    el.style.setProperty("--tilt-y", `${x * 14}deg`);
+    button.style.setProperty("--tilt-x", `${-y * 10}deg`);
+    button.style.setProperty("--tilt-y", `${x * 10}deg`);
   }, []);
 
   const resetTilt = useCallback(() => {
-    const el = buttonRef.current;
-    if (!el) return;
+    const button = buttonRef.current;
+    if (!button) return;
 
-    el.style.setProperty("--tilt-x", "0deg");
-    el.style.setProperty("--tilt-y", "0deg");
+    button.style.setProperty("--tilt-x", "0deg");
+    button.style.setProperty("--tilt-y", "0deg");
   }, []);
 
-  if (!mounted) {
-    return (
-      <span ref={anchorRef} aria-hidden="true" style={{ display: "none" }} />
-    );
-  }
+  /* -----------------------------------------------------
+     Tooltip accessibility
+  ----------------------------------------------------- */
 
-  const anchor = (
-    <span ref={anchorRef} aria-hidden="true" style={{ display: "none" }} />
-  );
+  const handleFocus = useCallback(() => {
+    setTooltipOpen(true);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setTooltipOpen(false);
+    resetTilt();
+  }, [resetTilt]);
+
+  /* -----------------------------------------------------
+     SSR-safe render
+  ----------------------------------------------------- */
+
+  if (!mounted) {
+    return <span ref={anchorRef} aria-hidden="true" className="hidden" />;
+  }
 
   const ui = (
     <>
       <style>{`
         @keyframes st-circle-in {
           from {
-            transform: scale(.72) rotate(-24deg);
+            transform: scale(.78);
             opacity: 0;
           }
           to {
-            transform: scale(1) rotate(0);
+            transform: scale(1);
             opacity: 1;
           }
         }
 
         @keyframes st-icon-up {
           0% { transform: translateY(0); opacity: 1; }
-          45% { transform: translateY(-12px); opacity: 0; }
-          46% { transform: translateY(12px); opacity: 0; }
+          45% { transform: translateY(-10px); opacity: 0; }
+          46% { transform: translateY(10px); opacity: 0; }
           100% { transform: translateY(0); opacity: 1; }
         }
 
         @keyframes st-icon-down {
           0% { transform: translateY(0); opacity: 1; }
-          45% { transform: translateY(12px); opacity: 0; }
-          46% { transform: translateY(-12px); opacity: 0; }
+          45% { transform: translateY(10px); opacity: 0; }
+          46% { transform: translateY(-10px); opacity: 0; }
           100% { transform: translateY(0); opacity: 1; }
         }
 
         @keyframes st-ripple {
-          0% { transform: scale(.6); opacity: .8; }
-          100% { transform: scale(2.25); opacity: 0; }
+          0% { transform: scale(.65); opacity: .8; }
+          100% { transform: scale(2.1); opacity: 0; }
         }
 
         @keyframes st-particle {
@@ -350,42 +448,41 @@ export function ScrollToTop({
         .st-circle {
           --tilt-x: 0deg;
           --tilt-y: 0deg;
-          cursor: pointer;
+          background: ${GRAY};
+          box-shadow: 0 6px 18px rgba(0,0,0,.24);
           transform:
             perspective(600px)
             rotateX(var(--tilt-x))
             rotateY(var(--tilt-y));
           transform-style: preserve-3d;
-          background: ${GRAY};
-          box-shadow: 0 6px 18px rgba(0,0,0,.35);
-          animation: st-circle-in .45s cubic-bezier(.2,.8,.2,1) both;
+          animation: st-circle-in .35s ease-out both;
           transition:
-            transform .22s ease,
-            border-color .22s ease,
-            box-shadow .25s ease,
-            background .22s ease;
+            transform .2s ease,
+            border-color .2s ease,
+            box-shadow .2s ease,
+            background .2s ease;
         }
 
         .st-circle:hover {
           border-color: ${ACCENT};
           background: ${GRAY_HOVER};
-          box-shadow: 0 8px 22px rgba(0,0,0,.4);
+          box-shadow: 0 8px 22px rgba(0,0,0,.32);
         }
 
         .st-circle:active {
-          transform: perspective(600px) scale(.94);
+          transform: perspective(600px) scale(.95);
         }
 
         .st-circle-depth {
-          transform: translateZ(12px);
+          transform: translateZ(8px);
         }
 
         .st-circle-icon-up {
-          animation: st-icon-up .55s ease-in-out;
+          animation: st-icon-up .45s ease-in-out;
         }
 
         .st-circle-icon-down {
-          animation: st-icon-down .55s ease-in-out;
+          animation: st-icon-down .45s ease-in-out;
         }
 
         .st-circle-ripple {
@@ -399,34 +496,36 @@ export function ScrollToTop({
         @media (prefers-reduced-motion: reduce) {
           .st-circle,
           .st-circle:hover,
-          .st-circle:active {
-            animation: none !important;
-            transition: none !important;
-            transform: none !important;
-          }
-
+          .st-circle:active,
           .st-circle-icon-up,
           .st-circle-icon-down,
           .st-circle-ripple,
           .st-circle-particle {
             animation: none !important;
+            transition: none !important;
+            transform: none !important;
           }
         }
       `}</style>
 
+      {/* Top progress bar */}
       {showTopBar && (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 top-0 z-[9998] h-1 bg-white/5"
+          className="pointer-events-none fixed inset-x-0 top-0 z-[9998] h-1 bg-black/5 dark:bg-white/5"
         >
           <div
             ref={barRef}
             className="h-full origin-left"
-            style={{ background: ACCENT, transform: "scaleX(0)" }}
+            style={{
+              background: ACCENT,
+              transform: "scaleX(0)",
+            }}
           />
         </div>
       )}
 
+      {/* Floating action */}
       <div
         className="fixed z-[9999] flex flex-col items-center gap-2"
         style={{
@@ -435,22 +534,23 @@ export function ScrollToTop({
           opacity: visible ? 1 : 0,
           transform: visible ? "translateY(0)" : "translateY(12px)",
           pointerEvents: visible ? "auto" : "none",
-          transition: "opacity .25s ease, transform .25s ease",
+          transition: "opacity .22s ease, transform .22s ease",
         }}
         onMouseEnter={() => setTooltipOpen(true)}
         onMouseLeave={() => setTooltipOpen(false)}
-        onFocusCapture={() => setTooltipOpen(true)}
+        onFocusCapture={handleFocus}
         onBlurCapture={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) {
-            setTooltipOpen(false);
+            handleBlur();
           }
         }}
       >
-        {showLabel && visible && (
+        {showLabel && (
           <span
+            aria-hidden="true"
             className="rounded-full border px-3 py-1.5 text-xs font-extrabold tabular-nums tracking-wide shadow-xl"
             style={{
-              borderColor: `${accent}80`,
+              borderColor: `${ACCENT}80`,
               background: GRAY,
               color: TEXT_COLOR,
             }}
@@ -460,11 +560,11 @@ export function ScrollToTop({
         )}
 
         <div className="relative" style={{ width: size, height: size }}>
-          {/* Soft outer ring */}
+          {/* Outer accent ring */}
           <span
             aria-hidden="true"
             className="pointer-events-none absolute -inset-1 rounded-full border"
-            style={{ borderColor: `${accent}55` }}
+            style={{ borderColor: `${ACCENT}55` }}
           />
 
           <button
@@ -475,42 +575,45 @@ export function ScrollToTop({
             onPointerLeave={resetTilt}
             aria-label={
               isUp
-                ? `Scroll to top, ${progress}% down the page`
-                : `Scroll to bottom, ${progress}% down the page`
+                ? `Scroll to top. ${progress}% page progress`
+                : `Scroll to bottom. ${progress}% page progress`
             }
             aria-hidden={!visible}
             tabIndex={visible ? 0 : -1}
-            title={isUp ? "Back to top" : "Scroll to bottom"}
             className={cn(
-              "st-circle group relative flex size-full cursor-pointer items-center justify-center rounded-full border-2 text-white outline-none",
-              "focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-[#09090f]",
+              "st-circle group relative flex size-full",
+              "items-center justify-center rounded-full border-2",
+              "text-white outline-none",
+              "focus-visible:ring-2 focus-visible:ring-offset-4",
+              "focus-visible:ring-offset-background",
             )}
             style={{
-              borderColor: `${accent}B3`,
+              borderColor: `${ACCENT}B3`,
               "--tw-ring-color": ACCENT,
             }}
           >
-            {/* Circular scroll progress */}
+            {/* Progress ring */}
             <svg
               aria-hidden="true"
               viewBox="0 0 64 64"
-              className="pointer-events-none absolute inset-0 size-full -rotate-90 overflow-visible"
+              className="pointer-events-none absolute inset-0 size-full -rotate-90"
             >
               <circle
                 cx="32"
                 cy="32"
                 r="28"
                 fill="none"
-                stroke="rgba(255,255,255,.07)"
+                stroke="rgba(255,255,255,.12)"
                 strokeWidth="2"
               />
+
               <circle
                 ref={ringRef}
                 cx="32"
                 cy="32"
                 r="28"
                 fill="none"
-                stroke={accent}
+                stroke={ACCENT}
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 pathLength="100"
@@ -519,33 +622,33 @@ export function ScrollToTop({
               />
             </svg>
 
-            {/* Click ripple */}
+            {/* Ripple */}
             {launch && (
               <span
                 key={`ripple-${burstKey}`}
                 aria-hidden="true"
                 className="st-circle-ripple pointer-events-none absolute inset-2 rounded-full border-2"
-                style={{ borderColor: accent }}
+                style={{ borderColor: ACCENT }}
               />
             )}
 
-            {/* Tiny particles */}
+            {/* Particles */}
             {launch && (
               <span
                 key={`particles-${burstKey}`}
                 aria-hidden="true"
                 className="pointer-events-none absolute left-1/2 top-1/2"
               >
-                {Array.from({ length: 8 }, (_, i) => {
-                  const angle = (i / 8) * Math.PI * 2;
-                  const distance = 26;
+                {Array.from({ length: 8 }, (_, index) => {
+                  const angle = (index / 8) * Math.PI * 2;
+                  const distance = 25;
 
                   return (
                     <span
-                      key={i}
+                      key={index}
                       className="st-circle-particle absolute -ml-1 -mt-1 size-2 rounded-full"
                       style={{
-                        background: accent,
+                        background: ACCENT,
                         "--px": `${Math.cos(angle) * distance}px`,
                         "--py": `${Math.sin(angle) * distance}px`,
                       }}
@@ -555,13 +658,14 @@ export function ScrollToTop({
               </span>
             )}
 
-            <span className="st-circle-depth relative flex flex-col items-center justify-center">
+            <span className="st-circle-depth relative flex items-center justify-center">
               <Icon
                 key={direction}
                 aria-hidden="true"
                 strokeWidth={2.8}
                 className={cn(
-                  "size-6 transition-colors duration-200 group-hover:scale-110",
+                  "size-6 transition-transform duration-200",
+                  "group-hover:scale-110",
                   launch &&
                     (isUp ? "st-circle-icon-up" : "st-circle-icon-down"),
                 )}
@@ -576,16 +680,16 @@ export function ScrollToTop({
               role="tooltip"
               aria-hidden={!tooltipOpen || !visible}
               className={cn(
-                "pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 whitespace-nowrap rounded-xl border px-3.5 py-2 shadow-2xl",
+                "pointer-events-none absolute top-1/2 z-10",
+                "-translate-y-1/2 whitespace-nowrap rounded-xl border",
+                "px-3.5 py-2 shadow-2xl",
                 "transition-[opacity,transform] duration-200",
                 "motion-reduce:transition-none",
                 side === "left" ? "left-full ml-3" : "right-full mr-3",
-                tooltipOpen && visible
-                  ? "translate-y-[-50%] opacity-100"
-                  : "translate-y-[-45%] opacity-0",
+                tooltipOpen && visible ? "opacity-100" : "opacity-0",
               )}
               style={{
-                borderColor: `${accent}55`,
+                borderColor: `${ACCENT}55`,
                 background: GRAY,
               }}
             >
@@ -595,6 +699,7 @@ export function ScrollToTop({
               >
                 {isUp ? "BACK TO TOP" : "GO TO BOTTOM"}
               </div>
+
               <div
                 className="mt-1 text-[11px] font-bold"
                 style={{ color: TEXT_COLOR }}
@@ -610,10 +715,13 @@ export function ScrollToTop({
 
   return (
     <>
-      {anchor}
+      <span ref={anchorRef} aria-hidden="true" className="hidden" />
+
       {createPortal(ui, document.body)}
     </>
   );
-}
+});
+
+ScrollToTop.displayName = "ScrollToTop";
 
 export default ScrollToTop;

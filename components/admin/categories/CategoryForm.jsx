@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { TextField } from "@/components/shared/TextField";
+import { CategoryIcon } from "@/components/shared/CategoryIcon";
 import {
   CharCount,
   FormFooter,
@@ -34,6 +35,81 @@ const defaults = (c) => ({
   seoTitle: c?.seoTitle ?? "",
   seoDescription: c?.seoDescription ?? "",
 });
+
+// Full class strings so Tailwind can see them (same palette the public cards use).
+const ACCENT_CLASSES = {
+  rose: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  sky: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  green: "bg-green-500/10 text-green-600 dark:text-green-400",
+  amber: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+  violet: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  purple: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+  indigo: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+  pink: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
+  teal: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+  cyan: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+};
+const accentClass = (name) =>
+  ACCENT_CLASSES[String(name ?? "").toLowerCase()] ??
+  "bg-primary/10 text-primary";
+
+// A rough picture of how the category appears on cards, updating as you edit
+// the name, description, icon and accent.
+function CategoryPreview({ name, description, icon, accent }) {
+  return (
+    <div
+      className="rounded-lg border border-border bg-card p-4"
+      role="group"
+      aria-label="Card preview"
+    >
+      <p className="text-xs font-medium text-muted-foreground">Card preview</p>
+      <div className="mt-3 flex items-start gap-3">
+        <span
+          className={`grid size-10 shrink-0 place-items-center rounded-lg ${accentClass(accent)}`}
+        >
+          <CategoryIcon name={icon} className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate font-medium text-foreground">
+            {name || "Category name"}
+          </p>
+          <p className="mt-0.5 line-clamp-2 text-sm leading-6 text-muted-foreground">
+            {description || "The description appears here."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// How the page will read in search results, using the same fallbacks as the
+// live page (SEO title -> "{name} courses", SEO description -> description).
+function SeoPreview({ title, description, slug }) {
+  return (
+    <div
+      className="rounded-lg border border-border bg-card p-4"
+      role="group"
+      aria-label="Search result preview"
+    >
+      <p className="text-xs font-medium text-muted-foreground">
+        Search result preview
+      </p>
+      <p className="mt-2 truncate text-xs text-muted-foreground">
+        /categories/{slug || "category-slug"}
+      </p>
+      <p className="mt-0.5 line-clamp-2 text-base font-medium leading-snug text-primary">
+        {title || "Page title appears here"}
+      </p>
+      <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
+        {description ||
+          "The SEO description, or the description, appears here."}
+      </p>
+    </div>
+  );
+}
 
 export function CategoryForm({ record = null }) {
   const router = useRouter();
@@ -75,9 +151,13 @@ export function CategoryForm({ record = null }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [isDirty, isSubmitting, isSubmitSuccessful]);
 
-  // Ctrl/Cmd+S saves. The ref keeps the listener pointing at the latest handler.
+  // Ctrl/Cmd+S saves. The ref keeps the listener pointing at the latest handler,
+  // and a save already in progress is not started twice.
   const submitRef = useRef(null);
-  submitRef.current = form.handleSubmit(onSubmit);
+  submitRef.current = () => {
+    if (form.formState.isSubmitting) return;
+    return form.handleSubmit(onSubmit)();
+  };
   useEffect(() => {
     const onKey = (event) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
@@ -89,8 +169,11 @@ export function CategoryForm({ record = null }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const name = form.watch("name");
   const slug = form.watch("slug")?.trim();
   const description = form.watch("description");
+  const icon = form.watch("icon");
+  const accent = form.watch("accent");
   const seoTitle = form.watch("seoTitle");
   const seoDescription = form.watch("seoDescription");
 
@@ -151,6 +234,12 @@ export function CategoryForm({ record = null }) {
             options={ACCENTS}
           />
         </div>
+        <CategoryPreview
+          name={name?.trim()}
+          description={description?.trim()}
+          icon={icon}
+          accent={accent}
+        />
         <ImageField
           control={form.control}
           name="image"
@@ -197,6 +286,13 @@ export function CategoryForm({ record = null }) {
               <CharCount value={seoDescription} max={160} />
             </>
           }
+        />
+        <SeoPreview
+          title={
+            seoTitle?.trim() || (name?.trim() ? `${name.trim()} courses` : "")
+          }
+          description={seoDescription?.trim() || description?.trim()}
+          slug={slug}
         />
       </FormSection>
       <FormFooter

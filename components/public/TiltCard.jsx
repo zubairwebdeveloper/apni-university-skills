@@ -7,9 +7,15 @@
 // and for touch / coarse pointers, and the content stays fully usable either way.
 import { useEffect, useRef } from "react";
 
-export function TiltCard({ children, className = "", max = 10 }) {
+export function TiltCard({
+  children,
+  className = "",
+  max = 10,
+  glare = false,
+}) {
   const outerRef = useRef(null);
   const innerRef = useRef(null);
+  const glareRef = useRef(null);
 
   useEffect(() => {
     const outer = outerRef.current;
@@ -31,6 +37,17 @@ export function TiltCard({ children, className = "", max = 10 }) {
       frame = requestAnimationFrame(() => {
         inner.style.setProperty("--ry", `${(x * max).toFixed(2)}deg`);
         inner.style.setProperty("--rx", `${(-y * max).toFixed(2)}deg`);
+        if (glareRef.current) {
+          glareRef.current.style.setProperty(
+            "--gx",
+            `${((x + 0.5) * 100).toFixed(1)}%`,
+          );
+          glareRef.current.style.setProperty(
+            "--gy",
+            `${((y + 0.5) * 100).toFixed(1)}%`,
+          );
+          glareRef.current.style.setProperty("--go", "1");
+        }
       });
     };
 
@@ -38,6 +55,7 @@ export function TiltCard({ children, className = "", max = 10 }) {
       cancelAnimationFrame(frame);
       inner.style.setProperty("--ry", "0deg");
       inner.style.setProperty("--rx", "0deg");
+      glareRef.current?.style.setProperty("--go", "0");
     };
 
     outer.addEventListener("pointermove", onMove);
@@ -60,6 +78,18 @@ export function TiltCard({ children, className = "", max = 10 }) {
         }}
       >
         {children}
+        {glare && (
+          <div
+            ref={glareRef}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-[inherit] transition-opacity duration-200"
+            style={{
+              opacity: "var(--go, 0)",
+              background:
+                "radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), hsl(var(--foreground) / 0.12), transparent 55%)",
+            }}
+          />
+        )}
       </div>
     </div>
   );

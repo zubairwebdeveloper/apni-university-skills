@@ -5,14 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MotionConfig, Reorder, useDragControls } from "framer-motion";
 import {
+  FiAlertCircle,
   FiArrowDown,
   FiArrowUp,
+  FiBookOpen,
   FiChevronDown,
   FiChevronRight,
   FiEdit2,
   FiEye,
+  FiLoader,
   FiMenu,
   FiPlus,
+  FiTrash2,
 } from "react-icons/fi";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +57,7 @@ const minutesOf = (lessons) =>
 
 function LessonRow({
   lesson,
+  index,
   courseSlug,
   perms,
   dirty,
@@ -73,21 +78,33 @@ function LessonRow({
       value={lesson}
       dragListener={false}
       dragControls={controls}
-      className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2"
+      whileDrag={{
+        scale: 1.01,
+        boxShadow: "0 10px 28px -10px rgb(0 0 0 / 0.35)",
+      }}
+      className="relative flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2.5 motion-safe:transition-colors motion-safe:duration-150 hover:bg-muted/30"
     >
       {canEdit && (
         <button
           type="button"
-          className="cursor-grab touch-none rounded p-1.5 text-muted-foreground hover:bg-accent active:cursor-grabbing"
+          className="cursor-grab touch-none rounded-md p-1.5 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60 active:cursor-grabbing"
           aria-label={`Drag to reorder ${lesson.title}`}
           onPointerDown={(e) => controls.start(e)}
         >
           <FiMenu aria-hidden="true" />
         </button>
       )}
+      <span
+        aria-hidden="true"
+        className="grid size-6 shrink-0 place-items-center rounded-md bg-muted text-xs font-medium tabular-nums text-muted-foreground"
+      >
+        {index + 1}
+      </span>
       <div className="min-w-0 flex-1 basis-48">
-        <p className="truncate text-sm font-medium">{lesson.title}</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="truncate text-sm font-medium leading-snug">
+          {lesson.title}
+        </p>
+        <p className="text-xs tabular-nums text-muted-foreground">
           {formatDuration(lesson.duration)}
         </p>
       </div>
@@ -261,11 +278,21 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
 
   if (!sections.length && !trash.length)
     return (
-      <Card className="items-center gap-3 p-10 text-center">
-        <h2 className="text-lg">No lessons yet</h2>
-        <p className="text-sm text-muted-foreground">
-          Add the first lesson to start building the curriculum.
-        </p>
+      <Card className="items-center gap-4 p-10 text-center shadow-sm">
+        <span
+          aria-hidden="true"
+          className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground"
+        >
+          <FiBookOpen className="size-5" />
+        </span>
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight">
+            No lessons yet
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Add the first lesson to start building the curriculum.
+          </p>
+        </div>
         {perms.includes("lessons.create") && (
           <Link
             href={`/admin/lessons/create?course=${course.slug}`}
@@ -293,10 +320,16 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
     <MotionConfig reducedMotion="user">
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted-foreground">
-            {sections.length} {sections.length === 1 ? "section" : "sections"}
+          <p className="text-sm tabular-nums text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {sections.length}
+            </span>{" "}
+            {sections.length === 1 ? "section" : "sections"}
             <span aria-hidden="true"> · </span>
-            {allLessons.length} {allLessons.length === 1 ? "lesson" : "lessons"}
+            <span className="font-medium text-foreground">
+              {allLessons.length}
+            </span>{" "}
+            {allLessons.length === 1 ? "lesson" : "lessons"}
             {totalMinutes > 0 && (
               <>
                 <span aria-hidden="true"> · </span>
@@ -331,10 +364,20 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
 
         {canEdit && (
           <div
-            className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-sm"
+            className={cn(
+              "flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm shadow-sm motion-safe:transition-colors motion-safe:duration-200",
+              dirty ? "border-[#FACC15]/50 bg-[#FACC15]/5" : "bg-card",
+            )}
             role="status"
           >
-            <p className="flex-1 text-muted-foreground">
+            <span
+              aria-hidden="true"
+              className={cn(
+                "size-2 shrink-0 rounded-full",
+                dirty ? "bg-[#FACC15]" : "bg-muted-foreground/40",
+              )}
+            />
+            <p className="min-w-0 flex-1 basis-60 text-muted-foreground">
               {dirty
                 ? "You have unsaved order changes. Lesson actions are hidden until you save or discard. Press Ctrl+S (Cmd+S on Mac) to save."
                 : "Drag the handle or use the arrows to reorder. Empty sections are removed when you save."}
@@ -352,15 +395,29 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
               type="button"
               size="sm"
               disabled={!dirty || saving}
+              aria-busy={saving}
               onClick={save}
             >
+              {saving && (
+                <FiLoader
+                  className="motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+              )}
               {saving ? "Saving…" : "Save order"}
             </Button>
           </div>
         )}
 
         {canEdit && hasDuplicateNames && (
-          <p role="alert" className="text-sm font-medium text-destructive">
+          <p
+            role="alert"
+            className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-2.5 text-sm font-medium text-destructive"
+          >
+            <FiAlertCircle
+              className="mt-0.5 size-4 shrink-0"
+              aria-hidden="true"
+            />
             Two sections have the same name. Lessons in sections that share a
             name are grouped together, so give each section its own name.
           </p>
@@ -370,8 +427,13 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
           const isCollapsed = collapsed.has(s.key);
           const sectionMinutes = minutesOf(s.lessons);
           return (
-            <Card key={s.key} className="gap-3 p-4">
-              <div className="flex flex-wrap items-center gap-2">
+            <Card key={s.key} className="gap-4 p-4 shadow-sm sm:p-5">
+              <div
+                className={cn(
+                  "flex flex-wrap items-center gap-2",
+                  !isCollapsed && "border-b pb-4",
+                )}
+              >
                 <Button
                   type="button"
                   variant="ghost"
@@ -387,6 +449,12 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
                     <FiChevronDown aria-hidden="true" />
                   )}
                 </Button>
+                <span
+                  aria-hidden="true"
+                  className="grid size-7 shrink-0 place-items-center rounded-md bg-primary/10 text-xs font-semibold tabular-nums text-primary ring-1 ring-primary/15"
+                >
+                  {si + 1}
+                </span>
                 {canEdit ? (
                   <Input
                     value={s.title}
@@ -398,9 +466,11 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
                     className="min-w-0 flex-1 basis-48 font-medium"
                   />
                 ) : (
-                  <h2 className="flex-1 text-base font-medium">{s.title}</h2>
+                  <h2 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">
+                    {s.title}
+                  </h2>
                 )}
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {s.lessons.length}{" "}
                   {s.lessons.length === 1 ? "lesson" : "lessons"}
                   {sectionMinutes > 0 && (
@@ -437,6 +507,11 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
                   </>
                 )}
               </div>
+              {!isCollapsed && s.lessons.length === 0 && (
+                <p className="rounded-lg border border-dashed bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground">
+                  No lessons in this section. It is removed when you save.
+                </p>
+              )}
               {!isCollapsed && s.lessons.length > 0 && (
                 <Reorder.Group
                   as="ul"
@@ -449,6 +524,7 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
                     <LessonRow
                       key={l.id}
                       lesson={l}
+                      index={li}
                       courseSlug={course.slug}
                       perms={perms}
                       dirty={dirty}
@@ -481,13 +557,22 @@ export function CurriculumBuilder({ course, initialSections, trash, perms }) {
         })}
 
         {trash.length > 0 && !dirty && (
-          <Card className="gap-3 p-4">
-            <h2 className="text-base font-medium">Trash</h2>
+          <Card className="gap-3 p-4 shadow-sm sm:p-5">
+            <div className="flex items-center gap-2 border-b pb-3">
+              <FiTrash2
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <h2 className="text-base font-semibold tracking-tight">Trash</h2>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                ({trash.length})
+              </span>
+            </div>
             <ul className="space-y-2">
               {trash.map((l) => (
                 <li
                   key={l.id}
-                  className="flex items-center gap-3 rounded-lg border p-2 text-sm"
+                  className="flex items-center gap-3 rounded-lg border bg-muted/20 p-2.5 text-sm"
                 >
                   <span className="min-w-0 flex-1 truncate text-muted-foreground">
                     {l.title}

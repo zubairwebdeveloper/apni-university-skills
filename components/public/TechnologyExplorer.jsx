@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { FiCpu, FiSearch, FiX } from "react-icons/fi";
+import { FiChevronDown, FiCpu, FiSearch, FiX } from "react-icons/fi";
 
 import { TechnologyCard } from "@/components/public/TechnologyCard";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -18,6 +18,8 @@ const SORTS = [
   { value: "default", label: "Recommended" },
   { value: "az", label: "A to Z" },
 ];
+
+const EASE = [0.22, 1, 0.36, 1];
 
 export function TechnologyExplorer({ items = [] }) {
   const reduce = useReducedMotion();
@@ -79,12 +81,17 @@ export function TechnologyExplorer({ items = [] }) {
   return (
     <div>
       {/* Toolbar */}
-      <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 12 }}
+        animate={reduce ? undefined : { opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: EASE }}
+        className="rounded-2xl border bg-card p-4 shadow-sm transition-shadow sm:p-5"
+      >
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative flex-1">
+          <div className="group relative flex-1">
             <FiSearch
               aria-hidden="true"
-              className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary"
             />
             <input
               type="search"
@@ -92,7 +99,7 @@ export function TechnologyExplorer({ items = [] }) {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search technologies, e.g. cloud, security, data"
               aria-label="Search technologies"
-              className="h-11 w-full rounded-xl border bg-background pl-10 pr-10 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-10 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:shadow-sm focus-visible:ring-2 focus-visible:ring-ring"
             />
             {query && (
               <button
@@ -106,7 +113,7 @@ export function TechnologyExplorer({ items = [] }) {
             )}
           </div>
 
-          <div>
+          <div className="relative">
             <label className="sr-only" htmlFor="tech-sort">
               Sort technologies
             </label>
@@ -114,7 +121,7 @@ export function TechnologyExplorer({ items = [] }) {
               id="tech-sort"
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-auto"
+              className="h-11 w-full appearance-none rounded-xl border bg-background px-3 pr-9 text-sm outline-none transition-shadow focus-visible:shadow-sm focus-visible:ring-2 focus-visible:ring-ring md:w-auto"
             >
               {SORTS.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -122,43 +129,54 @@ export function TechnologyExplorer({ items = [] }) {
                 </option>
               ))}
             </select>
+            <FiChevronDown
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
           </div>
         </div>
 
         {categories.length > 2 && (
-          <div
-            className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]"
-            role="group"
-            aria-label="Filter by category"
-          >
-            {categories.map((c) => {
-              const active = category === c.name;
-              return (
-                <button
-                  key={c.name}
-                  type="button"
-                  onClick={() => setCategory(c.name)}
-                  aria-pressed={active}
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all duration-200 ${
-                    active
-                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                      : "bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  }`}
-                >
-                  {c.name}
-                  <span
-                    className={`rounded-full px-1.5 text-xs ${
-                      active ? "bg-primary-foreground/20" : "bg-muted"
+          <div className="relative mt-4">
+            <div
+              className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]"
+              role="group"
+              aria-label="Filter by category"
+            >
+              {categories.map((c) => {
+                const active = category === c.name;
+                return (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => setCategory(c.name)}
+                    aria-pressed={active}
+                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all duration-200 ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : "bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
                     }`}
                   >
-                    {c.count}
-                  </span>
-                </button>
-              );
-            })}
+                    {c.name}
+                    <span
+                      className={`rounded-full px-1.5 text-xs ${
+                        active ? "bg-primary-foreground/20" : "bg-muted"
+                      }`}
+                    >
+                      {c.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {/* Edge fade hints the row scrolls, matches SectionNav */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent"
+            />
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Result meta */}
       <div
@@ -176,7 +194,7 @@ export function TechnologyExplorer({ items = [] }) {
           <button
             type="button"
             onClick={clearFilters}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
           >
             <FiX aria-hidden="true" className="size-3.5" />
             Clear filters
@@ -198,7 +216,11 @@ export function TechnologyExplorer({ items = [] }) {
                 initial={reduce ? false : { opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.3) }}
+                transition={{
+                  duration: 0.3,
+                  delay: Math.min(i * 0.04, 0.3),
+                  ease: EASE,
+                }}
                 className="min-w-0"
               >
                 <TechnologyCard technology={t} />
@@ -207,7 +229,12 @@ export function TechnologyExplorer({ items = [] }) {
           </AnimatePresence>
         </motion.div>
       ) : (
-        <div className="mt-5 rounded-2xl border border-dashed bg-card/50 p-10 text-center">
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 8 }}
+          animate={reduce ? undefined : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: EASE }}
+          className="mt-5 rounded-2xl border border-dashed bg-card/50 p-10 text-center"
+        >
           <span className="mx-auto grid size-12 place-items-center rounded-xl bg-primary/10 text-primary">
             <FiSearch aria-hidden="true" className="size-5" />
           </span>
@@ -224,7 +251,7 @@ export function TechnologyExplorer({ items = [] }) {
           >
             Reset filters
           </button>
-        </div>
+        </motion.div>
       )}
     </div>
   );

@@ -2,6 +2,7 @@
 // the dialog stays open (and the button disabled) while the async action runs.
 "use client";
 import { useState } from "react";
+import { FiAlertTriangle, FiLoader } from "react-icons/fi";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -12,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function ConfirmDialog({
   open,
@@ -36,7 +38,14 @@ export function ConfirmDialog({
     <AlertDialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogTitle className="flex items-center gap-2.5">
+            {destructive && (
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-destructive/10 text-destructive">
+                <FiAlertTriangle aria-hidden="true" className="size-4" />
+              </span>
+            )}
+            {title}
+          </AlertDialogTitle>
           {description && (
             <AlertDialogDescription>{description}</AlertDialogDescription>
           )}
@@ -48,7 +57,11 @@ export function ConfirmDialog({
             variant={destructive ? "destructive" : "default"}
             onClick={go}
             disabled={busy}
+            className={cn("gap-2", busy && "cursor-wait")}
           >
+            {busy && (
+              <FiLoader aria-hidden="true" className="size-4 animate-spin" />
+            )}
             {busy ? "Working…" : confirmLabel}
           </Button>
         </AlertDialogFooter>
@@ -56,4 +69,3 @@ export function ConfirmDialog({
     </AlertDialog>
   );
 }
-

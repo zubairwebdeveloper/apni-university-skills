@@ -1,17 +1,20 @@
+// components/student/StudyStreak.jsx
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { FiCheck, FiZap } from "react-icons/fi";
+import { CalendarDays, Check, Trophy, Zap } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-
-const ACCENT = "#ef07a2";
-const ACCENT_2 = "#7c3aed";
 
 const STORAGE_KEY = "student-study-days";
 const CHANGE_EVENT = "student-study-days-change";
 const DAY_MS = 86_400_000;
+const MILESTONES = [3, 7, 14, 30, 60, 100];
+
+/* Design tokens: yellow = progress / key action, violet = today / selected */
+const FOCUS =
+  "outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /* -------------------------------------------------------------------------- */
 /* localStorage external store                                                */
@@ -154,12 +157,40 @@ function getMessage(streak, doneToday) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Small pieces                                                               */
+/* -------------------------------------------------------------------------- */
+
+function StatTile({ icon: Icon, label, value, iconClass }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5">
+      <span
+        className={cn(
+          "grid size-7 shrink-0 place-items-center rounded-lg bg-background",
+          iconClass,
+        )}
+      >
+        <Icon aria-hidden="true" className="size-3.5" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-bold leading-none tabular-nums">
+          {value}
+        </span>
+        <span className="mt-1 block truncate text-[10px] font-medium text-muted-foreground">
+          {label}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Component                                                                  */
 /* -------------------------------------------------------------------------- */
 
 export function StudyStreak() {
   const reduceMotion = useReducedMotion();
   const mounted = useMounted();
+  const [, setTick] = useState(0);
 
   const savedDays = useSyncExternalStore(
     subscribe,
@@ -198,6 +229,40 @@ export function StudyStreak() {
 
   const best = mounted ? bestStreak(days) : 0;
 
+  /* Re-evaluate when the day changes while the page stays open
+     (at midnight, or when the tab regains focus). */
+  useEffect(() => {
+    if (!mounted) return undefined;
+
+    const bump = () => setTick((value) => value + 1);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") bump();
+    };
+
+    const now = new Date();
+    const nextMidnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+      0,
+      0,
+      1,
+    );
+    const timer = window.setTimeout(
+      bump,
+      nextMidnight.getTime() - now.getTime(),
+    );
+
+    window.addEventListener("focus", bump);
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", bump);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [mounted, today]);
+
   /* ---------------------------------------------------------------------- */
   /* Last 7 days                                                            */
   /* ---------------------------------------------------------------------- */
@@ -232,20 +297,51 @@ export function StudyStreak() {
     }
 
     return result;
-  }, [mounted]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, today]);
+
+  const thisWeek = mounted
+    ? week.filter((day) => daysSet.has(day.key)).length
+    : 0;
+
+  /* Next milestone, derived from the real streak */
+  const nextMilestone = MILESTONES.find((value) => value > streak) ?? null;
+  const milestoneProgress = nextMilestone
+    ? Math.min(100, (streak / nextMilestone) * 100)
+    : 100;
+
+  /* Status badge */
+  const status = !mounted
+    ? null
+    : doneToday
+      ? {
+          label: "Done today",
+          tone: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+        }
+      : streak > 0
+        ? {
+            label: "At risk today",
+            tone: "border-[#FACC15]/40 bg-[#FACC15]/10 text-amber-700 dark:text-[#FACC15]",
+          }
+        : {
+            label: "Not started",
+            tone: "border-border bg-muted/60 text-muted-foreground",
+          };
 
   /* ---------------------------------------------------------------------- */
   /* Toggle today's study status                                            */
   /* ---------------------------------------------------------------------- */
 
   function toggleToday() {
-    if (!mounted || !today) {
+    if (!mounted) {
       return;
     }
 
-    const nextDays = days.includes(today)
-      ? days.filter((day) => day !== today)
-      : [...days, today].sort().slice(-120);
+    const current = getToday();
+
+    const nextDays = days.includes(current)
+      ? days.filter((day) => day !== current)
+      : [...days, current].sort().slice(-120);
 
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextDays));
@@ -257,7 +353,8 @@ export function StudyStreak() {
   }
 
   return (
-    <motion.div
+    <motion.section
+      aria-label="Study streak"
       initial={
         reduceMotion
           ? false
@@ -274,23 +371,32 @@ export function StudyStreak() {
         delay: 0.3,
         duration: 0.35,
       }}
-      className="rounded-2xl border bg-card p-4"
+      className="rounded-2xl border border-border bg-card p-4"
     >
       {/* Header */}
-      <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-sm font-semibold">
-          <span
-            className="grid size-7 place-items-center rounded-lg text-white"
-            style={{
-              background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_2})`,
-            }}
-          >
-            <FiZap aria-hidden="true" className="size-3.5" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#FACC15] text-[#111318]">
+            <Zap aria-hidden="true" className="size-4" />
           </span>
-          Study streak
-        </p>
+          <div className="min-w-0">
+            <p className="text-sm font-bold leading-tight tracking-tight">
+              Study streak
+            </p>
+            {status && (
+              <span
+                className={cn(
+                  "mt-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold leading-none",
+                  status.tone,
+                )}
+              >
+                {status.label}
+              </span>
+            )}
+          </div>
+        </div>
 
-        <p className="flex items-baseline gap-1" aria-live="polite">
+        <p className="flex shrink-0 items-baseline gap-1" aria-live="polite">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.span
               key={streak}
@@ -317,28 +423,26 @@ export function StudyStreak() {
                 stiffness: 500,
                 damping: 28,
               }}
-              className="text-xl font-bold tabular-nums"
-              style={{
-                color: ACCENT,
-              }}
+              className="text-3xl font-extrabold leading-none tabular-nums tracking-tight text-amber-600 dark:text-[#FACC15]"
             >
               {streak}
             </motion.span>
           </AnimatePresence>
 
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground">
             {streak === 1 ? "day" : "days"}
+            <span className="sr-only"> current streak</span>
           </span>
         </p>
       </div>
 
       {/* Last 7 days */}
-      <ul className="mt-3 flex justify-between" aria-label="Last 7 days">
+      <ul className="mt-4 flex justify-between" aria-label="Last 7 days">
         {week.map((day, index) => {
           const done = mounted && daysSet.has(day.key);
 
           return (
-            <li key={day.key} className="flex flex-col items-center gap-1">
+            <li key={day.key} className="flex flex-col items-center gap-1.5">
               <motion.span
                 initial={
                   reduceMotion
@@ -357,24 +461,19 @@ export function StudyStreak() {
                   damping: 20,
                 }}
                 className={cn(
-                  "grid size-7 place-items-center rounded-full border text-white transition-colors duration-300",
-                  !done && "bg-muted/60 text-transparent",
-                  day.isToday && !done && "border-dashed",
-                )}
-                style={
+                  "grid size-8 place-items-center rounded-full border transition-colors duration-300",
                   done
-                    ? {
-                        background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_2})`,
-                        borderColor: "transparent",
-                      }
-                    : day.isToday
-                      ? {
-                          borderColor: ACCENT,
-                        }
-                      : undefined
-                }
+                    ? "border-[#FACC15] bg-[#FACC15] text-[#111318]"
+                    : "border-border bg-muted/60 text-transparent",
+                  day.isToday &&
+                    !done &&
+                    "border-dashed border-[#8B5CF6] bg-[#8B5CF6]/5",
+                  day.isToday &&
+                    done &&
+                    "ring-2 ring-[#8B5CF6]/50 ring-offset-2 ring-offset-card",
+                )}
               >
-                <FiCheck aria-hidden="true" className="size-3.5" />
+                <Check aria-hidden="true" className="size-4" strokeWidth={3} />
 
                 {day.full && (
                   <span className="sr-only">
@@ -386,8 +485,9 @@ export function StudyStreak() {
               <span
                 aria-hidden="true"
                 className={cn(
-                  "text-[10px] text-muted-foreground",
-                  day.isToday && "font-semibold text-foreground",
+                  "text-[10px] font-medium text-muted-foreground",
+                  day.isToday &&
+                    "font-bold text-violet-700 dark:text-violet-300",
                 )}
               >
                 {day.label || "\u00a0"}
@@ -396,6 +496,53 @@ export function StudyStreak() {
           );
         })}
       </ul>
+
+      {/* Stats */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <StatTile
+          icon={CalendarDays}
+          label="This week"
+          value={`${thisWeek}/7`}
+          iconClass="text-[#8B5CF6]"
+        />
+        <StatTile
+          icon={Trophy}
+          label="Best streak"
+          value={`${best} ${best === 1 ? "day" : "days"}`}
+          iconClass="text-amber-600 dark:text-[#FACC15]"
+        />
+      </div>
+
+      {/* Next milestone */}
+      <div className="mt-4">
+        <div className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="font-semibold text-foreground">
+            {nextMilestone
+              ? `Next milestone: ${nextMilestone} days`
+              : "All milestones reached"}
+          </span>
+          {nextMilestone && (
+            <span className="tabular-nums text-muted-foreground">
+              {streak}/{nextMilestone}
+            </span>
+          )}
+        </div>
+        <div
+          role="progressbar"
+          aria-label="Progress to next streak milestone"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(milestoneProgress)}
+          className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-border"
+        >
+          <motion.div
+            initial={reduceMotion ? false : { width: 0 }}
+            animate={{ width: `${milestoneProgress}%` }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="h-full rounded-full bg-[#FACC15]"
+          />
+        </div>
+      </div>
 
       {/* Message */}
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
@@ -411,23 +558,16 @@ export function StudyStreak() {
           reduceMotion
             ? undefined
             : {
-                scale: 0.96,
+                scale: 0.97,
               }
         }
         className={cn(
-          "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          "mt-3 inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-colors",
+          FOCUS,
           doneToday
-            ? "border bg-background text-muted-foreground hover:text-foreground"
-            : "text-white shadow-sm hover:brightness-110",
+            ? "border border-border bg-background text-muted-foreground hover:border-[#8B5CF6]/50 hover:text-foreground"
+            : "bg-[#FACC15] text-[#111318] hover:bg-[#EAB308]",
         )}
-        style={
-          doneToday
-            ? undefined
-            : {
-                background: `linear-gradient(90deg, ${ACCENT}, ${ACCENT_2})`,
-              }
-        }
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
@@ -455,25 +595,22 @@ export function StudyStreak() {
           >
             {doneToday ? (
               <>
-                <FiCheck
+                <Check
                   aria-hidden="true"
-                  className="size-4 text-emerald-600"
+                  className="size-4 text-emerald-600 dark:text-emerald-400"
                 />
                 Done for today (undo)
               </>
             ) : (
-              "I studied today"
+              <>
+                <Zap aria-hidden="true" className="size-4" />I studied today
+              </>
             )}
           </motion.span>
         </AnimatePresence>
       </motion.button>
-
-      {/* Best streak */}
-      {best > 0 && (
-        <p className="mt-2 text-center text-[11px] text-muted-foreground">
-          Best streak: {best} {best === 1 ? "day" : "days"}
-        </p>
-      )}
-    </motion.div>
+    </motion.section>
   );
 }
+
+export default StudyStreak;

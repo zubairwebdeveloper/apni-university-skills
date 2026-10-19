@@ -2,6 +2,8 @@
 "use client";
 import { useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
@@ -11,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 const ALL = "all";
 
@@ -33,7 +36,12 @@ export function QueryFilters({ fields }) {
   const active = fields.some((f) => params.has(f.key));
   return (
     <div className="space-y-3" aria-busy={pending}>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div
+        className={cn(
+          "grid gap-3 transition-opacity duration-200 sm:grid-cols-3",
+          pending && "opacity-70",
+        )}
+      >
         {fields.map((f) => (
           <Field key={f.key}>
             <FieldLabel
@@ -46,7 +54,10 @@ export function QueryFilters({ fields }) {
               value={params.get(f.key) ?? ALL}
               onValueChange={(v) => update(f.key, v)}
             >
-              <SelectTrigger id={`qf-${f.key}`} className="w-full">
+              <SelectTrigger
+                id={`qf-${f.key}`}
+                className="w-full transition-shadow focus-visible:shadow-sm"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -62,20 +73,37 @@ export function QueryFilters({ fields }) {
         ))}
       </div>
       <div className="flex min-h-6 items-center gap-3">
-        {active && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              startTransition(() => router.replace(pathname, { scroll: false }))
-            }
-          >
-            Clear filters
-          </Button>
-        )}
+        <AnimatePresence initial={false}>
+          {active && (
+            <motion.div
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -6 }}
+              transition={{ duration: 0.15 }}
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                onClick={() =>
+                  startTransition(() =>
+                    router.replace(pathname, { scroll: false }),
+                  )
+                }
+              >
+                <X aria-hidden="true" className="size-3.5" />
+                Clear filters
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         {pending && (
-          <p role="status" className="text-sm text-muted-foreground">
+          <p
+            role="status"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground"
+          >
+            <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
             Updating results…
           </p>
         )}
@@ -83,4 +111,3 @@ export function QueryFilters({ fields }) {
     </div>
   );
 }
-

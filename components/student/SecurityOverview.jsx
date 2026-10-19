@@ -1,6 +1,17 @@
-import { FiShield, FiCheckCircle, FiAlertTriangle } from "react-icons/fi";
+"use client";
 
-export function SecurityOverview({ user }) {
+import { motion, useReducedMotion } from "framer-motion";
+import {
+  FiAlertTriangle,
+  FiCheckCircle,
+  FiShield,
+  FiShieldOff,
+} from "react-icons/fi";
+import { cn } from "@/lib/utils";
+
+export function SecurityOverview({ user = {} }) {
+  const reduce = useReducedMotion();
+
   const hasPassword =
     user.providerData?.some((p) => p.providerId === "password") ?? true;
 
@@ -10,46 +21,78 @@ export function SecurityOverview({ user }) {
   ];
   const good = checks.filter((c) => c.ok).length;
   const allGood = good === checks.length;
+  const HeaderIcon = allGood ? FiShield : FiShieldOff;
 
   return (
-    <div
-      className={`flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center ${
-        allGood
-          ? "bg-gradient-to-r from-emerald-500/10 to-transparent"
-          : "bg-gradient-to-r from-amber-500/10 to-transparent"
-      }`}
+    <motion.section
+      aria-labelledby="security-overview-title"
+      initial={reduce ? false : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduce ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(
+        "flex flex-col gap-5 rounded-2xl border bg-card p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center lg:gap-6",
+        allGood ? "border-border" : "border-destructive/30",
+      )}
     >
-      <div
-        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
-          allGood
-            ? "bg-emerald-500/15 text-emerald-600"
-            : "bg-amber-500/15 text-amber-600"
-        }`}
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "grid size-12 shrink-0 place-items-center rounded-2xl",
+            allGood
+              ? "bg-primary/10 text-primary"
+              : "bg-destructive/10 text-destructive",
+          )}
+        >
+          <HeaderIcon className="size-6" />
+        </span>
+        <div className="min-w-0 space-y-1">
+          <h2
+            id="security-overview-title"
+            className="text-base font-semibold leading-snug tracking-tight sm:text-lg"
+          >
+            {allGood
+              ? "Your account looks secure"
+              : "A few things need attention"}
+          </h2>
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {good} of {checks.length} security checks passed
+          </p>
+        </div>
+      </div>
+
+      <ul
+        aria-label="Security checks"
+        className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:justify-end"
       >
-        <FiShield className="h-6 w-6" />
-      </div>
-      <div className="flex-1">
-        <p className="font-semibold">
-          {allGood
-            ? "Your account looks secure"
-            : "A few things need attention"}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {good} of {checks.length} security checks passed
-        </p>
-      </div>
-      <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
         {checks.map(({ label, ok }) => (
-          <li key={label} className="flex items-center gap-1.5">
-            {ok ? (
-              <FiCheckCircle className="text-emerald-500" />
-            ) : (
-              <FiAlertTriangle className="text-amber-500" />
+          <li
+            key={label}
+            className={cn(
+              "flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
+              ok
+                ? "border-border bg-muted/40 text-foreground"
+                : "border-destructive/30 bg-destructive/5 text-foreground",
             )}
-            {label}
+          >
+            {ok ? (
+              <FiCheckCircle
+                aria-hidden="true"
+                className="size-4 shrink-0 text-primary"
+              />
+            ) : (
+              <FiAlertTriangle
+                aria-hidden="true"
+                className="size-4 shrink-0 text-destructive"
+              />
+            )}
+            <span>{label}</span>
+            <span className="sr-only">
+              {ok ? "(passed)" : "(needs attention)"}
+            </span>
           </li>
         ))}
       </ul>
-    </div>
+    </motion.section>
   );
 }

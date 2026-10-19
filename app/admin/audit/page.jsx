@@ -158,6 +158,18 @@ function StatCard({ icon: Icon, label, value, iconWrap }) {
   );
 }
 
+// Shared entrance-animation classes/delays — same pattern used on the other
+// admin pages (fade + slide-up, respects prefers-reduced-motion). Applied
+// directly to each real content block below instead of a bespoke <style>
+// tag, since matching `.wrapper > *` previously counted the <style> element
+// itself as a child and threw every delay off by one.
+const ENTRANCE =
+  "animate-in fade-in slide-in-from-bottom-2 duration-500 motion-reduce:animate-none";
+const delay = (ms) => ({
+  animationDelay: `${ms}ms`,
+  animationFillMode: "backwards",
+});
+
 export default async function AuditPage({ searchParams }) {
   await requirePermission(P.AUDIT_READ);
   const sp = await searchParams;
@@ -172,25 +184,19 @@ export default async function AuditPage({ searchParams }) {
   const uniqueActors = new Set(items.map((a) => a.actorEmail ?? "system")).size;
 
   return (
-    <div className="ea-stagger">
-      <style>{`
-        @keyframes ea-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @media (prefers-reduced-motion: no-preference) {
-          .ea-stagger > * { animation: ea-fade-up 0.45s cubic-bezier(0.22,1,0.36,1) both; }
-          .ea-stagger > *:nth-child(1) { animation-delay: 0ms; }
-          .ea-stagger > *:nth-child(2) { animation-delay: 60ms; }
-          .ea-stagger > *:nth-child(3) { animation-delay: 120ms; }
-          .ea-stagger > *:nth-child(4) { animation-delay: 180ms; }
-        }
-      `}</style>
-
-      <AdminPageHeader
-        title="Audit log"
-        description="Every administrative change, newest first. Entries can't be edited or deleted."
-      />
+    <div>
+      <div className={ENTRANCE} style={delay(0)}>
+        <AdminPageHeader
+          title="Audit log"
+          description="Every administrative change, newest first. Entries can't be edited or deleted."
+        />
+      </div>
 
       {items.length > 0 && (
-        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div
+          className={cn("mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4", ENTRANCE)}
+          style={delay(60)}
+        >
           <StatCard
             icon={FiClipboard}
             label="Entries on this page"
@@ -218,9 +224,11 @@ export default async function AuditPage({ searchParams }) {
         </div>
       )}
 
-      <DataTableToolbar searchable={false} filters={FILTERS} total={total} />
+      <div className={ENTRANCE} style={delay(120)}>
+        <DataTableToolbar searchable={false} filters={FILTERS} total={total} />
+      </div>
 
-      <div className="mt-4">
+      <div className={cn("mt-4", ENTRANCE)} style={delay(180)}>
         {!items.length ? (
           <EmptyState
             icon={FiClipboard}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { Loader2, PenLine, Send, ShieldCheck, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,8 +27,17 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TextField } from "@/components/shared/TextField";
+import { cn } from "@/lib/utils";
 import { reviewSchema } from "@/lib/validations/review";
 import { submitReview } from "@/app/actions/student";
+
+const RATING_HINTS = {
+  1: "Poor",
+  2: "Fair",
+  3: "Good",
+  4: "Very good",
+  5: "Excellent",
+};
 
 export function ReviewDialog({
   courseSlug,
@@ -48,6 +58,10 @@ export function ReviewDialog({
     },
   });
 
+  const { isSubmitting } = form.formState;
+  const titleLength = (form.watch("title") ?? "").length;
+  const commentLength = (form.watch("comment") ?? "").length;
+
   async function onSubmit(v) {
     const res = await submitReview(v);
     if (!res.ok) return toast.error(res.error);
@@ -64,53 +78,100 @@ export function ReviewDialog({
         size="sm"
         onClick={() => setOpen(true)}
       >
+        <PenLine aria-hidden="true" className="size-4" />
         {label}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Review: {courseTitle}</DialogTitle>
-            <DialogDescription>
-              Reviews are checked by our team before they appear publicly.
-            </DialogDescription>
+            <div className="flex items-start gap-3">
+              <span
+                aria-hidden="true"
+                className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"
+              >
+                <Star className="size-5" />
+              </span>
+              <div className="min-w-0 space-y-1.5 text-left">
+                <DialogTitle className="break-words text-lg font-semibold leading-snug tracking-tight">
+                  Review: {courseTitle}
+                </DialogTitle>
+                <DialogDescription className="flex items-start gap-1.5">
+                  <ShieldCheck
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-primary"
+                  />
+                  Reviews are checked by our team before they appear publicly.
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
+
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
               <Controller
                 name="rating"
                 control={form.control}
-                render={({ field, fieldState }) => (
-                  <FieldSet data-invalid={fieldState.invalid}>
-                    <FieldLegend variant="label">Rating</FieldLegend>
-                    <RadioGroup
-                      value={String(field.value ?? "")}
-                      onValueChange={field.onChange}
-                      className="flex flex-wrap gap-4"
-                    >
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <Field
-                          key={n}
-                          orientation="horizontal"
-                          className="w-auto"
-                        >
-                          <RadioGroupItem
-                            value={String(n)}
-                            id={`${uid}-r${n}`}
-                          />
-                          <FieldLabel
-                            htmlFor={`${uid}-r${n}`}
-                            className="font-normal"
-                          >
-                            {n} {n === 1 ? "star" : "stars"}
-                          </FieldLabel>
-                        </Field>
-                      ))}
-                    </RadioGroup>
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </FieldSet>
-                )}
+                render={({ field, fieldState }) => {
+                  const selected = Number(field.value) || 0;
+                  return (
+                    <FieldSet data-invalid={fieldState.invalid}>
+                      <FieldLegend variant="label">Rating</FieldLegend>
+                      <RadioGroup
+                        value={String(field.value ?? "")}
+                        onValueChange={field.onChange}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {[1, 2, 3, 4, 5].map((n) => {
+                          const filled = n <= selected;
+                          return (
+                            <Field
+                              key={n}
+                              orientation="horizontal"
+                              className="relative w-auto"
+                            >
+                              <RadioGroupItem
+                                value={String(n)}
+                                id={`${uid}-r${n}`}
+                                className="peer sr-only"
+                              />
+                              <FieldLabel
+                                htmlFor={`${uid}-r${n}`}
+                                className={cn(
+                                  "grid size-11 cursor-pointer place-items-center rounded-xl border font-normal transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background motion-reduce:transition-none",
+                                  filled
+                                    ? "border-primary/40 bg-primary/10 text-primary"
+                                    : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-primary",
+                                )}
+                              >
+                                <Star
+                                  aria-hidden="true"
+                                  className={cn(
+                                    "size-5",
+                                    filled && "fill-current",
+                                  )}
+                                />
+                                <span className="sr-only">
+                                  {n} {n === 1 ? "star" : "stars"}
+                                </span>
+                              </FieldLabel>
+                            </Field>
+                          );
+                        })}
+                      </RadioGroup>
+                      <p
+                        aria-live="polite"
+                        className="text-sm text-muted-foreground"
+                      >
+                        {selected
+                          ? `${selected} of 5 stars · ${RATING_HINTS[selected]}`
+                          : "Select a rating from 1 to 5 stars."}
+                      </p>
+                      {fieldState.invalid && (
+                        <FieldError errors={[fieldState.error]} />
+                      )}
+                    </FieldSet>
+                  );
+                }}
               />
               <TextField
                 control={form.control}
@@ -119,6 +180,7 @@ export function ReviewDialog({
                 label="Title (optional)"
                 component={Input}
                 maxLength={80}
+                description={`${titleLength}/80`}
               />
               <TextField
                 control={form.control}
@@ -128,9 +190,10 @@ export function ReviewDialog({
                 component={Textarea}
                 rows={5}
                 maxLength={1000}
+                description={`${commentLength}/1000`}
               />
             </FieldGroup>
-            <DialogFooter className="mt-6">
+            <DialogFooter className="mt-6 gap-2 sm:gap-2">
               <Button
                 type="button"
                 variant="ghost"
@@ -138,8 +201,21 @@ export function ReviewDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Submitting…" : "Submit review"}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2
+                      aria-hidden="true"
+                      className="size-4 animate-spin motion-reduce:animate-none"
+                    />
+                    Submitting…
+                  </>
+                ) : (
+                  <>
+                    <Send aria-hidden="true" className="size-4" />
+                    Submit review
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -148,4 +224,3 @@ export function ReviewDialog({
     </>
   );
 }
-

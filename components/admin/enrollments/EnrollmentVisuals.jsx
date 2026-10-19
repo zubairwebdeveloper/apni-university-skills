@@ -7,6 +7,10 @@ import {
   useSpring,
   useTransform,
 } from "framer-motion";
+import { Check, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const EASE = [0.22, 1, 0.36, 1];
 
 /** Circular progress with a light 3D tilt. value is 0-100. */
 export function ProgressRing({ value = 0, caption }) {
@@ -14,11 +18,11 @@ export function ProgressRing({ value = 0, caption }) {
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [10, -10]), {
+  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [6, -6]), {
     stiffness: 200,
     damping: 22,
   });
-  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-10, 10]), {
+  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-6, 6]), {
     stiffness: 200,
     damping: 22,
   });
@@ -48,9 +52,14 @@ export function ProgressRing({ value = 0, caption }) {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={pct}
-      aria-label={`Progress ${pct}%`}
+      aria-valuetext={`${pct}% complete`}
+      aria-label="Course progress"
     >
-      <svg viewBox="0 0 120 120" className="size-full -rotate-90">
+      <svg
+        viewBox="0 0 120 120"
+        className="size-full -rotate-90"
+        aria-hidden="true"
+      >
         <circle
           cx="60"
           cy="60"
@@ -59,58 +68,101 @@ export function ProgressRing({ value = 0, caption }) {
           strokeWidth="10"
           className="stroke-muted"
         />
-        <motion.circle
-          cx="60"
-          cy="60"
-          r="52"
-          fill="none"
-          strokeWidth="10"
-          strokeLinecap="round"
-          className="stroke-primary"
-          initial={reduce ? false : { pathLength: 0 }}
-          animate={{ pathLength: pct / 100 }}
-          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-        />
+        {/* A round linecap at pathLength 0 can paint a stray dot, so skip it at 0% */}
+        {pct > 0 && (
+          <motion.circle
+            cx="60"
+            cy="60"
+            r="52"
+            fill="none"
+            strokeWidth="10"
+            strokeLinecap="round"
+            className={cn(pct >= 100 ? "stroke-emerald-500" : "stroke-primary")}
+            initial={reduce ? false : { pathLength: 0 }}
+            animate={{ pathLength: pct / 100 }}
+            transition={{ duration: 1, ease: EASE }}
+          />
+        )}
       </svg>
       <div
-        className="absolute inset-0 flex flex-col items-center justify-center"
+        className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center"
         style={{ transform: "translateZ(24px)" }}
       >
-        <span className="text-3xl font-semibold tabular-nums">{pct}%</span>
+        <span className="text-3xl font-semibold leading-none tracking-tight tabular-nums">
+          {pct}%
+        </span>
         {caption && (
-          <span className="text-xs text-muted-foreground">{caption}</span>
+          <span className="mt-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            {caption}
+          </span>
         )}
       </div>
     </motion.div>
   );
 }
 
+const TONES = {
+  done: {
+    marker: "bg-emerald-500 text-white",
+    sr: "Completed: ",
+    icon: Check,
+  },
+  danger: {
+    marker: "bg-destructive text-white",
+    sr: "Needs attention: ",
+    icon: X,
+  },
+  default: {
+    marker: "bg-primary text-primary-foreground",
+    sr: "",
+    icon: null,
+  },
+};
+
 /** items: [{ label, value, tone?: "done" | "danger" }] already formatted. */
 export function EnrollmentTimeline({ items }) {
   const reduce = useReducedMotion();
-  const dot = {
-    done: "bg-emerald-500",
-    danger: "bg-destructive",
-    default: "bg-primary",
-  };
   return (
-    <ol className="relative space-y-5 border-l border-border pl-6">
-      {items.map((it, i) => (
-        <motion.li
-          key={it.label}
-          className="relative"
-          initial={reduce ? false : { opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, delay: reduce ? 0 : i * 0.1 }}
-        >
-          <span
-            className={`absolute -left-[1.9rem] top-1 size-3 rounded-full ring-4 ring-background ${dot[it.tone] ?? dot.default}`}
-            aria-hidden="true"
-          />
-          <p className="text-xs text-muted-foreground">{it.label}</p>
-          <p className="text-sm font-medium">{it.value}</p>
-        </motion.li>
-      ))}
+    <ol className="relative space-y-6 border-l border-border pl-7">
+      {items.map((it, i) => {
+        const tone = TONES[it.tone] ?? TONES.default;
+        const Icon = tone.icon;
+        return (
+          <motion.li
+            key={`${it.label}-${i}`}
+            className="relative"
+            initial={reduce ? false : { opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{
+              duration: 0.4,
+              delay: reduce ? 0 : Math.min(i, 6) * 0.1,
+              ease: EASE,
+            }}
+          >
+            {/* Icon, not just color, tells done/danger apart */}
+            <span
+              className={cn(
+                "absolute -left-[2.4rem] top-0 grid size-5 place-items-center rounded-full ring-4 ring-background",
+                tone.marker,
+              )}
+              aria-hidden="true"
+            >
+              {Icon ? (
+                <Icon className="size-3" strokeWidth={3} />
+              ) : (
+                <span className="size-1.5 rounded-full bg-current" />
+              )}
+            </span>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              {it.label}
+            </p>
+            <p className="mt-0.5 text-sm font-medium leading-snug [overflow-wrap:anywhere]">
+              {tone.sr && <span className="sr-only">{tone.sr}</span>}
+              {it.value}
+            </p>
+          </motion.li>
+        );
+      })}
     </ol>
   );
 }

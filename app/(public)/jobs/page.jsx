@@ -2,17 +2,22 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import {
+  FiArrowRight,
   FiAward,
   FiBriefcase,
+  FiCheck,
   FiChevronDown,
   FiClipboard,
+  FiClock,
   FiCompass,
   FiEdit3,
   FiFileText,
   FiGlobe,
+  FiHelpCircle,
   FiMessageSquare,
   FiSearch,
   FiShield,
+  FiSliders,
   FiUser,
   FiX,
   FiZap,
@@ -32,6 +37,7 @@ import { Reveal } from "@/components/public/PricingMotion";
 import { jobService } from "@/services/jobService";
 import { parseJobFilters } from "@/lib/validations/listings";
 import { EMPLOYMENT_TYPES, EXPERIENCE_LEVELS } from "@/config/jobs";
+import { cn } from "@/lib/utils";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -150,6 +156,13 @@ const faqs = [
   },
 ];
 
+const eyebrow =
+  "mb-3 inline-block text-xs font-semibold uppercase tracking-wider text-primary";
+const sectionTitle =
+  "text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl";
+const iconTile =
+  "grid shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15";
+
 function buildHref(params, omitKey) {
   const sp = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -236,11 +249,11 @@ export default async function JobsPage({ searchParams }) {
         description="Put your skills to work. Listings are reviewed before they are published."
         breadcrumbs={[{ label: "Home", href: "/" }, { label: "Jobs" }]}
       >
-        <ul className="mt-5 flex flex-wrap gap-2">
+        <ul className="mt-6 flex flex-wrap gap-2.5">
           {chips.map(({ icon: Icon, text }) => (
             <li
               key={text}
-              className="inline-flex items-center gap-2 rounded-full border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3.5 py-1.5 text-sm font-medium text-foreground shadow-sm backdrop-blur"
             >
               <Icon aria-hidden="true" className="size-4 text-primary" />
               {text}
@@ -252,30 +265,38 @@ export default async function JobsPage({ searchParams }) {
       <div className="relative overflow-x-clip">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
+          className="pointer-events-none absolute -top-24 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
         />
 
         {/* Search and results */}
-        <Container className="relative py-8 sm:py-10">
+        <Container className="relative py-8 sm:py-10 lg:py-12">
           {/* Quick filters */}
           <div className="mb-5">
-            <p className="mb-2 text-sm font-medium text-muted-foreground">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Quick filters
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div
+              role="group"
+              aria-label="Quick job filters"
+              className="flex flex-wrap gap-2"
+            >
               {quickFilters.map((q) => {
                 const active = String(linkParams[q.key]) === String(q.value);
                 return (
                   <Link
                     key={`${q.key}-${q.value}`}
                     href={active ? buildHref(linkParams, q.key) : q.href}
-                    aria-pressed={active}
-                    className={`inline-flex min-h-9 shrink-0 items-center rounded-full border px-4 py-1.5 text-sm font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${
+                    aria-current={active ? "true" : undefined}
+                    className={cn(
+                      "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
                       active
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                    }`}
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                    )}
                   >
+                    {active && (
+                      <FiCheck aria-hidden="true" className="size-3.5" />
+                    )}
                     {q.label}
                   </Link>
                 );
@@ -284,15 +305,30 @@ export default async function JobsPage({ searchParams }) {
           </div>
 
           {/* Filters */}
-          <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+          <section
+            aria-label="Filter jobs"
+            className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5"
+          >
+            <div className="mb-4 flex items-center gap-2.5">
+              <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
+                <FiSliders aria-hidden="true" className="size-4" />
+              </span>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Refine jobs
+              </p>
+            </div>
             <Suspense fallback={<Skeleton className="h-20 w-full" />}>
               <QueryFilters fields={FIELDS} />
             </Suspense>
-          </div>
+          </section>
 
           {/* Active filters */}
           {filtered && (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div
+              className="mt-4 flex flex-wrap items-center gap-2"
+              role="group"
+              aria-label="Active filters"
+            >
               <span className="text-sm text-muted-foreground">
                 Active filters:
               </span>
@@ -301,7 +337,7 @@ export default async function JobsPage({ searchParams }) {
                   key={f.key}
                   href={f.href}
                   aria-label={`Remove filter ${f.label}: ${f.text}`}
-                  className="group inline-flex min-h-8 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm font-medium text-primary outline-none transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                  className="group inline-flex min-h-8 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm font-medium text-primary outline-none transition-colors duration-200 hover:bg-primary hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
                 >
                   {f.text}
                   <FiX aria-hidden="true" className="size-3.5" />
@@ -309,7 +345,7 @@ export default async function JobsPage({ searchParams }) {
               ))}
               <Link
                 href="/jobs"
-                className="text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-sm px-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Clear all
               </Link>
@@ -317,28 +353,31 @@ export default async function JobsPage({ searchParams }) {
           )}
 
           {/* Results */}
-          <div className="mt-6">
+          <div className="mt-8">
             {items.length ? (
               <>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Showing{" "}
-                  <span className="font-semibold text-foreground">
-                    {items.length}
-                  </span>{" "}
-                  {items.length === 1 ? "job" : "jobs"} on this page
+                <p
+                  className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
+                  aria-live="polite"
+                >
+                  <span>
+                    Showing{" "}
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {items.length}
+                    </span>{" "}
+                    {items.length === 1 ? "job" : "jobs"} on this page
+                  </span>
                   {remoteCount > 0 && (
-                    <>
-                      <span aria-hidden="true"> · </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                      <FiGlobe aria-hidden="true" className="size-3" />
                       {remoteCount} remote
-                    </>
+                    </span>
                   )}
                   {closingSoonCount > 0 && (
-                    <>
-                      <span aria-hidden="true"> · </span>
-                      <span className="font-medium text-foreground">
-                        {closingSoonCount} closing within 7 days
-                      </span>
-                    </>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-highlight/30 px-2.5 py-0.5 text-xs font-medium text-foreground">
+                      <FiClock aria-hidden="true" className="size-3" />
+                      {closingSoonCount} closing within 7 days
+                    </span>
                   )}
                 </p>
                 <div className="grid gap-4 lg:grid-cols-2">
@@ -381,31 +420,32 @@ export default async function JobsPage({ searchParams }) {
         {/* Job types: open columns */}
         <section
           aria-labelledby="types-title"
-          className="border-t bg-muted/30 py-14 sm:py-20"
+          className="border-t border-border bg-muted/30 py-14 sm:py-20 lg:py-24"
         >
           <Container>
-            <h2
-              id="types-title"
-              className="max-w-xl text-balance text-3xl sm:text-4xl"
-            >
+            <span className={eyebrow}>Job types</span>
+            <h2 id="types-title" className={cn(sectionTitle, "max-w-xl")}>
               Which type of work fits you?
             </h2>
-            <p className="mt-3 max-w-xl text-muted-foreground">
+            <p className="mt-3 max-w-xl text-pretty text-muted-foreground">
               A quick guide to the kinds of roles you will see on this page.
             </p>
             <ul className="mt-10 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
-              {jobTypes.map(({ icon: Icon, title, text }) => (
-                <li
-                  key={title}
-                  className="min-w-0 border-t-2 border-primary pt-5"
-                >
-                  <Icon aria-hidden="true" className="size-6 text-primary" />
-                  <h3 className="mt-3 font-sans text-base font-semibold text-foreground">
-                    {title}
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-                    {text}
-                  </p>
+              {jobTypes.map(({ icon: Icon, title, text }, i) => (
+                <li key={title} className="min-w-0">
+                  <Reveal delay={i * 0.08} className="h-full">
+                    <div className="h-full border-t-2 border-primary pt-5">
+                      <span className={cn(iconTile, "size-11")}>
+                        <Icon aria-hidden="true" className="size-5" />
+                      </span>
+                      <h3 className="mt-4 font-sans text-base font-semibold text-foreground sm:text-lg">
+                        {title}
+                      </h3>
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                        {text}
+                      </p>
+                    </div>
+                  </Reveal>
                 </li>
               ))}
             </ul>
@@ -415,33 +455,38 @@ export default async function JobsPage({ searchParams }) {
         {/* Apply smarter: ruled list */}
         <section
           aria-labelledby="tips-title"
-          className="border-t py-14 sm:py-20"
+          className="border-t border-border py-14 sm:py-20 lg:py-24"
         >
           <Container>
             <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
               <div className="lg:col-span-4">
-                <h2
-                  id="tips-title"
-                  className="text-balance text-3xl sm:text-4xl"
-                >
-                  Four habits that get you noticed
-                </h2>
+                <div className="lg:sticky lg:top-24">
+                  <span className={eyebrow}>Apply smarter</span>
+                  <h2 id="tips-title" className={sectionTitle}>
+                    Four habits that get you noticed
+                  </h2>
+                </div>
               </div>
 
               <ul className="divide-y divide-border border-y border-border lg:col-span-8">
                 {tips.map(({ icon: Icon, title, text }) => (
                   <li
                     key={title}
-                    className="flex items-start gap-4 py-5 sm:gap-5 sm:py-6"
+                    className="group flex items-start gap-4 py-5 sm:gap-5 sm:py-7"
                   >
-                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <span
+                      className={cn(
+                        iconTile,
+                        "size-11 transition-all duration-200 group-hover:bg-primary group-hover:text-primary-foreground group-hover:ring-primary motion-reduce:transition-none",
+                      )}
+                    >
                       <Icon aria-hidden="true" className="size-5" />
                     </span>
                     <div className="min-w-0">
-                      <h3 className="font-sans text-base font-semibold text-foreground">
+                      <h3 className="font-sans text-base font-semibold text-foreground sm:text-lg">
                         {title}
                       </h3>
-                      <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">
+                      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
                         {text}
                       </p>
                     </div>
@@ -455,7 +500,7 @@ export default async function JobsPage({ searchParams }) {
         {/* How listings are reviewed: a 3D trust scene beside a real sequence */}
         <section
           aria-labelledby="review-title"
-          className="border-t bg-muted/30 py-14 sm:py-20"
+          className="border-t border-border bg-muted/30 py-14 sm:py-20 lg:py-24"
         >
           <Container>
             <div className="grid items-center gap-12 lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-20">
@@ -477,19 +522,18 @@ export default async function JobsPage({ searchParams }) {
               </TiltCard>
 
               <div className="min-w-0">
-                <h2
-                  id="review-title"
-                  className="max-w-xl text-balance text-3xl sm:text-4xl"
-                >
+                <span className={eyebrow}>Trust and safety</span>
+                <h2 id="review-title" className={cn(sectionTitle, "max-w-xl")}>
                   How listings are reviewed
                 </h2>
-                <p className="mt-3 max-w-xl text-muted-foreground">
+                <p className="mt-3 max-w-xl text-pretty text-muted-foreground">
                   We want you to apply with confidence. Every job goes through
                   three steps before you see it.
                 </p>
 
                 <Reveal>
-                  <ol className="relative mt-8 grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-6">
+                  <ol className="relative mt-10 grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-6">
+                    {/* Connecting line (desktop only) */}
                     <span
                       aria-hidden="true"
                       className="absolute left-5 right-5 top-5 hidden h-px bg-border sm:block"
@@ -499,22 +543,30 @@ export default async function JobsPage({ searchParams }) {
                         key={title}
                         className="relative flex gap-4 sm:block sm:pr-4"
                       >
+                        {/* Connecting line (mobile only) */}
+                        {i < reviewSteps.length - 1 && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute -bottom-10 left-5 top-10 w-px bg-border sm:hidden"
+                          />
+                        )}
                         <span
                           aria-hidden="true"
-                          className={`relative z-10 grid size-10 shrink-0 place-items-center rounded-full border font-serif text-base font-semibold ${
+                          className={cn(
+                            "relative z-10 grid size-10 shrink-0 place-items-center rounded-full border-2 font-serif text-base font-semibold shadow-sm",
                             i === reviewSteps.length - 1
                               ? "border-highlight bg-highlight text-foreground"
-                              : "border-primary bg-background text-primary"
-                          }`}
+                              : "border-primary bg-background text-primary",
+                          )}
                         >
                           {i + 1}
                         </span>
                         <div className="sm:mt-5">
-                          <h3 className="font-sans text-base font-semibold text-foreground">
+                          <h3 className="font-sans text-base font-semibold text-foreground sm:text-lg">
                             <span className="sr-only">Step {i + 1}: </span>
                             {title}
                           </h3>
-                          <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+                          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-base">
                             {text}
                           </p>
                         </div>
@@ -523,7 +575,7 @@ export default async function JobsPage({ searchParams }) {
                   </ol>
                 </Reveal>
 
-                <p className="mt-8 flex items-start gap-2 text-sm text-muted-foreground">
+                <p className="mt-8 flex items-start gap-2 rounded-xl border border-border bg-card/70 p-3 text-sm leading-relaxed text-muted-foreground">
                   <FiShield
                     aria-hidden="true"
                     className="mt-0.5 size-4 shrink-0 text-primary"
@@ -536,68 +588,92 @@ export default async function JobsPage({ searchParams }) {
         </section>
 
         {/* Skills banner */}
-        <section className="border-t py-14 sm:py-16">
+        <section className="border-t border-border py-14 sm:py-16">
           <Container>
-            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between md:gap-10">
-              <div className="flex items-start gap-4">
-                <FiCompass
-                  aria-hidden="true"
-                  className="mt-1 size-7 shrink-0 text-primary"
-                />
-                <div>
-                  <h2 className="text-balance text-2xl sm:text-3xl">
-                    Not ready to apply yet?
-                  </h2>
-                  <p className="mt-2 max-w-xl text-muted-foreground">
-                    Pick a career path, follow its roadmap and learn the skills
-                    employers ask for. Many courses are free.
-                  </p>
+            <Reveal>
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between md:gap-10">
+                <div className="flex items-start gap-4">
+                  <span className={cn(iconTile, "size-12")}>
+                    <FiCompass aria-hidden="true" className="size-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-balance text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                      Not ready to apply yet?
+                    </h2>
+                    <p className="mt-2 max-w-xl text-pretty text-muted-foreground">
+                      Pick a career path, follow its roadmap and learn the
+                      skills employers ask for. Many courses are free.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row md:shrink-0">
+                  <Link
+                    href="/careers"
+                    className={cn(
+                      buttonVariants({ variant: "default", size: "lg" }),
+                      "group",
+                    )}
+                  >
+                    Explore careers
+                    <FiArrowRight
+                      aria-hidden="true"
+                      className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                    />
+                  </Link>
+                  <Link
+                    href="/courses"
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "lg",
+                    })}
+                  >
+                    <FiSearch aria-hidden="true" />
+                    Browse courses
+                  </Link>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3 md:shrink-0">
-                <Link
-                  href="/careers"
-                  className={buttonVariants({ variant: "default", size: "lg" })}
-                >
-                  Explore careers
-                </Link>
-                <Link
-                  href="/courses"
-                  className={buttonVariants({ variant: "outline", size: "lg" })}
-                >
-                  <FiSearch aria-hidden="true" />
-                  Browse courses
-                </Link>
-              </div>
-            </div>
+            </Reveal>
           </Container>
         </section>
 
         {/* FAQ: heading left, accordion right */}
         <section
           aria-labelledby="faq-title"
-          className="border-t bg-muted/30 py-14 sm:py-20"
+          className="border-t border-border bg-muted/30 py-14 sm:py-20 lg:py-24"
         >
           <Container>
             <div className="grid gap-8 lg:grid-cols-12 lg:gap-16">
-              <h2
-                id="faq-title"
-                className="text-balance text-3xl sm:text-4xl lg:col-span-4"
-              >
-                Job search questions
-              </h2>
+              <div className="lg:col-span-4">
+                <div className="lg:sticky lg:top-24">
+                  <span className={eyebrow}>FAQ</span>
+                  <h2 id="faq-title" className={sectionTitle}>
+                    Job search questions
+                  </h2>
+                  <p className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                    <FiHelpCircle
+                      aria-hidden="true"
+                      className="mt-1 size-4 shrink-0 text-primary"
+                    />
+                    <span>
+                      Answers about applying, remote roles and listing checks.
+                    </span>
+                  </p>
+                </div>
+              </div>
 
               <div className="divide-y divide-border border-y border-border lg:col-span-8">
                 {faqs.map(({ q, a }) => (
                   <details key={q} className="group py-1">
-                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-left text-base font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-left text-base font-medium text-foreground outline-none transition-colors duration-200 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [&::-webkit-details-marker]:hidden">
                       {q}
                       <FiChevronDown
                         aria-hidden="true"
                         className="size-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
                       />
                     </summary>
-                    <p className="max-w-2xl pb-4 text-muted-foreground">{a}</p>
+                    <p className="max-w-2xl pb-4 leading-relaxed text-muted-foreground">
+                      {a}
+                    </p>
                   </details>
                 ))}
               </div>

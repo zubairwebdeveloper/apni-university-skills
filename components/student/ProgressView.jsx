@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { animate, motion, useMotionValue, useTransform } from "framer-motion";
+import {
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+} from "framer-motion";
 import {
   ArrowRight,
   BookOpen,
@@ -77,10 +83,11 @@ const ICONS = {
   zap: Zap,
 };
 
+/* Semantic tokens only. State is also spelled out in text, never colour alone. */
 const STATE_META = {
   completed: {
     icon: CheckCircle2,
-    tone: "bg-green-500/10 text-green-600",
+    tone: "bg-primary text-primary-foreground",
     action: "Review",
   },
   "in-progress": {
@@ -95,14 +102,29 @@ const STATE_META = {
   },
 };
 
-const listVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-};
+/* Shared entrance variants that collapse to no motion when the user asks for it */
+function useMotionKit() {
+  const reduce = useReducedMotion();
+  return useMemo(
+    () => ({
+      reduce: !!reduce,
+      list: {
+        hidden: {},
+        show: { transition: { staggerChildren: reduce ? 0 : 0.06 } },
+      },
+      item: {
+        hidden: reduce ? { opacity: 1 } : { opacity: 0, y: 16 },
+        show: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: reduce ? 0 : 0.3, ease: "easeOut" },
+        },
+      },
+      lift: reduce ? undefined : { y: -3 },
+    }),
+    [reduce],
+  );
+}
 
 function heroCopy(s) {
   if (!s.total)
@@ -133,25 +155,36 @@ function heroCopy(s) {
 
 /* ---------------- Building blocks ---------------- */
 function AnimatedNumber({ value, suffix = "" }) {
+  const reduce = useReducedMotion();
   const mv = useMotionValue(0);
   const rounded = useTransform(mv, (v) => Math.round(v));
 
   useEffect(() => {
+    if (reduce) {
+      mv.set(value);
+      return;
+    }
     const controls = animate(mv, value, { duration: 1, ease: "easeOut" });
     return () => controls.stop();
-  }, [value, mv]);
+  }, [value, mv, reduce]);
 
   return (
     <>
-      <motion.span>{rounded}</motion.span>
+      <motion.span className="tabular-nums">{rounded}</motion.span>
       {suffix}
     </>
   );
 }
 
 function ProgressRing({ value }) {
+  const reduce = useReducedMotion();
+
   return (
-    <div className="relative size-32 shrink-0 sm:size-40">
+    <div
+      role="img"
+      aria-label={`Average progress ${value} percent`}
+      className="relative size-36 shrink-0 sm:size-44"
+    >
       <svg viewBox="0 0 100 100" className="size-full -rotate-90" aria-hidden>
         <circle
           cx="50"
@@ -159,7 +192,7 @@ function ProgressRing({ value }) {
           r="42"
           fill="none"
           strokeWidth="8"
-          className="stroke-background/80"
+          className="stroke-muted"
         />
         <motion.circle
           cx="50"
@@ -169,60 +202,70 @@ function ProgressRing({ value }) {
           strokeWidth="8"
           strokeLinecap="round"
           className="stroke-primary"
-          initial={{ pathLength: 0 }}
+          initial={{ pathLength: reduce ? value / 100 : 0 }}
           animate={{ pathLength: value / 100 }}
-          transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
+          transition={{
+            duration: reduce ? 0 : 1.2,
+            ease: "easeOut",
+            delay: reduce ? 0 : 0.3,
+          }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold sm:text-4xl">
+        <span className="text-3xl font-bold tracking-tight sm:text-4xl">
           <AnimatedNumber value={value} suffix="%" />
         </span>
-        <span className="text-[11px] text-muted-foreground">
-          Average progress
-        </span>
+        <span className="text-xs text-muted-foreground">Average progress</span>
       </div>
     </div>
   );
 }
 
 function MilestoneBar({ value }) {
+  const reduce = useReducedMotion();
+
   return (
     <div className="relative pt-1">
       <div
         className="h-2.5 overflow-hidden rounded-full bg-muted"
         role="progressbar"
+        aria-label="Course progress"
         aria-valuenow={value}
         aria-valuemin={0}
         aria-valuemax={100}
       >
         <motion.div
-          initial={{ width: 0 }}
+          initial={{ width: reduce ? `${value}%` : 0 }}
           whileInView={{ width: `${value}%` }}
           viewport={{ once: true }}
-          transition={{ duration: 0.9, ease: "easeOut" }}
-          className="h-full rounded-full bg-gradient-to-r from-primary to-primary/60"
+          transition={{ duration: reduce ? 0 : 0.9, ease: "easeOut" }}
+          className="h-full rounded-full bg-primary"
         />
       </div>
 
       {/* Tick marks over the bar */}
-      {MILESTONES.filter((m) => m < 100).map((m) => (
+      {MILESTONES.filter((m) => m > 0 && m < 100).map((m) => (
         <span
           key={m}
+          aria-hidden="true"
           style={{ left: `${m}%` }}
           className="absolute top-1 h-2.5 w-px bg-background/80"
         />
       ))}
 
       {/* Labels */}
-      <div className="relative mt-1.5 h-4 text-[10px] text-muted-foreground">
+      <div className="relative mt-1.5 h-4 text-[11px] text-muted-foreground">
         {MILESTONES.map((m) => (
           <span
             key={m}
             style={{ left: `${m}%` }}
             className={cn(
-              "absolute transition-colors",
-              m === 100 ? "-translate-x-full" : "-translate-x-1/2",
+              "absolute tabular-nums transition-colors motion-reduce:transition-none",
+              m === 100
+                ? "-translate-x-full"
+                : m === 0
+                  ? ""
+                  : "-translate-x-1/2",
               value >= m && "font-semibold text-primary",
             )}
           >
@@ -235,6 +278,7 @@ function MilestoneBar({ value }) {
 }
 
 function CourseProgressCard({ item }) {
+  const { reduce } = useMotionKit();
   const meta = STATE_META[item.state];
   const Icon = meta.icon;
   const next = nextMilestone(item.p);
@@ -247,11 +291,17 @@ function CourseProgressCard({ item }) {
         : `${next - item.p}% to your next milestone (${next}%)`;
 
   return (
-    <div className="group relative overflow-hidden rounded-xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:border-primary/40 hover:shadow-md sm:p-6",
+        !reduce && "hover:-translate-y-0.5",
+      )}
+    >
       <div className="flex items-start gap-4">
         <span
+          aria-hidden="true"
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-110",
+            "flex size-11 shrink-0 items-center justify-center rounded-xl",
             meta.tone,
           )}
         >
@@ -260,20 +310,20 @@ function CourseProgressCard({ item }) {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-serif text-lg font-semibold transition-colors group-hover:text-primary">
+            <h3 className="break-words font-serif text-lg font-semibold leading-snug transition-colors group-hover:text-primary motion-reduce:transition-none">
               {item.courseTitle}
             </h3>
             <StatusBadge status={item.status} />
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">{message}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{message}</p>
         </div>
 
-        <p className="shrink-0 text-2xl font-bold leading-none">
+        <p className="shrink-0 text-2xl font-bold leading-none tracking-tight">
           <AnimatedNumber value={item.p} suffix="%" />
         </p>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-5">
         <MilestoneBar value={item.p} />
       </div>
 
@@ -288,9 +338,14 @@ function CourseProgressCard({ item }) {
             "group/btn",
           )}
         >
-          {item.state === "completed" && <RotateCcw className="size-4" />}
+          {item.state === "completed" && (
+            <RotateCcw aria-hidden="true" className="size-4" />
+          )}
           {meta.action}
-          <ArrowRight className="size-4 transition-transform group-hover/btn:translate-x-1" />
+          <ArrowRight
+            aria-hidden="true"
+            className="size-4 transition-transform group-hover/btn:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover/btn:translate-x-0"
+          />
         </Link>
       </div>
     </div>
@@ -298,76 +353,110 @@ function CourseProgressCard({ item }) {
 }
 
 function StatusBreakdown({ stats, onSelect }) {
+  const { reduce } = useMotionKit();
   const segments = [
     {
       key: "completed",
       label: "Completed",
       value: stats.completed,
-      bar: "bg-green-500",
+      bar: "bg-primary",
     },
     {
       key: "in-progress",
       label: "In progress",
       value: stats.inProgress,
-      bar: "bg-primary",
+      bar: "bg-primary/45",
     },
     {
       key: "not-started",
       label: "Not started",
       value: stats.notStarted,
-      bar: "bg-muted-foreground/40",
+      bar: "bg-muted-foreground/35",
     },
   ];
 
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <section
+      aria-labelledby="status-breakdown-title"
+      className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+    >
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="font-semibold">Course status breakdown</h2>
-        <span className="text-xs text-muted-foreground">
+        <h2
+          id="status-breakdown-title"
+          className="text-base font-semibold tracking-tight"
+        >
+          Course status breakdown
+        </h2>
+        <span className="text-sm text-muted-foreground tabular-nums">
           {stats.total} {stats.total === 1 ? "course" : "courses"}
         </span>
       </div>
 
-      <div className="flex h-3 overflow-hidden rounded-full bg-muted">
+      <div
+        aria-hidden="true"
+        className="flex h-3 overflow-hidden rounded-full bg-muted"
+      >
         {segments.map((s) => (
           <motion.div
             key={s.key}
-            initial={{ width: 0 }}
-            animate={{ width: `${(s.value / stats.total) * 100}%` }}
-            transition={{ duration: 0.9, ease: "easeOut", delay: 0.2 }}
+            initial={{
+              width: reduce
+                ? `${stats.total ? (s.value / stats.total) * 100 : 0}%`
+                : 0,
+            }}
+            animate={{
+              width: `${stats.total ? (s.value / stats.total) * 100 : 0}%`,
+            }}
+            transition={{
+              duration: reduce ? 0 : 0.9,
+              ease: "easeOut",
+              delay: reduce ? 0 : 0.2,
+            }}
             className={cn("h-full", s.bar)}
           />
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
         {segments.map((s) => (
           <button
             key={s.key}
             type="button"
             onClick={() => onSelect(s.key)}
-            className="group rounded-lg border p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+            aria-label={`Show ${s.label.toLowerCase()} courses (${s.value})`}
+            className="group rounded-xl border border-border p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none"
           >
-            <span className="flex items-center gap-2 text-xs text-muted-foreground transition-colors group-hover:text-primary">
-              <span className={cn("size-2 rounded-full", s.bar)} />
-              {s.label}
+            <span className="flex items-center gap-2 text-xs text-muted-foreground transition-colors group-hover:text-primary motion-reduce:transition-none">
+              <span
+                aria-hidden="true"
+                className={cn("size-2 shrink-0 rounded-full", s.bar)}
+              />
+              <span className="truncate">{s.label}</span>
             </span>
-            <span className="mt-1 block text-xl font-bold">{s.value}</span>
+            <span className="mt-1 block text-xl font-bold tabular-nums">
+              {s.value}
+            </span>
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
 function AchievementsSection({ stats }) {
+  const { list, item, lift } = useMotionKit();
   const unlockedCount = BADGES.filter((b) => b.check(stats)).length;
 
   return (
-    <section>
+    <section aria-labelledby="achievements-title">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Achievements</h2>
+          <h2
+            id="achievements-title"
+            className="text-xl font-semibold tracking-tight"
+          >
+            Achievements
+          </h2>
           <p className="text-sm text-muted-foreground">
             Unlock badges as you learn. Every milestone counts.
           </p>
@@ -378,7 +467,7 @@ function AchievementsSection({ stats }) {
       </div>
 
       <motion.div
-        variants={listVariants}
+        variants={list}
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, margin: "-60px" }}
@@ -390,16 +479,17 @@ function AchievementsSection({ stats }) {
           return (
             <motion.div
               key={b.id}
-              variants={itemVariants}
-              whileHover={unlocked ? { y: -3 } : undefined}
+              variants={item}
+              whileHover={unlocked ? lift : undefined}
               className={cn(
-                "relative flex items-center gap-4 overflow-hidden rounded-xl border p-4 transition-colors",
+                "relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-colors motion-reduce:transition-none",
                 unlocked
-                  ? "bg-gradient-to-br from-primary/10 to-transparent hover:border-primary/40"
-                  : "bg-card opacity-70",
+                  ? "border-primary/30 bg-card shadow-sm hover:border-primary/50"
+                  : "border-dashed border-border bg-muted/30",
               )}
             >
               <span
+                aria-hidden="true"
                 className={cn(
                   "flex size-12 shrink-0 items-center justify-center rounded-full",
                   unlocked
@@ -417,10 +507,16 @@ function AchievementsSection({ stats }) {
                 <p className="flex items-center gap-2 text-sm font-semibold">
                   {b.title}
                   {unlocked && (
-                    <CheckCircle2 className="size-4 text-green-600" />
+                    <CheckCircle2
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-primary"
+                    />
                   )}
+                  <span className="sr-only">
+                    {unlocked ? "(unlocked)" : "(locked)"}
+                  </span>
                 </p>
-                <p className="text-xs text-muted-foreground">{b.description}</p>
+                <p className="text-sm text-muted-foreground">{b.description}</p>
               </div>
             </motion.div>
           );
@@ -432,14 +528,19 @@ function AchievementsSection({ stats }) {
 
 /* ---------------- Guide + tips (also used on the empty page) ---------------- */
 export function ProgressGuide() {
+  const { list, item, lift } = useMotionKit();
+
   return (
     <div className="mt-10 space-y-10">
-      <section>
-        <h2 className="mb-5 text-xl font-semibold tracking-tight">
+      <section aria-labelledby="progress-guide-title">
+        <h2
+          id="progress-guide-title"
+          className="mb-5 text-xl font-semibold tracking-tight"
+        >
           How your progress works
         </h2>
         <motion.div
-          variants={listVariants}
+          variants={list}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: "-60px" }}
@@ -450,18 +551,21 @@ export function ProgressGuide() {
             return (
               <motion.div
                 key={g.title}
-                variants={itemVariants}
-                whileHover={{ y: -3 }}
-                className="rounded-xl border bg-card p-5 transition-colors hover:border-primary/40"
+                variants={item}
+                whileHover={lift}
+                className="rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary/40 motion-reduce:transition-none"
               >
                 <div className="mb-3 flex items-center gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                  <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary tabular-nums">
                     {i + 1}
                   </span>
-                  <Icon className="size-5 text-muted-foreground" />
+                  <Icon
+                    aria-hidden="true"
+                    className="size-5 text-muted-foreground"
+                  />
                 </div>
                 <h3 className="font-semibold">{g.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                   {g.description}
                 </p>
               </motion.div>
@@ -470,15 +574,18 @@ export function ProgressGuide() {
         </motion.div>
       </section>
 
-      <section>
+      <section aria-labelledby="progress-tips-title">
         <div className="mb-5 flex items-center gap-2">
-          <Lightbulb className="size-5 text-yellow-500" />
-          <h2 className="text-xl font-semibold tracking-tight">
+          <Lightbulb aria-hidden="true" className="size-5 text-primary" />
+          <h2
+            id="progress-tips-title"
+            className="text-xl font-semibold tracking-tight"
+          >
             Tips to keep moving forward
           </h2>
         </div>
         <motion.div
-          variants={listVariants}
+          variants={list}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: "-60px" }}
@@ -489,13 +596,18 @@ export function ProgressGuide() {
             return (
               <motion.div
                 key={t.title}
-                variants={itemVariants}
-                whileHover={{ y: -3 }}
-                className="rounded-xl border bg-gradient-to-br from-muted/60 to-transparent p-5"
+                variants={item}
+                whileHover={lift}
+                className="rounded-2xl border border-border bg-muted/40 p-5"
               >
-                <Icon className="mb-3 size-5 text-primary" />
+                <span
+                  aria-hidden="true"
+                  className="mb-3 grid size-9 place-items-center rounded-lg bg-primary/10 text-primary"
+                >
+                  <Icon className="size-5" />
+                </span>
                 <h3 className="font-semibold">{t.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                   {t.description}
                 </p>
               </motion.div>
@@ -509,6 +621,7 @@ export function ProgressGuide() {
 
 /* ---------------- Main view ---------------- */
 export function ProgressView({ items }) {
+  const { reduce, list, item, lift } = useMotionKit();
   const [tab, setTab] = useState("all");
   const [sort, setSort] = useState("progress-desc");
 
@@ -553,90 +666,88 @@ export function ProgressView({ items }) {
   const copy = heroCopy(stats);
 
   const statCards = [
-    {
-      label: "Enrolled",
-      value: stats.total,
-      icon: BookOpen,
-      tone: "text-primary bg-primary/10",
-    },
-    {
-      label: "In progress",
-      value: stats.inProgress,
-      icon: TrendingUp,
-      tone: "text-orange-500 bg-orange-500/10",
-    },
-    {
-      label: "Completed",
-      value: stats.completed,
-      icon: CheckCircle2,
-      tone: "text-green-600 bg-green-500/10",
-    },
-    {
-      label: "Not started",
-      value: stats.notStarted,
-      icon: Clock,
-      tone: "text-violet-500 bg-violet-500/10",
-    },
+    { label: "Enrolled", value: stats.total, icon: BookOpen },
+    { label: "In progress", value: stats.inProgress, icon: TrendingUp },
+    { label: "Completed", value: stats.completed, icon: CheckCircle2 },
+    { label: "Not started", value: stats.notStarted, icon: Clock },
   ];
 
   return (
     <div className="space-y-8">
       {/* Hero */}
       <motion.section
-        initial={{ opacity: 0, y: 16 }}
+        aria-labelledby="progress-hero-title"
+        initial={reduce ? false : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5 sm:p-8"
+        transition={{ duration: reduce ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-8 lg:p-10"
       >
-        <motion.div
-          aria-hidden
-          animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
-          transition={{ duration: 6, repeat: Infinity }}
-          className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/20 blur-3xl"
+        {/* hairline accent along the top edge */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent"
         />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12">
           <div className="min-w-0 flex-1">
             <Badge variant="secondary" className="gap-1">
-              <Sparkles className="size-3" /> Progress overview
+              <Sparkles aria-hidden="true" className="size-3" /> Progress
+              overview
             </Badge>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
+            <h2
+              id="progress-hero-title"
+              className="mt-4 text-3xl font-bold leading-tight tracking-tight sm:text-4xl"
+            >
               {copy.title}
             </h2>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
               {copy.text}
             </p>
-            <p className="mt-2 text-sm font-medium">
-              {stats.completed} of {stats.total} courses completed
+            <p className="mt-3 text-sm font-medium tabular-nums">
+              <span className="text-primary">{stats.completed}</span> of{" "}
+              {stats.total} courses completed
             </p>
 
             {focus ? (
               <motion.div
-                whileHover={{ y: -2 }}
-                className="mt-5 flex max-w-xl flex-col gap-3 rounded-xl border bg-background/80 p-4 backdrop-blur sm:flex-row sm:items-center"
+                whileHover={lift}
+                className="mt-6 flex max-w-xl flex-col gap-4 rounded-2xl border border-border bg-muted/40 p-4 sm:flex-row sm:items-center"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <Zap className="size-9 shrink-0 text-primary" />
+                  <span
+                    aria-hidden="true"
+                    className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"
+                  >
+                    <Zap className="size-5" />
+                  </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Closest to the finish line
                     </p>
                     <p className="truncate text-sm font-semibold sm:text-base">
                       {focus.courseTitle}
                     </p>
                     <div className="mt-2 flex items-center gap-3">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        role="progressbar"
+                        aria-label={`Progress in ${focus.courseTitle}`}
+                        aria-valuenow={focus.p}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+                      >
                         <motion.div
-                          initial={{ width: 0 }}
+                          initial={{ width: reduce ? `${focus.p}%` : 0 }}
                           animate={{ width: `${focus.p}%` }}
                           transition={{
-                            duration: 0.9,
+                            duration: reduce ? 0 : 0.9,
                             ease: "easeOut",
-                            delay: 0.3,
+                            delay: reduce ? 0 : 0.3,
                           }}
-                          className="h-full rounded-full bg-gradient-to-r from-primary to-primary/60"
+                          className="h-full rounded-full bg-primary"
                         />
                       </div>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground tabular-nums">
                         {focus.p}%
                       </span>
                     </div>
@@ -646,61 +757,73 @@ export function ProgressView({ items }) {
                   href={getHref(focus)}
                   className={cn(
                     buttonVariants({ size: "sm" }),
-                    "group shrink-0",
+                    "group w-full shrink-0 sm:w-auto",
                   )}
                 >
                   Resume
-                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                  />
                 </Link>
               </motion.div>
             ) : (
               <Link
                 href="/courses"
-                className={cn(buttonVariants(), "group mt-5")}
+                className={cn(
+                  buttonVariants({ size: "lg" }),
+                  "group mt-6 w-full sm:w-auto",
+                )}
               >
                 Explore more courses
-                <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                />
               </Link>
             )}
           </div>
 
           <div className="flex justify-center lg:justify-end">
-            <ProgressRing value={stats.avg} />
+            <div className="rounded-2xl border border-border bg-muted/40 p-6 sm:p-8">
+              <ProgressRing value={stats.avg} />
+            </div>
           </div>
         </div>
       </motion.section>
 
       {/* Stat cards */}
-      <motion.div
-        variants={listVariants}
+      <motion.ul
+        aria-label="Course totals"
+        variants={list}
         initial="hidden"
         animate="show"
         className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
       >
         {statCards.map((s) => (
-          <motion.div
+          <motion.li
             key={s.label}
-            variants={itemVariants}
-            whileHover={{ y: -3 }}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40"
+            variants={item}
+            whileHover={lift}
+            className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 motion-reduce:transition-none sm:p-5"
           >
             <span
-              className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                s.tone,
-              )}
+              aria-hidden="true"
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
             >
               <s.icon className="size-5" />
             </span>
-            <div>
-              <p className="text-2xl font-bold leading-none">
+            <div className="min-w-0">
+              <p className="text-2xl font-bold leading-none tracking-tight">
                 <AnimatedNumber value={s.value} />
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {s.label}
+              </p>
             </div>
-          </motion.div>
+          </motion.li>
         ))}
-      </motion.div>
+      </motion.ul>
 
       <StatusBreakdown stats={stats} onSelect={setTab} />
 
@@ -730,7 +853,7 @@ export function ProgressView({ items }) {
                 ].map((t) => (
                   <TabsTrigger key={t.value} value={t.value}>
                     {t.label}
-                    <span className="ml-1.5 text-xs text-muted-foreground">
+                    <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">
                       {t.count}
                     </span>
                   </TabsTrigger>
@@ -740,7 +863,7 @@ export function ProgressView({ items }) {
           </div>
 
           <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-full sm:w-48" aria-label="Sort courses">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
@@ -753,21 +876,24 @@ export function ProgressView({ items }) {
           </Select>
         </div>
 
-        <p className="text-sm text-muted-foreground" aria-live="polite">
+        <p
+          className="text-sm text-muted-foreground tabular-nums"
+          aria-live="polite"
+        >
           Showing {filtered.length} of {stats.total} courses
         </p>
 
         {filtered.length ? (
           <motion.ul
             key={`${tab}-${sort}`}
-            variants={listVariants}
+            variants={list}
             initial="hidden"
             animate="show"
             className="space-y-4"
           >
-            {filtered.map((item) => (
-              <motion.li key={item.id} variants={itemVariants}>
-                <CourseProgressCard item={item} />
+            {filtered.map((it) => (
+              <motion.li key={it.id} variants={item}>
+                <CourseProgressCard item={it} />
               </motion.li>
             ))}
           </motion.ul>

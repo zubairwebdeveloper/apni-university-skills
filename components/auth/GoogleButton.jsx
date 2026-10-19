@@ -18,6 +18,19 @@ const SILENT = new Set([
   "auth/cancelled-popup-request",
 ]);
 
+// `next` usually comes from a `?next=` query param, so it must be checked
+// before it's handed to the router — otherwise a link like
+// `/login?next=https://evil.com` would send a freshly signed-in user
+// straight to an attacker's site. Mirrors the equivalent guard already
+// used by the password-login flow.
+function safeNext(value, fallback) {
+  return typeof value === "string" &&
+    value.startsWith("/") &&
+    !value.startsWith("//")
+    ? value
+    : fallback;
+}
+
 export function GoogleButton({
   next = "/",
   label = "Continue with Google",
@@ -43,7 +56,7 @@ export function GoogleButton({
 
       const cred = await signInWithPopup(auth, provider);
       await startServerSession(cred.user);
-      router.replace(next);
+      router.replace(safeNext(next, "/"));
       router.refresh();
     } catch (e) {
       if (!SILENT.has(e?.code)) onError?.(authErrorMessage(e));
@@ -90,7 +103,7 @@ export function GoogleButton({
 // "or continue with email" line
 export function OrDivider({ text = "or continue with" }) {
   return (
-    <div className="flex items-center gap-3" role="separator" aria-label={text}>
+    <div className="flex items-center gap-3" role="separator">
       <span className="h-px flex-1 bg-gradient-to-r from-transparent to-border" />
       <span className="text-xs text-foreground/60">{text}</span>
       <span className="h-px flex-1 bg-gradient-to-l from-transparent to-border" />

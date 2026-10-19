@@ -1,6 +1,7 @@
 // components/admin/reviews/ReviewsTable.jsx
 "use client";
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   FiCheck,
   FiEye,
@@ -20,44 +21,87 @@ import { useSelection } from "@/hooks/useSelection";
 import { formatDate } from "@/lib/utils/format";
 import { bulkReviewAction, runReviewAction } from "@/app/actions/admin/reviews";
 
+const focusRing =
+  "rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+function getInitial(name) {
+  return name?.trim()?.charAt(0)?.toUpperCase() || "?";
+}
+
+function TableReveal({ children }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="w-full min-w-0"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 export function ReviewsTable({ rows, perms }) {
   const { selected, setSelected, clear, ids } = useSelection(rows);
-  const mod = perms.includes("reviews.moderate"),
-    del = perms.includes("reviews.delete");
+  const mod = perms.includes("reviews.moderate");
+  const del = perms.includes("reviews.delete");
+
   const columns = [
     {
       key: "review",
       header: "Review",
       className: "min-w-72",
       cell: (r) => (
-        <div className="min-w-0">
+        <div className="min-w-0 max-w-md">
           <Link
             href={`/admin/reviews/${r.slug}`}
-            className="font-medium hover:underline"
+            className={`block truncate text-sm font-medium leading-5 transition-colors hover:text-violet-600 hover:underline dark:hover:text-violet-300 ${
+              r.title ? "text-foreground" : "italic text-muted-foreground"
+            } ${focusRing}`}
           >
             {r.title || "Untitled review"}
           </Link>
-          <p className="line-clamp-2 text-xs text-muted-foreground">
-            {r.comment}
-          </p>
+          {r.comment && (
+            <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
+              {r.comment}
+            </p>
+          )}
         </div>
       ),
     },
     {
       key: "student",
       header: "Student",
-      className: "text-muted-foreground",
-      cell: (r) => r.studentName,
+      className: "min-w-40",
+      cell: (r) => (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex size-7 shrink-0 items-center justify-center rounded-full border border-violet-500/20 bg-violet-500/10 text-[11px] font-semibold text-violet-600 dark:text-violet-300"
+          >
+            {getInitial(r.studentName)}
+          </span>
+          <span className="truncate text-sm leading-5 text-foreground">
+            {r.studentName}
+          </span>
+        </div>
+      ),
     },
     {
       key: "course",
       header: "Course",
       className: "min-w-40",
-      cell: (r) => r.courseTitle,
+      cell: (r) => (
+        <span className="line-clamp-2 text-sm leading-5 text-foreground">
+          {r.courseTitle}
+        </span>
+      ),
     },
     {
       key: "rating",
       header: "Rating",
+      className: "whitespace-nowrap",
       cell: (r) => <Rating value={r.rating} count={1} showCount={false} />,
     },
     {
@@ -68,7 +112,7 @@ export function ReviewsTable({ rows, perms }) {
     {
       key: "date",
       header: "Submitted",
-      className: "whitespace-nowrap text-muted-foreground",
+      className: "whitespace-nowrap text-sm tabular-nums text-muted-foreground",
       cell: (r) => formatDate(r.createdAt),
     },
     {
@@ -92,6 +136,7 @@ export function ReviewsTable({ rows, perms }) {
       ),
     },
   ];
+
   const bulk = [
     mod && { key: "approve", label: "Approve", icon: FiCheck },
     mod && {
@@ -130,22 +175,24 @@ export function ReviewsTable({ rows, perms }) {
 
   return (
     <>
-      <DataTable
-        columns={columns}
-        rows={rows}
-        caption="Reviews"
-        selectable={bulk.length > 0}
-        selected={selected}
-        onSelectedChange={setSelected}
-        minWidth="min-w-[960px]"
-        empty={
-          <EmptyState
-            icon={FiStar}
-            title="No reviews match"
-            description="Reviews appear here when enrolled students submit them."
-          />
-        }
-      />
+      <TableReveal>
+        <DataTable
+          columns={columns}
+          rows={rows}
+          caption="Reviews"
+          selectable={bulk.length > 0}
+          selected={selected}
+          onSelectedChange={setSelected}
+          minWidth="min-w-[960px]"
+          empty={
+            <EmptyState
+              icon={FiStar}
+              title="No reviews match"
+              description="Reviews appear here when enrolled students submit them. If you expected results, try adjusting your filters."
+            />
+          }
+        />
+      </TableReveal>
       <BulkActionBar
         selectedIds={ids}
         onClear={clear}
@@ -157,4 +204,3 @@ export function ReviewsTable({ rows, perms }) {
     </>
   );
 }
-

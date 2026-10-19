@@ -22,10 +22,14 @@ import {
 } from "@/components/admin/table/lifecycle";
 import { useSelection } from "@/hooks/useSelection";
 import { formatCompact, formatDate } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
 import {
   bulkInstructorAction,
   runInstructorAction,
 } from "@/app/actions/admin/instructors";
+
+const linkClass =
+  "rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60";
 
 function initials(name) {
   const parts = String(name ?? "")
@@ -40,9 +44,9 @@ function initials(name) {
 
 function Stat({ icon: Icon, value, label }) {
   return (
-    <span className="inline-flex items-center gap-1.5 tabular-nums">
+    <span className="inline-flex items-center gap-1.5 text-sm tabular-nums">
       <Icon className="size-3.5 text-muted-foreground" aria-hidden="true" />
-      <span>{value}</span>
+      <span className="font-medium">{value}</span>
       <span className="sr-only">{label}</span>
     </span>
   );
@@ -72,10 +76,10 @@ export function InstructorsTable({ rows, perms }) {
     {
       key: "name",
       header: "Instructor",
-      className: "min-w-52",
+      className: "min-w-60",
       cell: (r) => (
-        <div className="flex items-center gap-3">
-          <Avatar className="size-10 ring-2 ring-border">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar className="size-10 shrink-0 ring-1 ring-border">
             <AvatarImage src={r.avatar || undefined} alt="" />
             <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
               {initials(r.name)}
@@ -84,11 +88,14 @@ export function InstructorsTable({ rows, perms }) {
           <div className="min-w-0">
             <Link
               href={`/admin/instructors/${r.slug}`}
-              className="font-medium hover:underline"
+              className={cn(
+                "block truncate text-sm font-semibold leading-snug",
+                linkClass,
+              )}
             >
               {r.name}
             </Link>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="max-w-56 truncate text-xs text-muted-foreground">
               {r.designation}
             </p>
           </div>
@@ -98,18 +105,21 @@ export function InstructorsTable({ rows, perms }) {
     {
       key: "email",
       header: "Email",
-      className: "text-muted-foreground",
+      className: "text-sm text-muted-foreground",
       cell: (r) =>
         r.email ? (
           <a
             href={`mailto:${r.email}`}
-            className="inline-flex items-center gap-1.5 hover:text-foreground hover:underline"
+            className={cn(
+              "inline-flex max-w-full items-center gap-1.5 hover:text-foreground",
+              linkClass,
+            )}
           >
             <FiMail className="size-3.5 shrink-0" aria-hidden="true" />
             <span className="max-w-48 truncate">{r.email}</span>
           </a>
         ) : (
-          "—"
+          <span aria-label="No email">—</span>
         ),
     },
     {
@@ -150,7 +160,7 @@ export function InstructorsTable({ rows, perms }) {
     {
       key: "updated",
       header: "Updated",
-      className: "whitespace-nowrap text-muted-foreground",
+      className: "whitespace-nowrap text-sm tabular-nums text-muted-foreground",
       cell: (r) => formatDate(r.updatedAt),
     },
     {

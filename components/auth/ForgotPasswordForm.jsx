@@ -71,7 +71,11 @@ function BackToLogin() {
   );
 }
 
-function AuthCard({ icon: Icon, title, description, children, footer }) {
+// Local to this file: a single-message status shell (icon + title +
+// description) for the success/error screens below. Distinct from the
+// shared components/auth/AuthCard.jsx, which is a plain form shell with
+// a different prop shape — named AuthStatusCard to avoid colliding with it.
+function AuthStatusCard({ icon: Icon, title, description, children, footer }) {
   const reduce = useReducedMotion();
 
   return (
@@ -156,8 +160,7 @@ export function ForgotPasswordForm() {
 
   if (sentTo)
     return (
-      <AuthCard
-        key="sent"
+      <AuthStatusCard
         icon={MailCheck}
         title="Check your email"
         description={
@@ -189,7 +192,9 @@ export function ForgotPasswordForm() {
               disabled={cooldown > 0 || resending}
               className="tabular-nums"
             >
-              {resending && <Loader2 className="animate-spin" />}
+              {resending && (
+                <Loader2 aria-hidden="true" className="animate-spin" />
+              )}
               {resending
                 ? "Sending…"
                 : cooldown > 0
@@ -201,12 +206,11 @@ export function ForgotPasswordForm() {
             </Button>
           </div>
         </div>
-      </AuthCard>
+      </AuthStatusCard>
     );
 
   return (
-    <AuthCard
-      key="form"
+    <AuthStatusCard
       icon={KeyRound}
       title="Forgot your password?"
       description="Enter the email you signed up with and we'll send you a link to reset it."
@@ -223,11 +227,13 @@ export function ForgotPasswordForm() {
             autoComplete="email"
           />
           <Button type="submit" size="lg" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="animate-spin" />}
+            {isSubmitting && (
+              <Loader2 aria-hidden="true" className="animate-spin" />
+            )}
             {isSubmitting ? "Sending…" : "Send reset link"}
           </Button>
         </FieldGroup>
       </form>
-    </AuthCard>
+    </AuthStatusCard>
   );
 }

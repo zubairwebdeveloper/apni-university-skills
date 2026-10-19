@@ -4,6 +4,9 @@ import { ChevronLeft } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 /*
   Props (all optional except title):
   - title        string | ReactNode
@@ -39,33 +42,40 @@ export function AdminPageHeader({
       {back?.href ? (
         <Link
           href={back.href}
-          className="group inline-flex items-center gap-1 rounded-md text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(
+            "group inline-flex items-center gap-1 rounded-md py-1 pr-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground motion-reduce:transition-none",
+            focusRing,
+          )}
         >
           <ChevronLeft
             aria-hidden="true"
-            className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5 motion-reduce:transition-none"
+            className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
           />
           <span>Back{back.label ? ` to ${back.label}` : ""}</span>
         </Link>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-        <div className="min-w-0 space-y-1.5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+        <div className="min-w-0 space-y-2">
           {eyebrow ? (
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">
+              <span
+                aria-hidden="true"
+                className="h-3.5 w-0.5 rounded-full bg-yellow-400"
+              />
               {eyebrow}
             </p>
           ) : null}
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="min-w-0 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h1 className="min-w-0 text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
               {title}
             </h1>
             {badge ? <div className="shrink-0">{badge}</div> : null}
           </div>
 
           {description ? (
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
               {description}
             </p>
           ) : null}
@@ -78,10 +88,7 @@ export function AdminPageHeader({
         ) : null}
       </div>
 
-      <div
-        aria-hidden="true"
-        className="h-px w-full bg-gradient-to-r from-border via-border/60 to-transparent"
-      />
+      <div aria-hidden="true" className="h-px w-full bg-border" />
     </header>
   );
 }
@@ -99,13 +106,16 @@ export function AdminPageHeaderSkeleton({
   withActions = true,
 }) {
   return (
-    <header className="mb-6 animate-pulse space-y-4" aria-hidden="true">
+    <header
+      className="mb-6 animate-pulse space-y-4 motion-reduce:animate-none"
+      aria-hidden="true"
+    >
       {withBack && <div className="h-4 w-24 rounded bg-muted" />}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-        <div className="min-w-0 flex-1 space-y-2">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+        <div className="min-w-0 flex-1 space-y-2.5">
           <div className="flex items-center gap-3">
-            <div className="h-7 w-48 rounded bg-muted sm:h-8 sm:w-64" />
+            <div className="h-7 w-48 rounded-md bg-muted sm:h-8 sm:w-64" />
             {withBadge && <div className="h-5 w-16 rounded-full bg-muted" />}
           </div>
           {withDescription && (
@@ -115,8 +125,8 @@ export function AdminPageHeaderSkeleton({
 
         {withActions && (
           <div className="flex shrink-0 gap-2">
-            <div className="h-8 w-20 rounded-md bg-muted" />
-            <div className="h-8 w-24 rounded-md bg-muted" />
+            <div className="h-9 w-20 rounded-md bg-muted" />
+            <div className="h-9 w-24 rounded-md bg-muted" />
           </div>
         )}
       </div>

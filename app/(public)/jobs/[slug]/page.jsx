@@ -12,9 +12,15 @@ import {
   FiBarChart2,
   FiBriefcase,
   FiCalendar,
+  FiCheckCircle,
   FiClock,
   FiDollarSign,
+  FiExternalLink,
+  FiFileText,
+  FiList,
   FiMapPin,
+  FiTarget,
+  FiZap,
 } from "react-icons/fi";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +37,7 @@ import { jobService } from "@/services/jobService";
 import { safe } from "@/lib/utils/safe";
 import { safeExternalUrl } from "@/lib/utils/url";
 import { formatDate, formatPrice } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
 
 import {
   EMPLOYMENT_TYPES,
@@ -89,20 +96,40 @@ export async function generateMetadata({ params }) {
   };
 }
 
-function List({ id, title, items }) {
+const iconTile =
+  "grid shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15";
+
+// Section heading with an icon tile that reinforces what the block is about.
+function SectionTitle({ id, icon: Icon, children }) {
+  return (
+    <div className="mb-5 flex items-center gap-3">
+      <span className={cn(iconTile, "size-10")}>
+        <Icon aria-hidden="true" className="size-[18px]" />
+      </span>
+      <h2
+        id={id}
+        className="text-balance text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+      >
+        {children}
+      </h2>
+    </div>
+  );
+}
+
+function List({ id, title, icon, items }) {
   if (!items?.length) return null;
 
   return (
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="scroll-mt-24 border-t pt-10"
+      className="scroll-mt-24 border-t border-border pt-10"
     >
-      <h2 id={`${id}-title`} className="mb-4 text-xl sm:text-2xl">
+      <SectionTitle id={`${id}-title`} icon={icon}>
         {title}
-      </h2>
+      </SectionTitle>
 
-      <ul className="max-w-3xl space-y-3 text-sm text-muted-foreground sm:text-base">
+      <ul className="max-w-3xl space-y-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
         {items.map((item) => (
           <li key={item} className="flex gap-3">
             <span
@@ -120,13 +147,14 @@ function List({ id, title, items }) {
 function Fact({ icon: Icon, label, children }) {
   return (
     <div className="flex items-start gap-3">
-      <Icon
-        aria-hidden="true"
-        className="mt-0.5 size-4 shrink-0 text-primary"
-      />
+      <span className={cn(iconTile, "size-9 rounded-lg")}>
+        <Icon aria-hidden="true" className="size-4" />
+      </span>
       <div className="min-w-0">
-        <dt className="text-xs text-muted-foreground">{label}</dt>
-        <dd className="text-sm font-medium text-foreground">{children}</dd>
+        <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+        <dd className="mt-0.5 text-sm font-medium text-foreground">
+          {children}
+        </dd>
       </div>
     </div>
   );
@@ -213,8 +241,12 @@ export default async function JobPage({ params }) {
       />
 
       {/* Job header */}
-      <div className="overflow-x-clip border-b bg-secondary/40">
-        <Container className="py-8 sm:py-12 lg:py-14">
+      <div className="relative overflow-x-clip border-b border-border bg-secondary/40">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-24 right-0 size-[28rem] rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
+        />
+        <Container className="relative py-8 sm:py-12 lg:py-14">
           <PageBreadcrumbs
             items={[
               {
@@ -238,7 +270,7 @@ export default async function JobPage({ params }) {
                 aria-hidden="true"
                 className="absolute inset-0 rounded-2xl bg-highlight/40 [transform:translateZ(-14px)_translate(6px,6px)]"
               />
-              <div className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl border bg-card font-serif text-2xl text-foreground shadow-lg [transform:translateZ(22px)] sm:text-3xl">
+              <div className="absolute inset-0 grid place-items-center overflow-hidden rounded-2xl border border-border bg-card font-serif text-2xl text-foreground shadow-lg [transform:translateZ(22px)] sm:text-3xl">
                 {job.companyLogo ? (
                   <Image
                     src={job.companyLogo}
@@ -255,33 +287,59 @@ export default async function JobPage({ params }) {
 
             <div className="min-w-0">
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">
+                <Badge
+                  variant="secondary"
+                  className="rounded-full px-3 py-1 text-xs font-semibold"
+                >
                   {employmentLabel(job.employmentType)}
                 </Badge>
                 {job.experienceLevel && (
-                  <Badge variant="secondary">
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                  >
                     {experienceLabel(job.experienceLevel)}
                   </Badge>
                 )}
-                {job.remote && <Badge variant="outline">Remote</Badge>}
-                {expired && <Badge variant="destructive">Expired</Badge>}
+                {job.remote && (
+                  <Badge
+                    variant="outline"
+                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                  >
+                    Remote
+                  </Badge>
+                )}
+                {expired && (
+                  <Badge
+                    variant="destructive"
+                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                  >
+                    Expired
+                  </Badge>
+                )}
                 {closingSoon && (
-                  <Badge className="bg-highlight text-highlight-foreground">
+                  <Badge className="gap-1 rounded-full bg-highlight px-3 py-1 text-xs font-semibold text-highlight-foreground">
+                    <FiClock aria-hidden="true" className="size-3" />
                     {daysLeftLabel}
                   </Badge>
                 )}
               </div>
 
-              <h1 className="text-balance text-3xl tracking-tight sm:text-4xl lg:text-5xl">
+              <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
                 {job.title}
               </h1>
 
-              <p className="mt-2 text-lg text-muted-foreground">
-                {job.company}
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 text-lg text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  {job.company}
+                </span>
                 {job.location && (
                   <>
-                    <span aria-hidden="true"> · </span>
-                    {job.location}
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <FiMapPin aria-hidden="true" className="size-4" />
+                      {job.location}
+                    </span>
                   </>
                 )}
               </p>
@@ -294,7 +352,7 @@ export default async function JobPage({ params }) {
                 <li key={s.id}>
                   <a
                     href={`#${s.id}`}
-                    className="inline-flex min-h-9 items-center rounded-full border bg-card px-4 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                    className="inline-flex min-h-9 items-center rounded-full border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm outline-none transition-colors duration-200 hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
                   >
                     {s.label}
                   </a>
@@ -306,9 +364,10 @@ export default async function JobPage({ params }) {
       </div>
 
       <Container
-        className={`grid gap-10 pt-10 sm:pt-14 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-14 lg:pb-14 ${
-          showStickyApply ? "pb-28" : "pb-10"
-        }`}
+        className={cn(
+          "grid gap-10 pt-10 sm:pt-14 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-14 lg:pb-14",
+          showStickyApply ? "pb-28" : "pb-10",
+        )}
       >
         <div className="min-w-0 space-y-10">
           <section
@@ -316,11 +375,11 @@ export default async function JobPage({ params }) {
             aria-labelledby="about-role"
             className="scroll-mt-24"
           >
-            <h2 id="about-role" className="mb-4 text-xl sm:text-2xl">
+            <SectionTitle id="about-role" icon={FiFileText}>
               About the role
-            </h2>
+            </SectionTitle>
 
-            <div className="max-w-3xl">
+            <div className="max-w-3xl leading-relaxed text-muted-foreground">
               <Paragraphs text={job.description} />
             </div>
           </section>
@@ -328,44 +387,62 @@ export default async function JobPage({ params }) {
           <List
             id="resp"
             title="Responsibilities"
+            icon={FiList}
             items={job.responsibilities}
           />
 
-          <List id="reqs" title="Requirements" items={job.requirements} />
+          <List
+            id="reqs"
+            title="Requirements"
+            icon={FiTarget}
+            items={job.requirements}
+          />
 
           {job.skills?.length > 0 && (
             <section
               id="skills-job"
               aria-labelledby="skills-job-title"
-              className="scroll-mt-24 border-t pt-10"
+              className="scroll-mt-24 border-t border-border pt-10"
             >
-              <h2 id="skills-job-title" className="mb-4 text-xl sm:text-2xl">
+              <SectionTitle id="skills-job-title" icon={FiZap}>
                 Skills
-              </h2>
+              </SectionTitle>
 
               <ul className="flex flex-wrap gap-2">
                 {job.skills.map((skill) => (
                   <li key={skill}>
-                    <Badge variant="secondary">{skill}</Badge>
+                    <Badge variant="secondary" className="px-3 py-1 text-sm">
+                      {skill}
+                    </Badge>
                   </li>
                 ))}
               </ul>
             </section>
           )}
 
-          <div className="border-t pt-8">
+          <div className="border-t border-border pt-8">
             <Link
               href="/jobs"
-              className={buttonVariants({ variant: "outline", size: "lg" })}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "group",
+              )}
             >
-              <FiArrowLeft aria-hidden="true" />
+              <FiArrowLeft
+                aria-hidden="true"
+                className="transition-transform duration-300 group-hover:-translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+              />
               Back to all jobs
             </Link>
           </div>
         </div>
 
-        <aside>
-          <Card className="gap-5 p-5 sm:p-6 lg:sticky lg:top-24">
+        <aside aria-label="Job summary">
+          <Card className="gap-5 p-5 shadow-sm sm:p-6 lg:sticky lg:top-24">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
+              Job summary
+            </h2>
+
             <dl className="space-y-4">
               {job.location && (
                 <Fact icon={FiMapPin} label="Location">
@@ -386,7 +463,7 @@ export default async function JobPage({ params }) {
 
               {salary && (
                 <Fact icon={FiDollarSign} label="Salary">
-                  {salary}
+                  <span className="tabular-nums">{salary}</span>
                 </Fact>
               )}
 
@@ -403,11 +480,12 @@ export default async function JobPage({ params }) {
                   </span>
                   {daysLeftLabel && (
                     <span
-                      className={`ml-2 text-xs font-normal ${
+                      className={cn(
+                        "ml-2 text-xs font-normal",
                         closingSoon
                           ? "font-medium text-foreground"
-                          : "text-muted-foreground"
-                      }`}
+                          : "text-muted-foreground",
+                      )}
                     >
                       ({daysLeftLabel})
                     </span>
@@ -417,7 +495,7 @@ export default async function JobPage({ params }) {
             </dl>
 
             {expired ? (
-              <p className="rounded-md border p-3 text-sm text-muted-foreground">
+              <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm leading-relaxed text-muted-foreground">
                 This listing has expired and is no longer accepting
                 applications.
               </p>
@@ -426,13 +504,19 @@ export default async function JobPage({ params }) {
                 href={applyUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className={buttonVariants({
-                  size: "lg",
-                  className: "w-full",
-                })}
+                className={cn(
+                  buttonVariants({
+                    size: "lg",
+                  }),
+                  "group w-full",
+                )}
               >
                 Apply on company site
-                <FiArrowRight aria-hidden="true" />
+                <FiExternalLink
+                  aria-hidden="true"
+                  className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                />
+                <span className="sr-only">(opens in a new tab)</span>
               </a>
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -441,9 +525,15 @@ export default async function JobPage({ params }) {
             )}
 
             {!expired && (
-              <p className="text-xs text-muted-foreground">
-                You will leave Apni University to apply. We don&apos;t review
-                applications.
+              <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+                <FiCheckCircle
+                  aria-hidden="true"
+                  className="mt-0.5 size-3.5 shrink-0 text-primary"
+                />
+                <span>
+                  You will leave Apni University to apply. We don&apos;t review
+                  applications.
+                </span>
               </p>
             )}
           </Card>
@@ -452,7 +542,7 @@ export default async function JobPage({ params }) {
 
       {/* Mobile apply bar: keeps the main action reachable on long listings */}
       {showStickyApply && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_-8px_rgb(0_0_0/0.2)] backdrop-blur lg:hidden">
           <a
             href={applyUrl}
             target="_blank"
@@ -464,6 +554,7 @@ export default async function JobPage({ params }) {
           >
             Apply on company site
             <FiArrowRight aria-hidden="true" />
+            <span className="sr-only">(opens in a new tab)</span>
           </a>
         </div>
       )}

@@ -3,13 +3,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import {
-  motion,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
-  useTransform,
-} from "framer-motion";
 import { LayoutDashboard } from "lucide-react";
 
 import {
@@ -25,9 +18,11 @@ import { AdminNav } from "./AdminNav";
 import { AdminFooterLinks } from "./AdminFooterLinks";
 import { cn } from "@/lib/utils";
 
-const SPRING = { stiffness: 220, damping: 18, mass: 0.6 };
 const enter =
   "animate-in fade-in slide-in-from-left-3 fill-mode-both duration-300 motion-reduce:animate-none";
+
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 // Teen lines jo "X" ban jati hain
 function MenuIcon({ open }) {
@@ -58,74 +53,23 @@ function MenuIcon({ open }) {
   );
 }
 
-// 3D tile: touch ya mouse ke saath tilt
-function BrandTile({ reduce }) {
-  const px = useMotionValue(0);
-  const py = useMotionValue(0);
-  const sx = useSpring(px, SPRING);
-  const sy = useSpring(py, SPRING);
-  const rotateY = useTransform(sx, [-0.5, 0.5], [-20, 20]);
-  const rotateX = useTransform(sy, [-0.5, 0.5], [20, -20]);
-
-  function onMove(e) {
-    if (reduce) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    px.set((e.clientX - r.left) / r.width - 0.5);
-    py.set((e.clientY - r.top) / r.height - 0.5);
-  }
-  function onLeave() {
-    px.set(0);
-    py.set(0);
-  }
-
+// Solid brand mark in the yellow accent
+function BrandTile() {
   return (
-    <div
-      className="relative shrink-0 touch-none [perspective:600px]"
-      onPointerMove={onMove}
-      onPointerLeave={onLeave}
-      onPointerUp={onLeave}
+    <span
+      aria-hidden="true"
+      className="grid size-11 shrink-0 place-items-center rounded-xl bg-yellow-400 text-gray-900 shadow-sm"
     >
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 translate-y-1.5 rounded-xl bg-primary/30 blur-md"
-      />
-      <motion.span
-        style={reduce ? undefined : { rotateX, rotateY }}
-        whileTap={reduce ? undefined : { scale: 0.94 }}
-        className="relative grid size-11 place-items-center rounded-xl bg-primary text-primary-foreground shadow-lg ring-1 ring-inset ring-white/20 [transform-style:preserve-3d]"
-      >
-        <LayoutDashboard
-          aria-hidden="true"
-          className="size-5 [transform:translateZ(14px)]"
-        />
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-white/25 via-transparent to-black/10"
-        />
-      </motion.span>
-    </div>
+      <LayoutDashboard className="size-5" />
+    </span>
   );
 }
 
 export function AdminMobileNav({ permissions }) {
   const pathname = usePathname();
-  const reduce = useReducedMotion();
   const [openPathname, setOpenPathname] = useState(null);
   const open = openPathname === pathname;
   const setOpen = (nextOpen) => setOpenPathname(nextOpen ? pathname : null);
-
-  // Spotlight: header mein touch ke saath chalta hai
-  const mx = useMotionValue(200);
-  const my = useMotionValue(20);
-  const gx = useSpring(mx, { stiffness: 120, damping: 20 });
-  const gy = useSpring(my, { stiffness: 120, damping: 20 });
-
-  function onHeaderMove(e) {
-    if (reduce) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    mx.set(e.clientX - r.left - 80);
-    my.set(e.clientY - r.top - 80);
-  }
 
   // Swipe left to close
   const touch = useRef(null);
@@ -158,9 +102,10 @@ export function AdminMobileNav({ permissions }) {
       <SheetTrigger
         className={cn(
           buttonVariants({ variant: "ghost", size: "icon" }),
-          "rounded-full lg:hidden",
-          "shadow-[0_2px_0_0_var(--border)] transition-[transform,box-shadow,background-color] duration-100",
-          "active:translate-y-[2px] active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0",
+          "size-10 rounded-full border border-border lg:hidden",
+          "transition-[transform,background-color] duration-100 hover:bg-muted/60",
+          "active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100",
+          focusRing,
           open && "bg-accent",
         )}
         aria-label={open ? "Close admin menu" : "Open admin menu"}
@@ -175,25 +120,14 @@ export function AdminMobileNav({ permissions }) {
         className="w-[85vw] max-w-xs gap-0 overflow-hidden p-0"
       >
         {/* Header */}
-        <SheetHeader
-          onPointerMove={onHeaderMove}
-          className="relative overflow-hidden border-b bg-gradient-to-br from-primary/10 via-background to-background p-4 text-left"
-        >
-          {!reduce && (
-            <motion.div
-              aria-hidden="true"
-              style={{ x: gx, y: gy }}
-              className="pointer-events-none absolute left-0 top-0 size-40 rounded-full bg-primary/15 blur-2xl"
-            />
-          )}
-
-          <div className="relative flex items-center gap-3">
-            <BrandTile reduce={reduce} />
-            <div className="min-w-0 space-y-0.5">
-              <SheetTitle className="text-base leading-none">
+        <SheetHeader className="border-b border-border bg-muted/30 p-4 text-left">
+          <div className="flex items-center gap-3">
+            <BrandTile />
+            <div className="min-w-0 space-y-1">
+              <SheetTitle className="truncate text-base font-semibold leading-none tracking-tight text-foreground">
                 Apni University
               </SheetTitle>
-              <SheetDescription className="text-xs">
+              <SheetDescription className="inline-flex items-center rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium leading-4 text-violet-700 dark:text-violet-300">
                 Admin Panel
               </SheetDescription>
             </div>
@@ -228,12 +162,12 @@ export function AdminMobileNav({ permissions }) {
         {/* Footer */}
         <div
           className={cn(
-            "space-y-2 border-t bg-muted/30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+            "space-y-2 border-t border-border bg-muted/30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
             enter,
           )}
           style={{ animationDelay: "160ms" }}
         >
-          <p className="text-center text-[11px] text-muted-foreground">
+          <p className="text-center text-[11px] leading-4 text-muted-foreground">
             Swipe left to close
           </p>
           <AdminFooterLinks />

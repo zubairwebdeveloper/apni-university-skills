@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import {
   animate,
   motion,
@@ -26,7 +26,9 @@ import {
 const BRAND = "#ef07a2";
 
 /* ------------------------------------------------------------------ */
-/* Tilt3D: mouse ke saath 3D tilt + glare                              */
+/* Tilt3D: pointer-driven 3D tilt + glare.                             */
+/* Exported API is unchanged. It is no longer used inside this file,   */
+/* so remove it if nothing else imports it.                            */
 /* ------------------------------------------------------------------ */
 export function Tilt3D({ children, className = "", max = 9, glare = true }) {
   const reduce = useReducedMotion();
@@ -86,93 +88,23 @@ export function Tilt3D({ children, className = "", max = 9, glare = true }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* CountUp                                                             */
+/* CountUp: animates once, without re-rendering React every frame      */
 /* ------------------------------------------------------------------ */
 function CountUp({ value }) {
-  const [n, setN] = useState(0);
+  const reduce = useReducedMotion();
+  const mv = useMotionValue(reduce ? value : 0);
+  const rounded = useTransform(mv, (v) => Math.round(v));
 
   useEffect(() => {
-    const controls = animate(0, value, {
-      duration: 1.1,
-      ease: "easeOut",
-      onUpdate: (v) => setN(Math.round(v)),
-    });
+    if (reduce) {
+      mv.set(value);
+      return;
+    }
+    const controls = animate(mv, value, { duration: 1.1, ease: "easeOut" });
     return () => controls.stop();
-  }, [value]);
+  }, [value, mv, reduce]);
 
-  return <>{n}</>;
-}
-
-/* ------------------------------------------------------------------ */
-/* 3D Cube                                                             */
-/* ------------------------------------------------------------------ */
-function Cube({ size = 96 }) {
-  const reduce = useReducedMotion();
-  const half = size / 2;
-
-  const faces = [
-    "rotateY(0deg)",
-    "rotateY(90deg)",
-    "rotateY(180deg)",
-    "rotateY(-90deg)",
-    "rotateX(90deg)",
-    "rotateX(-90deg)",
-  ];
-
-  return (
-    <motion.div
-      className="relative"
-      style={{ width: size, height: size, transformStyle: "preserve-3d" }}
-      animate={reduce ? undefined : { rotateX: [0, 360], rotateY: [0, 360] }}
-      transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
-    >
-      {faces.map((face) => (
-        <span
-          key={face}
-          className="absolute inset-0 rounded-2xl border border-[#ef07a2]/50 bg-gradient-to-br from-[#ef07a2]/30 via-[#ef07a2]/10 to-transparent"
-          style={{ transform: `${face} translateZ(${half}px)` }}
-        />
-      ))}
-    </motion.div>
-  );
-}
-
-function Ring({ size, duration, reverse = false, dashed = false }) {
-  const reduce = useReducedMotion();
-
-  return (
-    <motion.span
-      aria-hidden="true"
-      className={`absolute left-1/2 top-1/2 rounded-full border ${
-        dashed ? "border-dashed border-[#ef07a2]/40" : "border-[#ef07a2]/25"
-      }`}
-      style={{
-        width: size,
-        height: size,
-        marginLeft: -size / 2,
-        marginTop: -size / 2,
-        rotateX: 72,
-      }}
-      animate={reduce ? undefined : { rotateZ: reverse ? [360, 0] : [0, 360] }}
-      transition={{ duration, repeat: Infinity, ease: "linear" }}
-    />
-  );
-}
-
-function FloatChip({ icon: Icon, className, delay = 0 }) {
-  const reduce = useReducedMotion();
-
-  return (
-    <motion.span
-      aria-hidden="true"
-      className={`absolute grid size-10 place-items-center rounded-xl border border-border bg-card/90 text-[#ef07a2] shadow-lg backdrop-blur ${className}`}
-      animate={reduce ? undefined : { y: [0, -10, 0] }}
-      transition={{ duration: 4, delay, repeat: Infinity, ease: "easeInOut" }}
-      style={{ transform: "translateZ(60px)" }}
-    >
-      <Icon className="size-[18px]" />
-    </motion.span>
-  );
+  return <motion.span>{rounded}</motion.span>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -182,86 +114,37 @@ export function HeroScene3D({ first, total, active, completed }) {
   const percent = total ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-border bg-card">
-      {/* background glow */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -left-24 -top-24 size-72 rounded-full bg-[#ef07a2]/15 blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-32 right-0 size-80 rounded-full bg-[#ef07a2]/10 blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            "linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)",
-          backgroundSize: "36px 36px",
-        }}
-      />
+    <section className="rounded-3xl border border-border bg-card p-6 sm:p-8 lg:p-10">
+      <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#ef07a2]/25 bg-[#ef07a2]/10 px-3 py-1 text-xs font-semibold text-[#ef07a2]">
+        <FiZap className="size-3.5" aria-hidden="true" />
+        Student dashboard
+      </p>
 
-      <div className="relative grid items-center gap-8 p-6 sm:p-8 lg:grid-cols-[1.2fr_1fr] lg:p-10">
-        <div className="min-w-0">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#ef07a2]/25 bg-[#ef07a2]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#ef07a2]">
-            <FiZap className="size-3" />
-            Student dashboard
-          </p>
+      <h1 className="text-balance text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+        Welcome back, <span className="text-[#ef07a2]">{first}</span>
+      </h1>
 
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-            Welcome back, <span className="text-[#ef07a2]">{first}</span>
-          </h1>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+        {active > 0
+          ? `You have ${active} course${active > 1 ? "s" : ""} in progress. Pick up right where you left off.`
+          : "Start a new course and keep your learning journey moving."}
+      </p>
 
-          <p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground sm:text-base">
-            {active > 0
-              ? `Aap ke ${active} course${active > 1 ? "s" : ""} chal rahe hain. Wahin se continue karein jahan chhora tha.`
-              : "Naya course shuru karein aur apni learning journey aage barhayein."}
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-border bg-background/60 px-3.5 py-2 text-sm backdrop-blur">
-              <FiTrendingUp className="size-4 text-[#ef07a2]" />
-              <span className="font-bold tabular-nums text-foreground">
-                {percent}%
-              </span>
-              <span className="text-muted-foreground">completion rate</span>
-            </div>
-
-            <div className="flex items-center gap-2 rounded-xl border border-border bg-background/60 px-3.5 py-2 text-sm backdrop-blur">
-              <FiLayers className="size-4 text-[#ef07a2]" />
-              <span className="font-bold tabular-nums text-foreground">
-                {total}
-              </span>
-              <span className="text-muted-foreground">enrolled</span>
-            </div>
-          </div>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3.5 py-2 text-sm">
+          <FiTrendingUp className="size-4 text-[#ef07a2]" aria-hidden="true" />
+          <span className="font-bold tabular-nums text-foreground">
+            {percent}%
+          </span>
+          <span className="text-muted-foreground">completion rate</span>
         </div>
 
-        {/* 3D scene */}
-        <div className="relative mx-auto hidden h-64 w-full max-w-sm lg:block">
-          <Tilt3D className="size-full" max={12} glare={false}>
-            <div
-              className="relative grid size-full place-items-center"
-              style={{ perspective: 900, transformStyle: "preserve-3d" }}
-            >
-              <Ring size={230} duration={26} dashed />
-              <Ring size={170} duration={18} reverse />
-              <Cube size={92} />
-
-              <FloatChip icon={FiBookOpen} className="left-2 top-4" />
-              <FloatChip
-                icon={FiAward}
-                className="right-2 top-12"
-                delay={0.8}
-              />
-              <FloatChip
-                icon={FiStar}
-                className="bottom-4 left-10"
-                delay={1.6}
-              />
-            </div>
-          </Tilt3D>
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3.5 py-2 text-sm">
+          <FiLayers className="size-4 text-[#ef07a2]" aria-hidden="true" />
+          <span className="font-bold tabular-nums text-foreground">
+            {total}
+          </span>
+          <span className="text-muted-foreground">enrolled</span>
         </div>
       </div>
     </section>
@@ -269,7 +152,7 @@ export function HeroScene3D({ first, total, active, completed }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Stats (3D tilt cards + count up)                                    */
+/* Stats                                                               */
 /* ------------------------------------------------------------------ */
 export function Stats3D({ total, active, completed }) {
   const stats = [
@@ -297,32 +180,33 @@ export function Stats3D({ total, active, completed }) {
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       {stats.map((s) => (
-        <Tilt3D key={s.label} className="rounded-2xl">
-          <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {s.label}
-                </p>
-                <p
-                  className={`mt-2 text-4xl font-extrabold tabular-nums ${
-                    s.accent ? "text-[#ef07a2]" : "text-foreground"
-                  }`}
-                >
-                  <CountUp value={s.value} />
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">{s.hint}</p>
-              </div>
-
-              <span
-                className="grid size-12 place-items-center rounded-2xl border border-[#ef07a2]/25 bg-[#ef07a2]/10 text-[#ef07a2]"
-                style={{ transform: "translateZ(30px)" }}
+        <div
+          key={s.label}
+          className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-[#ef07a2]/40 motion-reduce:transition-none"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-muted-foreground">
+                {s.label}
+              </p>
+              <p
+                className={`mt-2 text-4xl font-extrabold tabular-nums ${
+                  s.accent ? "text-[#ef07a2]" : "text-foreground"
+                }`}
               >
-                <s.icon className="size-5" />
-              </span>
+                <CountUp value={s.value} />
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{s.hint}</p>
             </div>
+
+            <span
+              className="grid size-12 shrink-0 place-items-center rounded-2xl border border-[#ef07a2]/25 bg-[#ef07a2]/10 text-[#ef07a2]"
+              aria-hidden="true"
+            >
+              <s.icon className="size-5" />
+            </span>
           </div>
-        </Tilt3D>
+        </div>
       ))}
     </div>
   );
@@ -332,108 +216,119 @@ export function Stats3D({ total, active, completed }) {
 /* Completion orb (circular progress)                                  */
 /* ------------------------------------------------------------------ */
 export function CompletionOrb({ total, completed }) {
+  const reduce = useReducedMotion();
   const percent = total ? Math.round((completed / total) * 100) : 0;
   const r = 44;
   const c = 2 * Math.PI * r;
+  const offset = c - (percent / 100) * c;
 
   return (
-    <Tilt3D className="rounded-2xl">
-      <div className="rounded-2xl border border-border bg-card p-5">
-        <div className="flex items-center gap-5">
-          <div className="relative size-28 shrink-0">
-            <svg viewBox="0 0 100 100" className="size-full -rotate-90">
-              <circle
-                cx="50"
-                cy="50"
-                r={r}
-                fill="none"
-                strokeWidth="8"
-                className="stroke-muted"
-              />
-              <motion.circle
-                cx="50"
-                cy="50"
-                r={r}
-                fill="none"
-                stroke={BRAND}
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={c}
-                initial={{ strokeDashoffset: c }}
-                animate={{ strokeDashoffset: c - (percent / 100) * c }}
-                transition={{ duration: 1.2, ease: "easeOut" }}
-              />
-            </svg>
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center gap-5">
+        <div
+          className="relative size-28 shrink-0"
+          role="progressbar"
+          aria-label="Overall progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+        >
+          <svg
+            viewBox="0 0 100 100"
+            className="size-full -rotate-90"
+            aria-hidden="true"
+          >
+            <circle
+              cx="50"
+              cy="50"
+              r={r}
+              fill="none"
+              strokeWidth="8"
+              className="stroke-muted"
+            />
+            <motion.circle
+              cx="50"
+              cy="50"
+              r={r}
+              fill="none"
+              stroke={BRAND}
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={c}
+              initial={{ strokeDashoffset: reduce ? offset : c }}
+              animate={{ strokeDashoffset: offset }}
+              transition={{ duration: reduce ? 0 : 1.2, ease: "easeOut" }}
+            />
+          </svg>
 
-            <div className="absolute inset-0 grid place-items-center">
-              <span className="text-2xl font-extrabold tabular-nums text-foreground">
-                {percent}%
-              </span>
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <h3 className="text-sm font-bold text-foreground">
-              Overall progress
-            </h3>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              {completed} of {total} course{total === 1 ? "" : "s"} complete
-            </p>
-            <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#ef07a2]">
-              <FiFlag className="size-3.5" />
-              {percent >= 100 ? "Sab complete!" : "Keep going"}
-            </p>
+          <div className="absolute inset-0 grid place-items-center">
+            <span className="text-2xl font-extrabold tabular-nums text-foreground">
+              {percent}%
+            </span>
           </div>
         </div>
+
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-foreground">
+            Overall progress
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {completed} of {total} course{total === 1 ? "" : "s"} complete
+          </p>
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#ef07a2]">
+            <FiFlag className="size-3.5" aria-hidden="true" />
+            {percent >= 100 ? "All complete!" : "Keep going"}
+          </p>
+        </div>
       </div>
-    </Tilt3D>
+    </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Achievements (3D flip badges)                                       */
+/* Achievements                                                        */
 /* ------------------------------------------------------------------ */
 export function AchievementShelf({ total, active, completed }) {
   const badges = [
     {
       id: "start",
       title: "First step",
-      desc: "Pehla course enroll karein",
+      desc: "Enroll in your first course",
       icon: FiBookOpen,
       unlocked: total >= 1,
     },
     {
       id: "roll",
       title: "On a roll",
-      desc: "Koi course in progress ho",
+      desc: "Have a course in progress",
       icon: FiZap,
       unlocked: active >= 1,
     },
     {
       id: "finish",
       title: "Finisher",
-      desc: "Pehla course complete karein",
+      desc: "Complete your first course",
       icon: FiCheckCircle,
       unlocked: completed >= 1,
     },
     {
       id: "collect",
       title: "Collector",
-      desc: "5 courses enroll karein",
+      desc: "Enroll in 5 courses",
       icon: FiLayers,
       unlocked: total >= 5,
     },
     {
       id: "master",
       title: "Master",
-      desc: "5 courses complete karein",
+      desc: "Complete 5 courses",
       icon: FiAward,
       unlocked: completed >= 5,
     },
     {
       id: "star",
       title: "Rising star",
-      desc: "3 courses complete karein",
+      desc: "Complete 3 courses",
       icon: FiStar,
       unlocked: completed >= 3,
     },
@@ -443,66 +338,63 @@ export function AchievementShelf({ total, active, completed }) {
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-lg bg-[#ef07a2]/10 text-[#ef07a2]">
-            <FiAward className="size-4" />
-          </span>
-          <div>
-            <h3 className="text-sm font-bold text-foreground">Achievements</h3>
-            <p className="text-xs text-muted-foreground">
-              {unlocked} of {badges.length} unlocked
-            </p>
-          </div>
+      <div className="mb-4 flex items-center gap-2.5">
+        <span
+          className="grid size-9 place-items-center rounded-lg bg-[#ef07a2]/10 text-[#ef07a2]"
+          aria-hidden="true"
+        >
+          <FiAward className="size-4" />
+        </span>
+        <div>
+          <h3 className="text-sm font-bold text-foreground">Achievements</h3>
+          <p className="text-xs text-muted-foreground">
+            {unlocked} of {badges.length} unlocked
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <ul className="grid gap-3 min-[420px]:grid-cols-2 xl:grid-cols-3">
         {badges.map((b) => (
-          <div
+          <li
             key={b.id}
-            className="group h-24 cursor-pointer"
-            style={{ perspective: 600 }}
+            className={`flex flex-col gap-2 rounded-xl border p-3.5 ${
+              b.unlocked
+                ? "border-[#ef07a2]/30 bg-[#ef07a2]/5"
+                : "border-border bg-muted/40"
+            }`}
           >
-            <div
-              className="relative size-full transition-transform duration-500 group-hover:[transform:rotateY(180deg)]"
-              style={{ transformStyle: "preserve-3d" }}
+            <span
+              className={`grid size-8 place-items-center rounded-lg ${
+                b.unlocked
+                  ? "bg-[#ef07a2]/10 text-[#ef07a2]"
+                  : "bg-muted text-muted-foreground"
+              }`}
+              aria-hidden="true"
             >
-              {/* front */}
-              <div
-                className={`absolute inset-0 flex flex-col items-center justify-center gap-1.5 rounded-xl border text-center ${
-                  b.unlocked
-                    ? "border-[#ef07a2]/30 bg-[#ef07a2]/10 text-[#ef07a2]"
-                    : "border-border bg-muted/50 text-muted-foreground"
+              {b.unlocked ? (
+                <b.icon className="size-4" />
+              ) : (
+                <FiLock className="size-4" />
+              )}
+            </span>
+            <div>
+              <p
+                className={`text-sm font-semibold leading-tight ${
+                  b.unlocked ? "text-foreground" : "text-muted-foreground"
                 }`}
-                style={{ backfaceVisibility: "hidden" }}
               >
-                {b.unlocked ? (
-                  <b.icon className="size-5" />
-                ) : (
-                  <FiLock className="size-5" />
-                )}
-                <span className="px-1 text-[10px] font-bold leading-tight">
-                  {b.title}
+                {b.title}
+                <span className="sr-only">
+                  {b.unlocked ? " (unlocked)" : " (locked)"}
                 </span>
-              </div>
-
-              {/* back */}
-              <div
-                className="absolute inset-0 grid place-items-center rounded-xl border border-border bg-background p-2 text-center"
-                style={{
-                  backfaceVisibility: "hidden",
-                  transform: "rotateY(180deg)",
-                }}
-              >
-                <span className="text-[10px] font-medium leading-snug text-muted-foreground">
-                  {b.desc}
-                </span>
-              </div>
+              </p>
+              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                {b.desc}
+              </p>
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

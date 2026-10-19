@@ -1,6 +1,7 @@
 // components/admin/table/LifecycleTable.jsx: one table shell for every lifecycle-managed resource.
 // Client components pass `columns`, `run` and `bulk`, because functions can't cross the server/client boundary.
 "use client";
+import { motion, useReducedMotion } from "framer-motion";
 import { FiEdit2, FiEye } from "react-icons/fi";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DataTable } from "./DataTable";
@@ -8,6 +9,20 @@ import { BulkActionBar } from "./BulkActionBar";
 import { RowActions } from "./RowActions";
 import { lifecycleBulkActions, lifecycleItems } from "./lifecycle";
 import { useSelection } from "@/hooks/useSelection";
+
+function TableReveal({ children }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="w-full min-w-0"
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 export function LifecycleTable({
   rows,
@@ -63,22 +78,24 @@ export function LifecycleTable({
   ];
   return (
     <>
-      <DataTable
-        columns={all}
-        rows={rows}
-        caption={caption}
-        selectable
-        selected={selected}
-        onSelectedChange={setSelected}
-        minWidth={minWidth}
-        empty={
-          <EmptyState
-            icon={emptyIcon}
-            title={emptyTitle}
-            description="Try a different search or filter, or create a new one."
-          />
-        }
-      />
+      <TableReveal>
+        <DataTable
+          columns={all}
+          rows={rows}
+          caption={caption}
+          selectable
+          selected={selected}
+          onSelectedChange={setSelected}
+          minWidth={minWidth}
+          empty={
+            <EmptyState
+              icon={emptyIcon}
+              title={emptyTitle}
+              description="Try a different search or filter, or create a new one."
+            />
+          }
+        />
+      </TableReveal>
       <BulkActionBar
         selectedIds={ids}
         onClear={clear}
@@ -88,4 +105,3 @@ export function LifecycleTable({
     </>
   );
 }
-

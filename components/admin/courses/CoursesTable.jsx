@@ -28,21 +28,52 @@ export const priceLabel = (c) =>
       ? `${formatPrice(c.salePrice, c.currency)} (was ${formatPrice(c.price, c.currency)})`
       : formatPrice(c.price, c.currency);
 
+// Same rules as priceLabel, laid out as a sale price with the old price struck through
+function PriceCell({ c }) {
+  if (c.isFree) {
+    return (
+      <span className="inline-flex rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+        Free
+      </span>
+    );
+  }
+  if (c.salePrice != null && c.salePrice < c.price) {
+    return (
+      <div className="leading-tight">
+        <p className="text-sm font-semibold tabular-nums">
+          {formatPrice(c.salePrice, c.currency)}
+        </p>
+        <p className="text-xs tabular-nums text-muted-foreground">
+          <span className="sr-only">Was </span>
+          <span className="line-through">
+            {formatPrice(c.price, c.currency)}
+          </span>
+        </p>
+      </div>
+    );
+  }
+  return (
+    <p className="text-sm font-semibold tabular-nums">
+      {formatPrice(c.price, c.currency)}
+    </p>
+  );
+}
+
 export function CoursesTable({ rows, perms }) {
   const { selected, setSelected, clear, ids } = useSelection(rows);
   const columns = [
     {
       key: "thumb",
       header: "Thumbnail",
-      className: "w-20",
+      className: "w-24",
       cell: (r) => (
-        <div className="relative h-9 w-16 overflow-hidden rounded bg-muted">
+        <div className="relative h-10 w-[4.5rem] overflow-hidden rounded-md bg-muted ring-1 ring-border">
           {r.thumbnail ? (
             <Image
               src={r.thumbnail}
               alt=""
               fill
-              sizes="64px"
+              sizes="72px"
               className="object-cover"
             />
           ) : (
@@ -57,49 +88,70 @@ export function CoursesTable({ rows, perms }) {
     {
       key: "title",
       header: "Title",
-      className: "min-w-56",
+      className: "min-w-64",
       cell: (r) => (
         <div className="min-w-0">
           <Link
             href={`/admin/courses/${r.slug}`}
-            className="line-clamp-2 font-medium hover:underline"
+            className="line-clamp-2 rounded-sm text-sm font-semibold leading-snug underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/60"
           >
             {r.title}
           </Link>
-          <p className="font-mono text-xs text-muted-foreground">{r.slug}</p>
+          <p className="mt-0.5 max-w-64 truncate font-mono text-xs text-muted-foreground">
+            {r.slug}
+          </p>
         </div>
       ),
     },
     {
       key: "category",
       header: "Category",
-      className: "text-muted-foreground",
-      cell: (r) => r.category || "—",
+      className: "text-sm text-muted-foreground",
+      cell: (r) => (
+        <span className="block max-w-40 truncate">{r.category || "—"}</span>
+      ),
     },
     {
       key: "instructor",
       header: "Instructor",
-      className: "text-muted-foreground",
-      cell: (r) => r.instructor || "—",
+      className: "text-sm text-muted-foreground",
+      cell: (r) => (
+        <span className="block max-w-40 truncate">{r.instructor || "—"}</span>
+      ),
     },
     {
       key: "price",
       header: "Price",
       className: "whitespace-nowrap",
-      cell: priceLabel,
+      cell: (r) => <PriceCell c={r} />,
     },
     {
       key: "students",
       header: "Students",
-      className: "tabular-nums",
+      className: "text-sm tabular-nums",
       cell: (r) => formatCompact(r.studentsCount ?? 0),
     },
     {
       key: "rating",
       header: "Rating",
-      className: "whitespace-nowrap tabular-nums",
+      className: "whitespace-nowrap text-sm tabular-nums",
       cell: (r) =>
-        r.reviewCount ? `${r.rating.toFixed(1)} (${r.reviewCount})` : "—",
+        r.reviewCount ? (
+          <span className="inline-flex items-center gap-1.5">
+            <FiStar
+              className="size-3.5 fill-current text-highlight"
+              aria-hidden="true"
+            />
+            <span className="font-medium">
+              {Number(r.rating ?? 0).toFixed(1)}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              ({r.reviewCount})
+            </span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
       key: "status",
@@ -127,7 +179,7 @@ export function CoursesTable({ rows, perms }) {
     {
       key: "updated",
       header: "Updated",
-      className: "whitespace-nowrap text-muted-foreground",
+      className: "whitespace-nowrap text-sm tabular-nums text-muted-foreground",
       cell: (r) => formatDate(r.updatedAt),
     },
     {
@@ -215,4 +267,3 @@ export function CoursesTable({ rows, perms }) {
     </>
   );
 }
-

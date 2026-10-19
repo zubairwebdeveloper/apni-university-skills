@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -31,6 +31,8 @@ import {
   LayoutDashboard,
   LogIn,
   Megaphone,
+  Pause,
+  Play,
   Repeat2,
   Rocket,
   Star,
@@ -42,11 +44,8 @@ import Container from "@/components/layout/Container";
 import { mediaConfig } from "@/config/media";
 import { formatCompact } from "@/lib/utils/format";
 // TODO: point this at the file where you saved useLandingData.js.
-import {
-  FALLBACK_CATEGORIES,
-  matchesCategory,
-  useLandingData,
-} from "@/hooks/useLandingData";
+// Categories come only from Firebase (via useLandingData): no hardcoded list.
+import { matchesCategory } from "@/hooks/useLandingData";
 import { onAuthStateChanged } from "firebase/auth";
 // TODO: point this at the file that exports your initialised Firebase auth instance.
 import { auth } from "@/lib/firebase/client/auth";
@@ -62,14 +61,50 @@ const HeroScene = dynamic(() => import("./HeroScene"), {
 const EASE = [0.22, 1, 0.36, 1];
 
 /* ------------------------------------------------------------------ */
-/* Design tokens + routes (change routes here, nowhere else)           */
+/* Design tokens                                                       */
 /* ------------------------------------------------------------------ */
-const BORDER = "border-border/80";
+// Scoped to this section only, so the rest of the app keeps its own theme.
+// Dark surface follows your `.dark` class (shadcn default). Light mode uses
+// a darker amber so accent text stays readable on #F8FAFC.
+const THEME_CSS = `
+.apni-landing{
+  --background:#F8FAFC;--foreground:#111827;
+  --card:#FFFFFF;--card-foreground:#111827;
+  --muted:#EEF2F7;--muted-foreground:#55637A;
+  --border:#DCE3EC;--ring:#A16207;
+  --primary:#A16207;--primary-foreground:#FFFFFF;
+  --violet:#7C3AED;
+  font-family:var(--font-inter),var(--font-geist-sans),Inter,"DM Sans",ui-sans-serif,system-ui,sans-serif;
+  font-feature-settings:"cv11","ss01";
+  -webkit-font-smoothing:antialiased;
+}
+.dark .apni-landing{
+  --background:#111318;--foreground:#F8FAFC;
+  --card:#171A21;--card-foreground:#F8FAFC;
+  --muted:#1D212A;--muted-foreground:#94A3B8;
+  --border:#2A2F3A;--ring:#FACC15;
+  --primary:#FACC15;--primary-foreground:#111318;
+  --violet:#A78BFA;
+}
+@keyframes apni-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+`;
+
+const BORDER = "border-border";
 const TEXT_MUTED = "text-muted-foreground";
+const VIOLET = "text-[color:var(--violet)]";
 const FOCUS =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-// Sentence case label (no all-caps) keeps the page calmer and easier to read.
-const LABEL = "text-sm font-semibold tracking-wide text-primary";
+
+// Buttons: primary / secondary / quiet link.
+const BTN =
+  "inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg px-6 text-sm font-semibold transition-all duration-200 motion-reduce:transition-none";
+const BTN_PRIMARY = `${BTN} bg-primary text-primary-foreground shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:brightness-110 active:translate-y-0 motion-reduce:hover:transform-none ${FOCUS}`;
+const BTN_SECONDARY = `${BTN} border ${BORDER} bg-card text-foreground hover:border-primary/60 hover:bg-muted ${FOCUS}`;
+const LINK_QUIET = `inline-flex min-h-10 cursor-pointer items-center gap-1 rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline ${FOCUS}`;
+
+// Small label above a section: a badge, so it reads as a category and not a heading.
+const EYEBROW =
+  "inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground/80";
 
 const ROUTES = {
   login: "/signin",
@@ -87,10 +122,9 @@ const getFirstName = (user) => {
   return source.trim().split(/\s+/)[0] || "learner";
 };
 
-// Category links go to /courses?category=<firebase-slug>, e.g.
-// /courses?category=web-development. Only categories that really come from
-// Firebase get the filter (their slug is the real one). The built-in fallback
-// ones go to plain /courses, so a link never uses a slug that does not exist.
+// Each category carries its own href from Firebase (built from its slug).
+// A category without one falls back to the course list, so a link never
+// uses a slug that does not exist.
 const categoryHref = (category) => category?.href || ROUTES.courses;
 
 /* ------------------------------------------------------------------ */
@@ -121,6 +155,8 @@ const shorten = (text, max = 120) => {
   if (value.length <= max) return value;
   return `${value.slice(0, max).replace(/\s+\S*$/, "")}…`;
 };
+
+const countLabel = (n) => `${n} ${n === 1 ? "course" : "courses"}`;
 
 /* ------------------------------------------------------------------ */
 /* Static content                                                      */
@@ -156,22 +192,22 @@ const highlights = [
   {
     icon: UsersRound,
     title: "Live mentors",
-    text: "Get unstuck fast with Q&A sessions and code reviews.",
+    text: "Join Q&A sessions and get code reviews from people who work in the field.",
   },
   {
     icon: Layers3,
     title: "Real projects",
-    text: "Build a portfolio that others can actually open.",
+    text: "Every module ends with something you can deploy and share with a link.",
   },
   {
     icon: Award,
     title: "Certificates",
-    text: "Share proof of your skills on LinkedIn and your CV.",
+    text: "Add verified proof of your skills to LinkedIn and your CV.",
   },
   {
     icon: BriefcaseBusiness,
     title: "Career support",
-    text: "CV reviews, mock interviews and guidance.",
+    text: "CV reviews, mock interviews and advice on presenting your work.",
   },
 ];
 
@@ -179,7 +215,7 @@ const steps = [
   {
     icon: Target,
     title: "Pick your path",
-    text: "Choose a learning path and get a clear roadmap.",
+    text: "Choose a learning path and get a clear roadmap of what to study, in order.",
   },
   {
     icon: Code2,
@@ -194,8 +230,6 @@ const steps = [
 ];
 
 // `prefer` is the category KEY we would like to link to (web / ai / cloud).
-// Firebase categories get this key automatically (see useLandingData.js),
-// so it works even when the real slug is e.g. "web-development".
 // Falls back to position when no category has that key.
 const audienceDefs = [
   {
@@ -255,10 +289,10 @@ function reveal(reduce, delay = 0) {
   if (reduce) return {};
 
   return {
-    initial: { opacity: 0, y: 18 },
+    initial: { opacity: 0, y: 16 },
     whileInView: { opacity: 1, y: 0 },
     viewport: { once: true, margin: "-40px" },
-    transition: { duration: 0.6, delay, ease: EASE },
+    transition: { duration: 0.55, delay, ease: EASE },
   };
 }
 
@@ -272,7 +306,6 @@ function useCurrentUser() {
   const [state, setState] = useState({ user: null, loading: true });
 
   useEffect(() => {
-    // Firebase reports once whether someone is signed in (user object or null).
     const unsubscribe = onAuthStateChanged(
       auth,
       (firebaseUser) =>
@@ -332,8 +365,6 @@ class SceneBoundary extends Component {
 /* ------------------------------------------------------------------ */
 // Logged in  -> /student. Logged out -> create account. Loading -> placeholder.
 function AuthCta({ user, loading = false, className = "" }) {
-  const base = `inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none ${FOCUS} ${className}`;
-
   // Placeholder until auth resolves, so the button never flickers.
   if (loading) {
     return (
@@ -346,7 +377,10 @@ function AuthCta({ user, loading = false, className = "" }) {
 
   if (user) {
     return (
-      <Link href={getDashboardHref(user)} className={base}>
+      <Link
+        href={getDashboardHref(user)}
+        className={`${BTN_PRIMARY} ${className}`}
+      >
         <LayoutDashboard className="size-4" aria-hidden="true" />
         Go to dashboard
       </Link>
@@ -354,7 +388,7 @@ function AuthCta({ user, loading = false, className = "" }) {
   }
 
   return (
-    <Link href={ROUTES.register} className={base}>
+    <Link href={ROUTES.register} className={`${BTN_PRIMARY} ${className}`}>
       <GraduationCap className="size-4" aria-hidden="true" />
       Create your account
     </Link>
@@ -367,7 +401,7 @@ function LoginLink({ user, loading, className = "" }) {
   return (
     <Link
       href={ROUTES.login}
-      className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-sm text-sm font-medium text-foreground/80 hover:text-primary hover:underline ${FOCUS} ${className}`}
+      className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-sm text-sm font-medium ${TEXT_MUTED} underline-offset-4 transition-colors hover:text-foreground hover:underline ${FOCUS} ${className}`}
     >
       <LogIn className="size-4" aria-hidden="true" />
       Already a member? Log in
@@ -416,14 +450,14 @@ function StickyCta({ user, loading }) {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
           transition={{ duration: 0.3, ease: EASE }}
-          className={`fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3 rounded-2xl border ${BORDER} bg-card/95 p-3 shadow-xl shadow-black/10 backdrop-blur md:hidden`}
+          className={`fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3 rounded-2xl border ${BORDER} bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-xl shadow-black/20 md:hidden`}
         >
           <p className="text-sm font-medium leading-5">
             Ready to build your first project?
           </p>
           <Link
             href={ROUTES.register}
-            className={`inline-flex min-h-10 shrink-0 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground ${FOCUS}`}
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground ${FOCUS}`}
           >
             Join now
           </Link>
@@ -446,7 +480,7 @@ function Tilt3D({ reduce, className = "", max = 7, children }) {
   const rotateY = useTransform(sx, [0, 1], [-max, max]);
   const gx = useTransform(sx, (v) => `${v * 100}%`);
   const gy = useTransform(sy, (v) => `${v * 100}%`);
-  const glare = useMotionTemplate`radial-gradient(260px circle at ${gx} ${gy}, color-mix(in oklab, var(--primary) 14%, transparent), transparent 70%)`;
+  const glare = useMotionTemplate`radial-gradient(260px circle at ${gx} ${gy}, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%)`;
 
   const onMove = (event) => {
     if (reduce || event.pointerType !== "mouse") return;
@@ -494,22 +528,23 @@ function Tilt3D({ reduce, className = "", max = 7, children }) {
 function TiltCard({ reduce, delay = 0, className, children }) {
   return (
     <motion.li {...reveal(reduce, delay)} className="[perspective:900px]">
-      <Tilt3D reduce={reduce} className={className}>
+      <Tilt3D reduce={reduce} max={4} className={className}>
         {children}
       </Tilt3D>
     </motion.li>
   );
 }
 
+// Gentle idle drift for hero cards; disabled with reduced motion.
 function Float({ children, className, delay = 0 }) {
   const reduce = useReducedMotion();
 
   return (
     <motion.div
       className={className}
-      animate={reduce ? undefined : { y: [0, -6, 0] }}
+      animate={reduce ? undefined : { y: [0, -5, 0] }}
       transition={{
-        duration: 7,
+        duration: 8,
         delay,
         repeat: Infinity,
         ease: "easeInOut",
@@ -523,10 +558,12 @@ function Float({ children, className, delay = 0 }) {
 function CountUp({ value, reduce }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true });
-  const [count, setCount] = useState(reduce ? value : 0);
+  // Only real numbers animate; anything else (e.g. "24/7") is shown as given.
+  const numeric = typeof value === "number" && Number.isFinite(value);
+  const [count, setCount] = useState(reduce && numeric ? value : 0);
 
   useEffect(() => {
-    if (!inView || reduce) return;
+    if (!numeric || !inView || reduce) return;
 
     const controls = animate(0, value, {
       duration: 1.4,
@@ -535,7 +572,9 @@ function CountUp({ value, reduce }) {
     });
 
     return () => controls.stop();
-  }, [inView, value, reduce]);
+  }, [inView, value, reduce, numeric]);
+
+  if (!numeric) return <span ref={ref}>{String(value ?? "")}</span>;
 
   return <span ref={ref}>{formatCompact(reduce ? value : count)}+</span>;
 }
@@ -543,6 +582,7 @@ function CountUp({ value, reduce }) {
 /* ------------------------------------------------------------------ */
 /* Type rotator                                                        */
 /* ------------------------------------------------------------------ */
+// Rendered only when at least one category exists (see HeroSection).
 function TypeRotator({ reduce, paths }) {
   const ref = useRef(null);
   const inView = useInView(ref);
@@ -590,7 +630,7 @@ function TypeRotator({ reduce, paths }) {
       {/* min-h prevents layout shift while typing. */}
       <p
         aria-hidden="true"
-        className={`min-h-[5.5rem] text-base leading-7 sm:min-h-[4rem] sm:text-lg sm:leading-8 ${TEXT_MUTED}`}
+        className={`min-h-[5.5rem] border-l-2 border-primary/60 pl-4 text-base leading-7 sm:min-h-[4rem] sm:text-lg sm:leading-8 ${TEXT_MUTED}`}
       >
         {item.text.slice(0, visibleLength)}
         {!reduce && (
@@ -605,13 +645,17 @@ function TypeRotator({ reduce, paths }) {
           animate={{ opacity: 1, y: 0 }}
           exit={reduce ? undefined : { opacity: 0, y: -6 }}
           transition={{ duration: 0.25 }}
+          className="mt-3"
         >
           <Link
             href={item.href}
-            className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border ${BORDER} bg-foreground/[0.03] px-4 text-sm font-medium text-primary transition-colors duration-200 hover:border-primary/50 motion-reduce:transition-none ${FOCUS}`}
+            className={`group inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border ${BORDER} bg-card px-4 text-sm font-medium text-primary transition-colors duration-200 hover:border-primary/60 motion-reduce:transition-none ${FOCUS}`}
           >
             Explore {item.label}
-            <ArrowRight className="size-4" aria-hidden="true" />
+            <ArrowRight
+              className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
           </Link>
         </motion.div>
       </AnimatePresence>
@@ -647,12 +691,12 @@ function Terminal({ reduce, className = "w-60" }) {
     <div
       ref={ref}
       aria-hidden="true"
-      className={`rounded-xl border ${BORDER} bg-card/90 p-3 shadow-lg shadow-black/[0.06] backdrop-blur ${className}`}
+      className={`rounded-xl border ${BORDER} bg-card p-3 shadow-lg shadow-black/10 ${className}`}
     >
       <div className="mb-2 flex gap-1.5">
         <span className="size-2 rounded-full bg-foreground/20" />
         <span className="size-2 rounded-full bg-foreground/20" />
-        <span className="size-2 rounded-full bg-amber-400/80" />
+        <span className="size-2 rounded-full bg-primary" />
       </div>
       <pre className="h-24 overflow-hidden whitespace-pre-wrap font-mono text-[11px] leading-5 text-foreground/90">
         {fullText.slice(0, visibleLength)}
@@ -667,14 +711,16 @@ function Terminal({ reduce, className = "w-60" }) {
 /* ------------------------------------------------------------------ */
 /* Path switcher                                                       */
 /* ------------------------------------------------------------------ */
+// Rendered only when at least one category exists (see HeroSection).
 function PathSwitcher({ reduce, paths }) {
   const [activeId, setActiveId] = useState(paths[0].id);
   const [autoRotate, setAutoRotate] = useState(true);
-  // If Firebase data replaces the fallback, the old id may not exist anymore.
+  // If Firebase data changes, the old id may not exist anymore.
   const activePath = paths.find((path) => path.id === activeId) ?? paths[0];
+  const canRotate = !reduce && paths.length > 1;
 
   useEffect(() => {
-    if (!autoRotate || reduce || paths.length < 2) return;
+    if (!autoRotate || !canRotate) return;
 
     const intervalId = setInterval(() => {
       setActiveId((currentId) => {
@@ -684,7 +730,7 @@ function PathSwitcher({ reduce, paths }) {
     }, 6000);
 
     return () => clearInterval(intervalId);
-  }, [autoRotate, reduce, paths]);
+  }, [autoRotate, canRotate, paths]);
 
   // Empty fields (not filled in Firestore yet) are simply hidden.
   const details = [
@@ -697,10 +743,31 @@ function PathSwitcher({ reduce, paths }) {
   return (
     <div id="learning-paths" className="mt-10 scroll-mt-24">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className={LABEL}>Learning paths</h2>
-        <span className={`hidden text-xs sm:block ${TEXT_MUTED}`}>
-          Pick one to see what it covers
-        </span>
+        <h2 className="text-base font-semibold tracking-tight">
+          Learning paths
+        </h2>
+        <div className="flex items-center gap-3">
+          <span className={`hidden text-xs sm:block ${TEXT_MUTED}`}>
+            {autoRotate && canRotate
+              ? "Pick one to pause the preview and read more"
+              : "Pick a path to see what it covers"}
+          </span>
+          {/* Moving content needs a pause control (WCAG 2.2.2). */}
+          {canRotate && (
+            <button
+              type="button"
+              onClick={() => setAutoRotate((value) => !value)}
+              className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-primary underline-offset-4 hover:underline ${FOCUS}`}
+            >
+              {autoRotate ? (
+                <Pause className="size-3.5" aria-hidden="true" />
+              ) : (
+                <Play className="size-3.5" aria-hidden="true" />
+              )}
+              {autoRotate ? "Pause preview" : "Resume preview"}
+            </button>
+          )}
+        </div>
       </div>
 
       <ul
@@ -719,10 +786,10 @@ function PathSwitcher({ reduce, paths }) {
                   setAutoRotate(false);
                   setActiveId(path.id);
                 }}
-                className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors duration-200 motion-reduce:transition-none ${FOCUS} ${
+                className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors duration-200 motion-reduce:transition-none ${FOCUS} ${
                   isActive
                     ? "border-primary bg-primary text-primary-foreground"
-                    : `${BORDER} bg-foreground/[0.03] text-foreground/85 hover:border-primary/50 hover:text-foreground`
+                    : `${BORDER} bg-card text-foreground/85 hover:border-primary/60 hover:text-foreground`
                 }`}
               >
                 <CategoryIcon name={path.icon} className="size-4" />
@@ -733,18 +800,18 @@ function PathSwitcher({ reduce, paths }) {
         })}
       </ul>
 
-      <Tilt3D reduce={reduce} max={3} className="mt-2 rounded-2xl">
+      <Tilt3D reduce={reduce} max={2} className="mt-2 rounded-2xl">
         <div
-          className={`relative min-h-[21rem] overflow-hidden rounded-2xl border ${BORDER} bg-card/70 p-5 sm:min-h-[15rem] sm:p-6`}
+          className={`relative min-h-[21rem] overflow-hidden rounded-2xl border ${BORDER} bg-card p-5 sm:min-h-[15rem] sm:p-6`}
         >
-          {autoRotate && !reduce && (
+          {autoRotate && canRotate && (
             <motion.div
               key={activePath.id}
               aria-hidden="true"
               initial={{ scaleX: 0 }}
               animate={{ scaleX: 1 }}
               transition={{ duration: 6, ease: "linear" }}
-              className="absolute inset-x-0 top-0 h-px origin-left bg-primary"
+              className="absolute inset-x-0 top-0 h-0.5 origin-left bg-primary"
             />
           )}
 
@@ -756,10 +823,10 @@ function PathSwitcher({ reduce, paths }) {
               exit={reduce ? undefined : { opacity: 0, y: -6 }}
               transition={{ duration: 0.22 }}
             >
-              <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
                 {details.map(([term, description]) => (
                   <div key={term}>
-                    <dt className="text-xs font-semibold text-primary/80">
+                    <dt className={`text-xs font-semibold ${VIOLET}`}>
                       {term}
                     </dt>
                     <dd className="mt-1 text-sm leading-6 text-foreground/90">
@@ -769,13 +836,15 @@ function PathSwitcher({ reduce, paths }) {
                 ))}
               </dl>
 
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                {activePath.tools.length > 0 ? (
+              <div
+                className={`mt-5 flex flex-wrap items-center justify-between gap-3 border-t ${BORDER} pt-4`}
+              >
+                {activePath.tools?.length > 0 ? (
                   <ul className="flex flex-wrap gap-1.5">
                     {activePath.tools.map((tool) => (
                       <li
                         key={tool}
-                        className={`rounded-md border ${BORDER} bg-foreground/[0.03] px-2 py-1 text-xs text-foreground/80`}
+                        className={`rounded-md border ${BORDER} bg-muted px-2 py-1 text-xs font-medium text-foreground/80`}
                       >
                         {tool}
                       </li>
@@ -786,10 +855,13 @@ function PathSwitcher({ reduce, paths }) {
                 )}
                 <Link
                   href={categoryHref(activePath)}
-                  className={`inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline ${FOCUS}`}
+                  className={`group ${LINK_QUIET}`}
                 >
                   Browse {activePath.label} courses
-                  <ArrowRight className="size-4" aria-hidden="true" />
+                  <ArrowRight
+                    className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                    aria-hidden="true"
+                  />
                 </Link>
               </div>
             </motion.div>
@@ -817,7 +889,7 @@ function Stage({ reduce, src, featuredCourse, spotlightPath, scrollProgress }) {
     >
       <div
         aria-hidden="true"
-        className="absolute inset-[8%] rounded-full bg-primary/10 blur-3xl"
+        className="absolute inset-[10%] rounded-full bg-primary/10 blur-3xl"
       />
 
       <div aria-hidden="true" className="absolute inset-0">
@@ -837,11 +909,11 @@ function Stage({ reduce, src, featuredCourse, spotlightPath, scrollProgress }) {
         className="absolute bottom-[4%] left-[2%] w-[56%] sm:w-[50%]"
       >
         <div
-          className={`overflow-hidden rounded-xl border ${BORDER} bg-card/95 shadow-lg shadow-black/[0.06]`}
+          className={`overflow-hidden rounded-xl border ${BORDER} bg-card shadow-lg shadow-black/10`}
         >
           <div
             aria-hidden="true"
-            className={`flex h-7 items-center gap-1.5 border-b ${BORDER} bg-foreground/[0.03] px-3`}
+            className={`flex h-7 items-center gap-1.5 border-b ${BORDER} bg-muted px-3`}
           >
             <span className="size-1.5 rounded-full bg-foreground/20" />
             <span className="size-1.5 rounded-full bg-foreground/20" />
@@ -850,7 +922,7 @@ function Stage({ reduce, src, featuredCourse, spotlightPath, scrollProgress }) {
               my-first-project / main
             </span>
           </div>
-          <div className="relative aspect-[4/3] bg-muted/20">
+          <div className="relative aspect-[4/3] bg-muted/40">
             {gifFailed || !src ? (
               <div
                 aria-hidden="true"
@@ -874,12 +946,12 @@ function Stage({ reduce, src, featuredCourse, spotlightPath, scrollProgress }) {
         </div>
       </Float>
 
-      {/* Featured category card: link uses the category slug from Firebase. */}
+      {/* Featured category card: link uses the category href from Firebase. */}
       {spotlightPath && (
         <Float delay={1.2} className="absolute right-[2%] top-[10%]">
           <Link
             href={categoryHref(spotlightPath)}
-            className={`flex items-center gap-2.5 rounded-xl border ${BORDER} bg-card/90 p-2.5 backdrop-blur hover:border-primary/40 sm:p-3 ${FOCUS}`}
+            className={`flex items-center gap-2.5 rounded-xl border ${BORDER} bg-card p-2.5 shadow-lg shadow-black/10 transition-colors hover:border-primary/60 sm:p-3 ${FOCUS}`}
           >
             <span
               className={`grid size-8 place-items-center rounded-lg sm:size-9 ${accentClass(spotlightPath.accent)}`}
@@ -893,9 +965,7 @@ function Stage({ reduce, src, featuredCourse, spotlightPath, scrollProgress }) {
               <span className="block font-medium">{spotlightPath.label}</span>
               <span className={`hidden text-xs sm:block ${TEXT_MUTED}`}>
                 {spotlightPath.courseCount > 0
-                  ? `${spotlightPath.courseCount} ${
-                      spotlightPath.courseCount === 1 ? "course" : "courses"
-                    }`
+                  ? countLabel(spotlightPath.courseCount)
                   : "Explore courses"}
               </span>
             </p>
@@ -914,7 +984,7 @@ function Stage({ reduce, src, featuredCourse, spotlightPath, scrollProgress }) {
         >
           <Link
             href={`${ROUTES.courses}/${featuredCourse.slug}`}
-            className={`flex max-w-[14rem] cursor-pointer items-center gap-3 rounded-xl border ${BORDER} bg-card/95 p-3 backdrop-blur hover:border-primary/40 ${FOCUS}`}
+            className={`group flex max-w-[14rem] cursor-pointer items-center gap-3 rounded-xl border ${BORDER} bg-card p-3 shadow-lg shadow-black/10 transition-colors hover:border-primary/60 ${FOCUS}`}
           >
             <p className="text-sm">
               <span className={`block text-xs ${TEXT_MUTED}`}>
@@ -925,7 +995,7 @@ function Stage({ reduce, src, featuredCourse, spotlightPath, scrollProgress }) {
               </span>
             </p>
             <ArrowUpRight
-              className="size-4 shrink-0 text-primary"
+              className="size-4 shrink-0 text-primary transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
               aria-hidden="true"
             />
           </Link>
@@ -941,38 +1011,49 @@ function Stage({ reduce, src, featuredCourse, spotlightPath, scrollProgress }) {
 function SectionHeading({ reduce, eyebrow, title, text, id }) {
   return (
     <motion.div {...reveal(reduce)} className="max-w-2xl">
-      <p className={LABEL}>{eyebrow}</p>
+      <p className={EYEBROW}>
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />
+        {eyebrow}
+      </p>
       <h2
         id={id}
         style={{ fontSize: "clamp(1.75rem, 1.3rem + 1.8vw, 2.75rem)" }}
-        className="mt-3 text-balance font-semibold leading-[1.1] tracking-[-0.025em]"
+        className="mt-4 text-balance font-semibold leading-[1.1] tracking-[-0.025em]"
       >
         {title}
       </h2>
-      <p className={`mt-4 max-w-xl leading-7 ${TEXT_MUTED}`}>{text}</p>
+      <p className={`mt-4 max-w-xl text-base leading-7 ${TEXT_MUTED}`}>
+        {text}
+      </p>
     </motion.div>
   );
 }
 
-// Scrolling strip of technologies learners work with.
+// Scrolling strip of technologies learners work with. Pauses on hover.
 function ToolsMarquee({ reduce }) {
-  const items = [...marqueeTools, ...marqueeTools];
+  const items = reduce ? marqueeTools : [...marqueeTools, ...marqueeTools];
 
   return (
     <div
-      className={`border-y ${BORDER} bg-muted/20 py-4`}
+      className={`group/marquee border-y ${BORDER} bg-muted/40 py-4`}
       role="region"
       aria-label="Technologies you will learn"
     >
       <p className="sr-only">Technologies: {marqueeTools.join(", ")}</p>
       <div
         aria-hidden="true"
-        className="overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
+        className={
+          reduce
+            ? "mx-auto max-w-6xl px-4"
+            : "overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
+        }
       >
-        <motion.ul
-          className="flex w-max gap-3"
-          animate={reduce ? undefined : { x: ["0%", "-50%"] }}
-          transition={{ duration: 32, ease: "linear", repeat: Infinity }}
+        <ul
+          className={
+            reduce
+              ? "flex flex-wrap justify-center gap-2"
+              : "flex w-max gap-3 [animation:apni-marquee_36s_linear_infinite] group-hover/marquee:[animation-play-state:paused] motion-reduce:[animation:none]"
+          }
         >
           {items.map((tool, i) => (
             <li
@@ -982,7 +1063,7 @@ function ToolsMarquee({ reduce }) {
               {tool}
             </li>
           ))}
-        </motion.ul>
+        </ul>
       </div>
     </div>
   );
@@ -1005,18 +1086,26 @@ function Highlights({ reduce }) {
               key={title}
               reduce={reduce}
               delay={index * 0.07}
-              className={`group h-full rounded-2xl border ${BORDER} bg-card p-5 transition-colors duration-300 hover:border-primary/40 motion-reduce:transition-none`}
+              className={`group h-full rounded-2xl border ${BORDER} bg-card p-6 transition-colors duration-300 hover:border-primary/50 motion-reduce:transition-none`}
             >
-              <span
-                style={reduce ? undefined : { transform: "translateZ(34px)" }}
-                className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none"
-              >
-                <Icon className="size-5" aria-hidden="true" />
-              </span>
-              <h3 className="mt-4 text-base font-semibold tracking-tight">
+              <div className="flex items-center justify-between">
+                <span
+                  style={reduce ? undefined : { transform: "translateZ(30px)" }}
+                  className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none"
+                >
+                  <Icon className="size-5" aria-hidden="true" />
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={`font-mono text-xs tabular-nums opacity-70 ${VIOLET}`}
+                >
+                  0{index + 1}
+                </span>
+              </div>
+              <h3 className="mt-5 text-lg font-semibold tracking-tight">
                 {title}
               </h3>
-              <p className={`mt-1.5 text-sm leading-6 ${TEXT_MUTED}`}>{text}</p>
+              <p className={`mt-2 text-sm leading-6 ${TEXT_MUTED}`}>{text}</p>
             </TiltCard>
           ))}
         </ul>
@@ -1025,10 +1114,12 @@ function Highlights({ reduce }) {
   );
 }
 
-// One card per category (from Firebase), each linking to /courses?category=<slug>.
+// One card per category (from Firebase), each linking to its category page.
 function Outcomes({ reduce, paths }) {
+  if (!paths.length) return null;
+
   return (
-    <div className={`border-t ${BORDER} bg-muted/20 py-16 sm:py-24`}>
+    <div className={`border-t ${BORDER} bg-muted/40 py-16 sm:py-24`}>
       <Container>
         <SectionHeading
           reduce={reduce}
@@ -1049,24 +1140,25 @@ function Outcomes({ reduce, paths }) {
               >
                 <Link
                   href={categoryHref(path)}
-                  className={`group flex h-full flex-col justify-between gap-6 rounded-2xl border ${BORDER} bg-card p-6 transition-colors duration-200 hover:border-primary/50 motion-reduce:transition-none ${FOCUS}`}
+                  className={`group flex h-full flex-col justify-between gap-6 rounded-2xl border ${BORDER} bg-card p-6 transition-colors duration-200 hover:border-primary/60 motion-reduce:transition-none ${FOCUS}`}
                 >
                   <div>
-                    <div className="flex items-center gap-2.5 text-sm font-medium">
+                    <div className="flex flex-wrap items-center gap-2.5 text-sm font-medium">
                       <span
-                        className={`grid size-8 place-items-center rounded-lg ${accentClass(path.accent)}`}
+                        className={`grid size-9 place-items-center rounded-lg ${accentClass(path.accent)}`}
                       >
                         <CategoryIcon name={path.icon} className="size-4" />
                       </span>
-                      <span className="text-primary">{path.label}</span>
+                      <span className="text-foreground">{path.label}</span>
                       {path.courseCount > 0 && (
-                        <span className={`text-xs font-normal ${TEXT_MUTED}`}>
-                          {path.courseCount}{" "}
-                          {path.courseCount === 1 ? "course" : "courses"}
+                        <span
+                          className={`rounded-full border ${BORDER} bg-muted px-2 py-0.5 text-xs font-normal ${TEXT_MUTED}`}
+                        >
+                          {countLabel(path.courseCount)}
                         </span>
                       )}
                     </div>
-                    <h3 className="mt-3 text-lg font-semibold leading-snug tracking-tight">
+                    <h3 className="mt-4 text-balance text-xl font-semibold leading-snug tracking-tight">
                       {heading}
                     </h3>
                     {path.why && (
@@ -1075,13 +1167,15 @@ function Outcomes({ reduce, paths }) {
                       </p>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-end justify-between gap-3">
-                    {path.tools.length > 0 ? (
+                  <div
+                    className={`flex flex-wrap items-end justify-between gap-3 border-t ${BORDER} pt-4`}
+                  >
+                    {path.tools?.length > 0 ? (
                       <ul className="flex flex-wrap gap-1.5">
                         {path.tools.map((tool) => (
                           <li
                             key={tool}
-                            className={`rounded-md border ${BORDER} px-2 py-1 text-xs text-foreground/75`}
+                            className={`rounded-md border ${BORDER} bg-muted px-2 py-1 text-xs text-foreground/75`}
                           >
                             {tool}
                           </li>
@@ -1108,6 +1202,7 @@ function Outcomes({ reduce, paths }) {
   );
 }
 
+// This really is a sequence, so the numbered markers stay.
 function JourneyStep({ step, index, progress, reduce }) {
   const Icon = step.icon;
   const start = index / steps.length;
@@ -1120,27 +1215,25 @@ function JourneyStep({ step, index, progress, reduce }) {
   return (
     <li className="relative pl-14 md:pl-0 md:pt-14">
       <motion.span
-        whileHover={reduce ? undefined : { rotateY: 180, scale: 1.1 }}
-        transition={{ duration: 0.5 }}
-        style={
-          reduce ? undefined : { opacity: emphasis, transformPerspective: 400 }
-        }
-        className="absolute left-0 top-0 grid size-10 cursor-pointer place-items-center rounded-full border border-primary/50 bg-muted/20 text-primary"
+        whileHover={reduce ? undefined : { scale: 1.08 }}
+        transition={{ duration: 0.25 }}
+        style={reduce ? undefined : { opacity: emphasis }}
+        className="absolute left-0 top-0 grid size-10 place-items-center rounded-full border border-primary/60 bg-card text-primary"
       >
         <Icon className="size-5" aria-hidden="true" />
       </motion.span>
       <motion.div style={reduce ? undefined : { opacity: emphasis }}>
-        <h3 className="font-semibold tracking-tight">
+        <h3 className="text-lg font-semibold tracking-tight">
           <span className="sr-only">Step {index + 1}: </span>
           <span
             aria-hidden="true"
-            className="mr-2 font-mono text-amber-700 dark:text-amber-400"
+            className={`mr-2 font-mono text-sm ${VIOLET}`}
           >
             0{index + 1}
           </span>
           {step.title}
         </h3>
-        <p className={`mt-1.5 max-w-sm text-sm leading-6 ${TEXT_MUTED}`}>
+        <p className={`mt-2 max-w-sm text-sm leading-6 ${TEXT_MUTED}`}>
           {step.text}
         </p>
       </motion.div>
@@ -1177,7 +1270,7 @@ function Journey({ reduce }) {
         >
           <span
             aria-hidden="true"
-            className="absolute bottom-5 left-5 top-5 w-px bg-foreground/10 md:hidden"
+            className="absolute bottom-5 left-5 top-5 w-px bg-border md:hidden"
           >
             <motion.span
               style={reduce ? undefined : { scaleY: progress }}
@@ -1186,7 +1279,7 @@ function Journey({ reduce }) {
           </span>
           <span
             aria-hidden="true"
-            className="absolute left-5 right-5 top-5 hidden h-px bg-foreground/10 md:block"
+            className="absolute left-5 right-5 top-5 hidden h-px bg-border md:block"
           >
             <motion.span
               style={reduce ? undefined : { scaleX: progress }}
@@ -1211,8 +1304,7 @@ function Journey({ reduce }) {
 
 function Audiences({ reduce, paths }) {
   // Prefer the category with the wanted KEY (web / ai / cloud); otherwise use
-  // the path at that position. Firebase categories get their key automatically,
-  // so this works even when the real slug is e.g. "web-development".
+  // the path at that position. With no categories, link to the course list.
   const items = audienceDefs.map((def, index) => {
     const target =
       paths.find((p) => p.key === def.prefer || p.slug === def.prefer) ??
@@ -1227,7 +1319,7 @@ function Audiences({ reduce, paths }) {
   });
 
   return (
-    <div className={`border-t ${BORDER} bg-muted/20 py-16 sm:py-24`}>
+    <div className={`border-t ${BORDER} bg-muted/40 py-16 sm:py-24`}>
       <Container>
         <SectionHeading
           reduce={reduce}
@@ -1236,25 +1328,31 @@ function Audiences({ reduce, paths }) {
           text="Choose the route that matches your experience today. You can switch paths any time."
         />
 
-        <ul className="mt-10 grid gap-3 md:grid-cols-3 sm:gap-4">
+        <ul className="mt-10 grid gap-3 sm:gap-4 md:grid-cols-3">
           {items.map(({ icon: Icon, title, text, cta, href }, index) => (
             <TiltCard
               key={title}
               reduce={reduce}
               delay={index * 0.07}
-              className={`h-full rounded-2xl border ${BORDER} bg-card p-6`}
+              className={`flex h-full flex-col rounded-2xl border ${BORDER} bg-card p-6`}
             >
-              <Icon className="size-6 text-primary" aria-hidden="true" />
-              <h3 className="mt-4 text-lg font-semibold tracking-tight">
+              <span
+                className={`grid size-11 place-items-center rounded-xl bg-[color:var(--violet)]/10 ${VIOLET}`}
+              >
+                <Icon className="size-5" aria-hidden="true" />
+              </span>
+              <h3 className="mt-5 text-lg font-semibold tracking-tight">
                 {title}
               </h3>
-              <p className={`mt-2 text-sm leading-6 ${TEXT_MUTED}`}>{text}</p>
-              <Link
-                href={href}
-                className={`mt-5 inline-flex min-h-10 items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline ${FOCUS}`}
-              >
+              <p className={`mt-2 flex-1 text-sm leading-6 ${TEXT_MUTED}`}>
+                {text}
+              </p>
+              <Link href={href} className={`group mt-5 ${LINK_QUIET}`}>
                 {cta}
-                <ArrowRight className="size-4" aria-hidden="true" />
+                <ArrowRight
+                  className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
               </Link>
             </TiltCard>
           ))}
@@ -1277,24 +1375,27 @@ function Testimonials({ reduce, items }) {
           title="What learners say after building with us"
           text="Real feedback from people who finished a path."
         />
-        <ul className="mt-10 grid gap-3 md:grid-cols-3 sm:gap-4">
+        <ul className="mt-10 grid gap-3 sm:gap-4 md:grid-cols-3">
           {items.map((item, index) => (
             <motion.li
               key={`${item.name}-${index}`}
               {...reveal(reduce, index * 0.07)}
-              className={`flex h-full flex-col justify-between gap-5 rounded-2xl border ${BORDER} bg-card p-6`}
             >
-              <blockquote className="text-sm leading-7 text-foreground/90">
-                {item.quote}
-              </blockquote>
-              <figcaption className="text-sm">
-                <span className="block font-medium">{item.name}</span>
-                {item.role && (
-                  <span className={`block text-xs ${TEXT_MUTED}`}>
-                    {item.role}
-                  </span>
-                )}
-              </figcaption>
+              <figure
+                className={`flex h-full flex-col justify-between gap-5 rounded-2xl border ${BORDER} bg-card p-6`}
+              >
+                <blockquote className="text-sm leading-7 text-foreground/90">
+                  {item.quote}
+                </blockquote>
+                <figcaption className={`border-t ${BORDER} pt-4 text-sm`}>
+                  <span className="block font-medium">{item.name}</span>
+                  {item.role && (
+                    <span className={`block text-xs ${TEXT_MUTED}`}>
+                      {item.role}
+                    </span>
+                  )}
+                </figcaption>
+              </figure>
             </motion.li>
           ))}
         </ul>
@@ -1305,33 +1406,46 @@ function Testimonials({ reduce, items }) {
 
 function Faq({ reduce, items }) {
   const [openIndex, setOpenIndex] = useState(0);
+  const baseId = useId();
 
   return (
-    <div className={`border-t ${BORDER} bg-muted/20 py-16 sm:py-24`}>
+    <div className={`border-t ${BORDER} bg-muted/40 py-16 sm:py-24`}>
       <Container>
         <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
-          <SectionHeading
-            reduce={reduce}
-            eyebrow="Questions"
-            title="Before you start"
-            text="Short answers to what learners ask most. Still unsure? Talk to us."
-          />
+          <div>
+            <SectionHeading
+              reduce={reduce}
+              eyebrow="Questions"
+              title="Before you start"
+              text="Short answers to what learners ask most. Still unsure? Talk to us."
+            />
+            <Link
+              href={ROUTES.contact}
+              className={`${BTN_SECONDARY} mt-6 min-h-11`}
+            >
+              Contact us
+            </Link>
+          </div>
 
           <motion.div {...reveal(reduce, 0.1)}>
-            <ul className={`divide-y divide-border/80 border-y ${BORDER}`}>
+            <ul
+              className={`divide-y divide-border overflow-hidden rounded-2xl border ${BORDER} bg-card`}
+            >
               {items.map((item, index) => {
                 const open = openIndex === index;
-                const panelId = `faq-panel-${index}`;
+                const panelId = `${baseId}-panel-${index}`;
+                const buttonId = `${baseId}-button-${index}`;
 
                 return (
                   <li key={item.q}>
                     <h3>
                       <button
+                        id={buttonId}
                         type="button"
                         aria-expanded={open}
                         aria-controls={panelId}
                         onClick={() => setOpenIndex(open ? -1 : index)}
-                        className={`flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 py-4 text-left text-base font-medium ${FOCUS}`}
+                        className={`flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left text-base font-medium transition-colors hover:bg-muted/60 motion-reduce:transition-none ${FOCUS} focus-visible:ring-inset focus-visible:ring-offset-0`}
                       >
                         {item.q}
                         <ChevronDown
@@ -1347,6 +1461,7 @@ function Faq({ reduce, items }) {
                         <motion.div
                           id={panelId}
                           role="region"
+                          aria-labelledby={buttonId}
                           initial={reduce ? false : { height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
                           exit={reduce ? undefined : { height: 0, opacity: 0 }}
@@ -1354,7 +1469,7 @@ function Faq({ reduce, items }) {
                           className="overflow-hidden"
                         >
                           <p
-                            className={`max-w-xl pb-5 text-sm leading-7 ${TEXT_MUTED}`}
+                            className={`max-w-xl px-5 pb-5 text-sm leading-7 ${TEXT_MUTED}`}
                           >
                             {item.a}
                           </p>
@@ -1365,14 +1480,6 @@ function Faq({ reduce, items }) {
                 );
               })}
             </ul>
-
-            <Link
-              href={ROUTES.contact}
-              className={`mt-6 inline-flex min-h-10 items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline ${FOCUS}`}
-            >
-              Ask us a question
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
           </motion.div>
         </div>
       </Container>
@@ -1387,8 +1494,8 @@ function FinalCta({ reduce, user, loading }) {
     target: ctaRef,
     offset: ["start 95%", "start 60%"],
   });
-  const rotate = useTransform(scrollYProgress, [0, 1], [18, 0]);
-  const scale = useTransform(scrollYProgress, [0, 1], [0.94, 1]);
+  const rotate = useTransform(scrollYProgress, [0, 1], [12, 0]);
+  const scale = useTransform(scrollYProgress, [0, 1], [0.96, 1]);
 
   return (
     <div className={`border-t ${BORDER} py-16 sm:py-24`}>
@@ -1403,9 +1510,9 @@ function FinalCta({ reduce, user, loading }) {
             }
             className={`relative overflow-hidden rounded-3xl border ${BORDER} bg-card p-8 sm:p-12`}
           >
-            <div
+            <span
               aria-hidden="true"
-              className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/15 blur-3xl"
+              className="absolute inset-y-0 left-0 w-1.5 bg-primary"
             />
             <div className="relative flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
               <div className="max-w-xl">
@@ -1419,7 +1526,7 @@ function FinalCta({ reduce, user, loading }) {
                     ? `Welcome back, ${getFirstName(user)}.`
                     : "Your first project starts today."}
                 </h2>
-                <p className={`mt-4 leading-7 ${TEXT_MUTED}`}>
+                <p className={`mt-4 text-base leading-7 ${TEXT_MUTED}`}>
                   {user
                     ? "Head to your dashboard and continue where you left off."
                     : "Create an account, pick a path and build something you can show by the end of your first module."}
@@ -1430,11 +1537,11 @@ function FinalCta({ reduce, user, loading }) {
                 <AuthCta
                   user={user}
                   loading={loading}
-                  className="w-full shadow-md shadow-primary/25 sm:w-auto"
+                  className="w-full sm:w-auto"
                 />
                 <Link
                   href={ROUTES.courses}
-                  className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border ${BORDER} bg-foreground/[0.03] px-6 text-sm font-semibold transition-colors duration-200 hover:border-primary/50 motion-reduce:transition-none ${FOCUS}`}
+                  className={`${BTN_SECONDARY} w-full sm:w-auto`}
                 >
                   Browse all courses
                 </Link>
@@ -1455,7 +1562,7 @@ function AnnouncementBar({ announcement }) {
   if (!announcement?.text) return null;
 
   return (
-    <div className={`border-b ${BORDER} bg-primary/5`}>
+    <div className={`border-b ${BORDER} bg-primary/10`}>
       <Container className="flex min-h-10 flex-wrap items-center justify-center gap-x-2 gap-y-1 py-2 text-center text-sm">
         <Megaphone
           className="size-4 shrink-0 text-primary"
@@ -1465,7 +1572,7 @@ function AnnouncementBar({ announcement }) {
         {announcement.href && (
           <Link
             href={announcement.href}
-            className={`inline-flex items-center gap-1 rounded-sm font-medium text-primary hover:underline ${FOCUS}`}
+            className={`inline-flex items-center gap-1 rounded-sm font-medium text-primary underline-offset-4 hover:underline ${FOCUS}`}
           >
             Learn more
             <ArrowRight className="size-3.5" aria-hidden="true" />
@@ -1500,7 +1607,7 @@ function FeaturedCourses({ reduce, courses, paths }) {
           />
           <Link
             href={ROUTES.courses}
-            className={`inline-flex min-h-10 shrink-0 items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline ${FOCUS}`}
+            className={`${BTN_SECONDARY} min-h-11 shrink-0`}
           >
             View all courses
             <ArrowRight className="size-4" aria-hidden="true" />
@@ -1523,8 +1630,8 @@ function FeaturedCourses({ reduce, courses, paths }) {
                   href={`${ROUTES.courses}/${course.slug}`}
                   className={`group block h-full rounded-xl ${FOCUS}`}
                 >
-                  <Card className="h-full gap-0 overflow-hidden py-0 transition-all group-hover:-translate-y-0.5 group-hover:shadow-md motion-reduce:transition-none">
-                    <div className="relative aspect-video bg-muted/40">
+                  <Card className="h-full gap-0 overflow-hidden border-border py-0 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/60 group-hover:shadow-lg group-hover:shadow-black/10 motion-reduce:transition-none motion-reduce:group-hover:transform-none">
+                    <div className="relative aspect-video bg-muted">
                       {course.thumbnail ? (
                         <Image
                           src={course.thumbnail}
@@ -1545,7 +1652,7 @@ function FeaturedCourses({ reduce, courses, paths }) {
                     </div>
                     <div className="flex flex-1 flex-col gap-2 p-5">
                       {category && (
-                        <span className="text-xs font-medium text-primary">
+                        <span className="w-fit rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                           {category.label}
                         </span>
                       )}
@@ -1562,17 +1669,20 @@ function FeaturedCourses({ reduce, courses, paths }) {
                           {meta.join(" · ")}
                         </p>
                       )}
-                      <div className="mt-auto flex items-center justify-between pt-3 text-sm">
+                      <div
+                        className={`mt-auto flex items-center justify-between border-t ${BORDER} pt-3 text-sm`}
+                      >
                         <span className="inline-flex items-center gap-1">
                           {course.rating != null && (
                             <>
                               <Star
-                                className="size-4 fill-amber-400 text-amber-400"
+                                className="size-4 fill-primary text-primary"
                                 aria-hidden="true"
                               />
                               <span className="font-medium">
-                                {course.rating.toFixed(1)}
+                                {Number(course.rating).toFixed(1)}
                               </span>
+                              <span className="sr-only"> out of 5</span>
                             </>
                           )}
                         </span>
@@ -1597,7 +1707,7 @@ function FeaturedCourses({ reduce, courses, paths }) {
 /* ------------------------------------------------------------------ */
 // categories / courses / faqs / testimonials / stats / announcement come from useLandingData().
 export function HeroSection({
-  categories = FALLBACK_CATEGORIES,
+  categories = [],
   courses = [],
   faqs,
   stats = [],
@@ -1613,16 +1723,14 @@ export function HeroSection({
 
   const safeStats = Array.isArray(stats) ? stats : [];
 
-  // Firebase categories -> paths (icon name + slug-based links).
-  const paths = useMemo(() => {
-    const list =
-      Array.isArray(categories) && categories.length
-        ? categories
-        : FALLBACK_CATEGORIES;
-    return list;
-  }, [categories]);
+  // Firebase categories -> paths (icon name + href built from the slug).
+  // No hardcoded fallback: with no categories, category-driven blocks hide.
+  const paths = useMemo(
+    () => (Array.isArray(categories) ? categories : []),
+    [categories],
+  );
 
-  const spotlightPath = paths.find((p) => p.featured) ?? paths[0];
+  const spotlightPath = paths.find((p) => p.featured) ?? paths[0] ?? null;
   const faqItems = Array.isArray(faqs) && faqs.length ? faqs : defaultFaqs;
 
   // Source priority: prop > environment variable > local media config.
@@ -1633,12 +1741,12 @@ export function HeroSection({
     target: heroRef,
     offset: ["start start", "end start"],
   });
-  const stageY = useTransform(scrollYProgress, [0, 1], [0, 70]);
-  const glowY = useTransform(scrollYProgress, [0, 1], [0, -60]);
+  const stageY = useTransform(scrollYProgress, [0, 1], [0, 60]);
+  const glowY = useTransform(scrollYProgress, [0, 1], [0, -50]);
 
   const mouseX = useMotionValue(-600);
   const mouseY = useMotionValue(-600);
-  const spotlight = useMotionTemplate`radial-gradient(480px circle at ${mouseX}px ${mouseY}px, color-mix(in oklab, var(--primary) 8%, transparent), transparent 70%)`;
+  const spotlight = useMotionTemplate`radial-gradient(480px circle at ${mouseX}px ${mouseY}px, color-mix(in oklab, var(--primary) 7%, transparent), transparent 70%)`;
 
   const handlePointerMove = (event) => {
     if (reduce || event.pointerType !== "mouse") return;
@@ -1670,9 +1778,10 @@ export function HeroSection({
 
   return (
     <section
-      className="relative isolate max-w-full overflow-x-clip bg-background text-foreground"
+      className="apni-landing relative isolate max-w-full overflow-x-clip bg-background text-foreground"
       aria-labelledby="hero-title"
     >
+      <style>{THEME_CSS}</style>
       <ScrollProgress reduce={reduce} />
       <StickyCta user={user} loading={loading} />
       <AnnouncementBar announcement={announcement} />
@@ -1695,12 +1804,16 @@ export function HeroSection({
         <motion.div
           aria-hidden="true"
           style={reduce ? undefined : { y: glowY }}
-          className="pointer-events-none absolute -bottom-32 -right-40 -z-10 size-[26rem] rounded-full bg-amber-400/10 blur-3xl"
+          className="pointer-events-none absolute -bottom-32 -right-40 -z-10 size-[26rem] rounded-full bg-[color:var(--violet)]/10 blur-3xl"
         />
 
         <Container className="grid grid-cols-1 items-center gap-12 py-14 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-24">
           <div className="min-w-0">
-            <motion.p {...enter(0)} className={`mb-6 ${LABEL}`}>
+            <motion.p {...enter(0)} className={`mb-6 ${EYEBROW}`}>
+              <span
+                aria-hidden="true"
+                className="size-1.5 rounded-full bg-primary"
+              />
               {user
                 ? `Welcome back, ${getFirstName(user)}`
                 : "Technology-first learning at Apni University"}
@@ -1713,46 +1826,43 @@ export function HeroSection({
             >
               <span className="block overflow-hidden pb-[0.1em]">
                 <motion.span className="block" {...line(0.05)}>
-                  Build the Skills
+                  Build the skills
                 </motion.span>
               </span>
               <span className="block overflow-hidden pb-[0.1em]">
                 <motion.span className="block" {...line(0.16)}>
-                  That Shape <span className="text-primary">Tomorrow</span>
-                  <span className="text-amber-500">.</span>
+                  that shape <span className="text-primary">tomorrow</span>
+                  <span className={VIOLET}>.</span>
                 </motion.span>
               </span>
             </h1>
 
-            <motion.div {...enter(0.3)}>
-              <TypeRotator reduce={reduce} paths={paths} />
-            </motion.div>
+            {paths.length > 0 && (
+              <motion.div {...enter(0.3)}>
+                <TypeRotator reduce={reduce} paths={paths} />
+              </motion.div>
+            )}
 
             <motion.div
               {...enter(0.38)}
               className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap"
             >
-              <AuthCta
-                user={user}
-                loading={loading}
-                className="shadow-md shadow-primary/25"
-              />
-              <Link
-                href="#learning-paths"
-                className={`inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border ${BORDER} bg-foreground/[0.03] px-6 text-sm font-semibold text-foreground transition-colors duration-200 hover:border-primary/50 motion-reduce:transition-none ${FOCUS}`}
-              >
-                Explore Learning Paths
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
+              <AuthCta user={user} loading={loading} />
+              {paths.length > 0 && (
+                <Link href="#learning-paths" className={BTN_SECONDARY}>
+                  Explore learning paths
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              )}
               <Link
                 href={ROUTES.courses}
-                className={`inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border ${BORDER} bg-foreground/[0.03] px-6 text-sm font-semibold text-foreground transition-colors duration-200 hover:border-primary/50 motion-reduce:transition-none ${FOCUS}`}
+                className={`${BTN} ${TEXT_MUTED} hover:text-foreground ${FOCUS}`}
               >
-                Explore Courses
+                Browse courses
               </Link>
             </motion.div>
 
-            <motion.div {...enter(0.44)} className="mt-5">
+            <motion.div {...enter(0.44)} className="mt-4">
               <LoginLink user={user} loading={loading} />
             </motion.div>
 
@@ -1768,9 +1878,11 @@ export function HeroSection({
               ))}
             </motion.ul>
 
-            <motion.div {...enter(0.52)}>
-              <PathSwitcher reduce={reduce} paths={paths} />
-            </motion.div>
+            {paths.length > 0 && (
+              <motion.div {...enter(0.52)}>
+                <PathSwitcher reduce={reduce} paths={paths} />
+              </motion.div>
+            )}
 
             {safeStats.length > 0 && (
               <motion.dl
@@ -1781,13 +1893,13 @@ export function HeroSection({
                   <Tilt3D
                     key={stat.label}
                     reduce={reduce}
-                    max={8}
-                    className={`rounded-xl border ${BORDER} bg-foreground/[0.03] p-3 sm:p-4`}
+                    max={6}
+                    className={`rounded-xl border ${BORDER} bg-card p-3 sm:p-4`}
                   >
                     <dt className={`text-xs sm:text-sm ${TEXT_MUTED}`}>
                       {stat.label}
                     </dt>
-                    <dd className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+                    <dd className="mt-1 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl">
                       <CountUp value={stat.value} reduce={reduce} />
                     </dd>
                   </Tilt3D>

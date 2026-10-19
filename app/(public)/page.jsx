@@ -27,9 +27,10 @@ import {
   FAQSection,
   NewsletterSection,
 } from "@/components/public/home/EditorialSections";
-import { Newsletter } from "@/components/public/Newsletter";
 import { CTASection } from "@/components/public/CTASection";
 import { TechMarquee } from "@/components/public/home/TechSections";
+import { NewsletterForm } from "@/components/public/home/NewsletterForm";
+import { ContactForm } from "@/components/public/ContactForm";
 
 export const revalidate = 300; // ISR: fresh every 5 minutes, served statically in between
 
@@ -97,7 +98,8 @@ export default async function HomePage() {
       <FreeResources />
       <FAQSection />
       <NewsletterSection>
-        <Newsletter />
+        <NewsletterForm />
+        <ContactForm />
       </NewsletterSection>
       <CTASection />
     </>

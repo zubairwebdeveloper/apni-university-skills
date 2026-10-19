@@ -1,14 +1,17 @@
 // components/admin/notifications/NotificationForm.jsx
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { motion, useReducedMotion } from "framer-motion";
+import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { TextField } from "@/components/shared/TextField";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
+  CharCount,
   DateField,
   FormFooter,
   FormSection,
@@ -24,12 +27,73 @@ import {
 import { localToISO, toDateTimeInput } from "@/lib/utils/date";
 import { createNotification } from "@/app/actions/admin/notifications";
 
+const BODY_MAX = 1000;
+
+// Staggered fade-and-slide entrance; fully off under prefers-reduced-motion.
+// Delay is capped so sections far down the page never wait.
+function Reveal({ index = 0, children }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.4,
+        delay: reduce ? 0 : Math.min(index, 4) * 0.06,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// Plain-language note about what the chosen delivery mode will do
+function ModeNote({ mode }) {
+  if (mode === "now") {
+    return (
+      <p
+        role="status"
+        className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-2.5 text-sm text-destructive"
+      >
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span>
+          It is delivered to the whole audience as soon as you confirm and
+          can&apos;t be recalled.
+        </span>
+      </p>
+    );
+  }
+  return (
+    <p
+      role="status"
+      className="flex items-start gap-2 rounded-lg border bg-muted/40 px-3.5 py-2.5 text-sm text-muted-foreground"
+    >
+      <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <span>
+        {mode === "schedule"
+          ? "It will be sent at the time you choose below."
+          : "Nothing is sent. You can find the draft in the notifications list."}
+      </span>
+    </p>
+  );
+}
+
 export function NotificationForm({ courses }) {
   const router = useRouter();
   const [pending, setPending] = useState(null);
   const [minimumScheduledTime] = useState(() =>
     toDateTimeInput(Date.now() + 5 * 60e3),
   );
+  // Time zone is read after mount so server and client render the same markup
+  const [timeZone, setTimeZone] = useState("");
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone),
+      0,
+    );
+    return () => window.clearTimeout(timeout);
+  }, []);
   const form = useForm({
     resolver: zodResolver(notificationSchema),
     defaultValues: {
@@ -44,9 +108,9 @@ export function NotificationForm({ courses }) {
       scheduledFor: "",
     },
   });
-  const [audience, mode] = useWatch({
+  const [audience, mode, body] = useWatch({
     control: form.control,
-    name: ["audience", "mode"],
+    name: ["audience", "mode", "body"],
   });
   const c = form.control;
 
@@ -87,82 +151,115 @@ export function NotificationForm({ courses }) {
       noValidate
       className="space-y-6"
     >
-      <FormSection title="Message">
-        <TextField control={c} name="title" label="Title" autoComplete="off" />
-        <TextField
-          control={c}
-          name="body"
-          label="Message"
-          component={Textarea}
-          rows={4}
-          description="Plain text, up to 1000 characters."
-        />
-        <div className="grid gap-5 sm:grid-cols-2">
-          <SelectField
+      <Reveal index={0}>
+        <FormSection
+          title="Message"
+          description="What students see in their notification list."
+        >
+          <TextField
             control={c}
-            name="type"
-            label="Type"
-            options={NOTIFICATION_TYPES.map((t) => ({
-              value: t,
-              label: t.charAt(0).toUpperCase() + t.slice(1),
-            }))}
+            name="title"
+            label="Title"
+            autoComplete="off"
           />
           <TextField
             control={c}
-            name="link"
-            label="Link (optional)"
-            description="A path on this site, e.g. /courses/my-course."
-            autoComplete="off"
+            name="body"
+            label="Message"
+            component={Textarea}
+            rows={4}
+            description={
+              <>
+                Plain text, up to 1000 characters.
+                <CharCount value={body} max={BODY_MAX} />
+              </>
+            }
           />
-        </div>
-      </FormSection>
-      <FormSection title="Audience">
-        <SelectField
-          control={c}
-          name="audience"
-          label="Send to"
-          options={AUDIENCES}
-        />
-        {audience === "course" && (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <SelectField
+              control={c}
+              name="type"
+              label="Type"
+              options={NOTIFICATION_TYPES.map((t) => ({
+                value: t,
+                label: t.charAt(0).toUpperCase() + t.slice(1),
+              }))}
+            />
+            <TextField
+              control={c}
+              name="link"
+              label="Link (optional)"
+              description="A path on this site, e.g. /courses/my-course."
+              autoComplete="off"
+            />
+          </div>
+        </FormSection>
+      </Reveal>
+
+      <Reveal index={1}>
+        <FormSection
+          title="Audience"
+          description="Who receives this notification."
+        >
           <SelectField
             control={c}
-            name="courseSlug"
-            label="Course"
-            placeholder="Choose a course"
-            options={courses.map((x) => ({ value: x.slug, label: x.title }))}
-            description="Students with an active or completed enrollment."
+            name="audience"
+            label="Send to"
+            options={AUDIENCES}
           />
-        )}
-        {audience === "users" && (
-          <LinesField
+          {audience === "course" && (
+            <SelectField
+              control={c}
+              name="courseSlug"
+              label="Course"
+              placeholder="Choose a course"
+              options={courses.map((x) => ({
+                value: x.slug,
+                label: x.title,
+              }))}
+              description="Students with an active or completed enrollment."
+            />
+          )}
+          {audience === "users" && (
+            <LinesField
+              control={c}
+              name="userEmails"
+              label="Email addresses"
+              rows={4}
+              description="One per line, up to 50. Each must belong to an existing account."
+            />
+          )}
+        </FormSection>
+      </Reveal>
+
+      <Reveal index={2}>
+        <FormSection
+          title="Delivery"
+          description="Send it now, schedule it for later, or keep it as a draft."
+        >
+          <SelectField
             control={c}
-            name="userEmails"
-            label="Email addresses"
-            rows={4}
-            description="One per line, up to 50. Each must belong to an existing account."
+            name="mode"
+            label="When"
+            options={SEND_MODES}
           />
-        )}
-      </FormSection>
-      <FormSection title="Delivery">
-        <SelectField
-          control={c}
-          name="mode"
-          label="When"
-          options={SEND_MODES}
-        />
-        {mode === "schedule" && (
-          <DateField
-            control={c}
-            name="scheduledFor"
-            type="datetime-local"
-            label="Send at"
-            min={minimumScheduledTime}
-            description={`Your time zone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}. Delivery runs every few minutes.`}
-          />
-        )}
-      </FormSection>
+          {mode === "schedule" && (
+            <DateField
+              control={c}
+              name="scheduledFor"
+              type="datetime-local"
+              label="Send at"
+              min={minimumScheduledTime}
+              description={`${timeZone ? `Your time zone: ${timeZone}. ` : ""}Delivery runs every few minutes.`}
+            />
+          )}
+          <ModeNote mode={mode} />
+        </FormSection>
+      </Reveal>
+
       <FormFooter
         submitting={form.formState.isSubmitting}
+        dirty={form.formState.isDirty}
         cancelHref="/admin/notifications"
         submitLabel={
           mode === "now"
@@ -183,4 +280,3 @@ export function NotificationForm({ courses }) {
     </form>
   );
 }
-

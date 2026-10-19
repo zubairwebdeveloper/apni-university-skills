@@ -50,6 +50,7 @@ const tiers = [
     icon: FiGift,
     badge: "Start here",
     price: "Free",
+    caption: "No card required",
     text: "Enroll with a free account and start right away.",
     points: [
       "Full course access",
@@ -65,6 +66,7 @@ const tiers = [
     icon: FiCreditCard,
     badge: "Pay once",
     price: "One-time payment",
+    caption: "Price shown before you pay",
     text: "Each paid course has its own price, shown before you pay. There are no subscriptions.",
     points: [
       "Pay once per course",
@@ -79,7 +81,8 @@ const tiers = [
     name: "Free previews",
     icon: FiPlay,
     badge: "Try first",
-    price: "Try first",
+    price: "Free to preview",
+    caption: "Watch before you enroll",
     text: "Many paid courses include preview lessons you can watch without enrolling.",
     points: [
       "No account needed to preview",
@@ -155,22 +158,57 @@ const sections = [
   { id: "faq", label: "FAQ" },
 ];
 
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+function Eyebrow({ children }) {
+  return (
+    <p className="inline-flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+      <span aria-hidden="true" className="h-px w-6 bg-primary" />
+      {children}
+    </p>
+  );
+}
+
+function SectionHeading({ id, eyebrow, title, description, className = "" }) {
+  return (
+    <div className={`max-w-2xl ${className}`}>
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h2
+        id={id}
+        className="mt-3 text-balance text-3xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-4xl"
+      >
+        {title}
+      </h2>
+      {description ? (
+        <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
+          {description}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function Cell({ value }) {
   if (value === true)
     return (
-      <span className="inline-flex items-center gap-1.5">
-        <FiCheck className="size-4 text-primary" aria-hidden="true" />
+      <span className="inline-flex items-center gap-2 font-medium text-foreground">
+        <span className="grid size-5 place-items-center rounded-full bg-primary/10 text-primary">
+          <FiCheck className="size-3" aria-hidden="true" />
+        </span>
         Included
       </span>
     );
   if (value === false)
     return (
-      <span className="inline-flex items-center gap-1.5">
-        <FiMinus className="size-4 text-muted-foreground" aria-hidden="true" />
+      <span className="inline-flex items-center gap-2 text-muted-foreground">
+        <span className="grid size-5 place-items-center rounded-full bg-muted">
+          <FiMinus className="size-3" aria-hidden="true" />
+        </span>
         None
       </span>
     );
-  return value;
+  return <span className="leading-snug text-foreground">{value}</span>;
 }
 
 export default function PricingPage() {
@@ -203,17 +241,20 @@ export default function PricingPage() {
         <section
           id="plans"
           aria-label="Plans"
-          className="scroll-mt-24 py-10 sm:py-14"
+          className="scroll-mt-24 py-10 sm:py-16"
         >
           <Container>
-            <nav aria-label="On this page" className="mb-8">
+            <nav aria-label="On this page" className="mb-10">
               <ul className="flex flex-wrap gap-2">
-                {sections.map((s) => (
+                {sections.map((s, i) => (
                   <li key={s.id}>
                     <a
                       href={`#${s.id}`}
-                      className="inline-flex min-h-9 items-center rounded-full border bg-card px-4 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                      className={`group/nav inline-flex min-h-10 items-center gap-2 rounded-full border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary motion-reduce:transition-none ${focusRing}`}
                     >
+                      <span className="text-[11px] font-semibold tabular-nums text-muted-foreground transition-colors group-hover/nav:text-primary">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
                       {s.label}
                     </a>
                   </li>
@@ -222,7 +263,7 @@ export default function PricingPage() {
             </nav>
 
             {/* Each tier is a 3D scene: icon, badge and price float on their own layers */}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:gap-8">
               {tiers.map((t) => (
                 <TiltCard
                   key={t.name}
@@ -230,14 +271,27 @@ export default function PricingPage() {
                   max={t.featured ? 7 : 6}
                 >
                   <Card
-                    className={`h-full gap-4 p-6 [transform-style:preserve-3d] sm:p-7 ${
+                    className={`relative h-full gap-5 p-6 transition-shadow [transform-style:preserve-3d] motion-reduce:transition-none sm:p-8 ${
                       t.featured
-                        ? "border-2 border-primary shadow-lg shadow-primary/10"
-                        : ""
+                        ? "border-2 border-primary shadow-xl shadow-primary/10"
+                        : "shadow-sm hover:shadow-md"
                     }`}
                   >
+                    {t.featured ? (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-x-8 top-0 h-1 rounded-b-full bg-primary"
+                      />
+                    ) : null}
+
                     <div className="flex items-center justify-between gap-3 [transform-style:preserve-3d]">
-                      <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary [transform:translateZ(30px)]">
+                      <span
+                        className={`grid size-12 place-items-center rounded-xl [transform:translateZ(30px)] ${
+                          t.featured
+                            ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                            : "bg-primary/10 text-primary"
+                        }`}
+                      >
                         <t.icon aria-hidden="true" className="size-5" />
                       </span>
                       <Badge
@@ -248,21 +302,28 @@ export default function PricingPage() {
                       </Badge>
                     </div>
 
-                    <h2 className="text-xl">{t.name}</h2>
-                    <p className="font-serif text-2xl font-semibold text-foreground [transform:translateZ(18px)]">
-                      {t.price}
-                    </p>
-                    <p className="text-sm text-muted-foreground sm:text-base">
+                    <div className="space-y-1.5">
+                      <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        {t.name}
+                      </h2>
+                      <p className="font-serif text-3xl font-semibold leading-tight tracking-tight text-foreground [transform:translateZ(18px)]">
+                        {t.price}
+                      </p>
+                      <p className="text-sm font-medium text-primary">
+                        {t.caption}
+                      </p>
+                    </div>
+
+                    <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
                       {t.text}
                     </p>
 
-                    <ul className="space-y-2.5 text-sm sm:text-base">
+                    <ul className="space-y-3 border-t pt-5 text-sm sm:text-base">
                       {t.points.map((p) => (
-                        <li key={p} className="flex gap-2.5">
-                          <FiCheck
-                            className="mt-1 size-4 shrink-0 text-primary"
-                            aria-hidden="true"
-                          />
+                        <li key={p} className="flex gap-3 text-foreground">
+                          <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                            <FiCheck className="size-3" aria-hidden="true" />
+                          </span>
                           {p}
                         </li>
                       ))}
@@ -273,7 +334,7 @@ export default function PricingPage() {
                       className={buttonVariants({
                         variant: t.featured ? "default" : "outline",
                         size: "lg",
-                        className: "group/btn mt-auto",
+                        className: "group/btn mt-auto min-h-11",
                       })}
                     >
                       {t.cta}
@@ -286,6 +347,11 @@ export default function PricingPage() {
                 </TiltCard>
               ))}
             </div>
+
+            <p className="mt-8 flex items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+              <FiShield aria-hidden="true" className="size-4 text-primary" />
+              Every price is shown in full before you pay.
+            </p>
           </Container>
         </section>
 
@@ -293,19 +359,16 @@ export default function PricingPage() {
         <section
           id="flow"
           aria-labelledby="flow-title"
-          className="scroll-mt-24 border-t bg-muted/30 py-14 sm:py-20"
+          className="scroll-mt-24 border-t bg-muted/30 py-16 sm:py-24"
         >
           <Container>
-            <h2
+            <SectionHeading
               id="flow-title"
-              className="max-w-xl text-balance text-3xl sm:text-4xl"
-            >
-              From first click to certificate
-            </h2>
-            <p className="mt-3 max-w-xl text-muted-foreground">
-              Four simple steps. Free courses skip the payment step.
-            </p>
-            <div className="mt-10">
+              eyebrow="How it works"
+              title="From first click to certificate"
+              description="Four simple steps. Free courses skip the payment step."
+            />
+            <div className="mt-12">
               <PricingFlow />
             </div>
           </Container>
@@ -315,20 +378,16 @@ export default function PricingPage() {
         <section
           id="planner"
           aria-labelledby="plan-title"
-          className="scroll-mt-24 border-t py-14 sm:py-20"
+          className="scroll-mt-24 border-t py-16 sm:py-24"
         >
           <Container>
-            <h2
+            <SectionHeading
               id="plan-title"
-              className="max-w-xl text-balance text-3xl sm:text-4xl"
-            >
-              Plan what you will spend
-            </h2>
-            <p className="mt-3 max-w-xl text-muted-foreground">
-              Move the sliders to see a rough one-time total. Nothing is charged
-              here.
-            </p>
-            <div className="mt-8">
+              eyebrow="Budget planner"
+              title="Plan what you will spend"
+              description="Move the sliders to see a rough one-time total. Nothing is charged here."
+            />
+            <div className="mt-10">
               <BudgetPlanner />
             </div>
           </Container>
@@ -338,36 +397,36 @@ export default function PricingPage() {
         <section
           id="compare"
           aria-labelledby="compare-title"
-          className="scroll-mt-24 border-t bg-muted/30 py-14 sm:py-20"
+          className="scroll-mt-24 border-t bg-muted/30 py-16 sm:py-24"
         >
           <Container>
-            <h2
+            <SectionHeading
               id="compare-title"
-              className="mb-6 max-w-xl text-balance text-3xl sm:text-4xl"
-            >
-              Free vs. paid at a glance
-            </h2>
+              eyebrow="Compare"
+              title="Free vs. paid at a glance"
+              className="mb-10"
+            />
             <div className="rounded-2xl border bg-card shadow-sm">
               {/* Mobile: one card per row (below md) */}
               <ul className="divide-y md:hidden">
                 {/* Column labels stay visible while scrolling */}
                 <li
                   aria-hidden="true"
-                  className="sticky top-0 z-10 grid grid-cols-[1fr_1fr] gap-3 rounded-t-2xl bg-card px-4 py-3 text-xs font-semibold text-muted-foreground"
+                  className="sticky top-0 z-10 grid grid-cols-[1fr_1fr] gap-3 rounded-t-2xl border-b bg-card px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
                   <span>Free course</span>
                   <span className="text-primary">Paid course</span>
                 </li>
 
                 {compare.map(([label, free, paid]) => (
-                  <li key={label} className="px-4 py-4">
+                  <li key={label} className="px-4 py-5">
                     <p className="mb-3 text-sm font-semibold leading-snug text-foreground">
                       {label}
                     </p>
 
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border bg-muted/30 p-3">
-                        <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+                      <div className="min-w-0 rounded-xl border bg-muted/30 p-3.5">
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           Free
                         </p>
                         <div className="text-sm">
@@ -375,8 +434,8 @@ export default function PricingPage() {
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
-                        <p className="mb-1 text-[11px] font-medium text-primary">
+                      <div className="min-w-0 rounded-xl border border-primary/30 bg-primary/5 p-3.5">
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
                           Paid
                         </p>
                         <div className="text-sm">
@@ -393,13 +452,13 @@ export default function PricingPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[40%] py-4 pl-6">
+                      <TableHead className="w-[34%] py-5 pl-6">
                         <span className="sr-only">Feature</span>
                       </TableHead>
-                      <TableHead className="w-[30%] py-4 text-base font-semibold">
+                      <TableHead className="w-[33%] py-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                         Free course
                       </TableHead>
-                      <TableHead className="w-[30%] border-x border-primary/20 bg-primary/10 py-4 text-base font-semibold text-primary">
+                      <TableHead className="w-[33%] border-x border-primary/20 bg-primary/10 py-5 text-sm font-semibold uppercase tracking-wider text-primary">
                         Paid course
                       </TableHead>
                     </TableRow>
@@ -409,15 +468,15 @@ export default function PricingPage() {
                     {compare.map(([label, free, paid]) => (
                       <TableRow
                         key={label}
-                        className="group transition-colors hover:bg-muted/40"
+                        className="group transition-colors hover:bg-muted/40 motion-reduce:transition-none"
                       >
-                        <TableCell className="py-4 pl-6 font-medium">
+                        <TableCell className="py-5 pl-6 font-medium text-foreground">
                           {label}
                         </TableCell>
-                        <TableCell className="py-4">
+                        <TableCell className="whitespace-normal py-5">
                           <Cell value={free} />
                         </TableCell>
-                        <TableCell className="border-x border-primary/20 bg-primary/5 py-4 transition-colors group-hover:bg-primary/10">
+                        <TableCell className="whitespace-normal border-x border-primary/20 bg-primary/5 py-5 transition-colors group-hover:bg-primary/10 motion-reduce:transition-none">
                           <Cell value={paid} />
                         </TableCell>
                       </TableRow>
@@ -426,11 +485,11 @@ export default function PricingPage() {
                 </Table>
               </div>
             </div>
-            <p className="mt-4 text-sm text-muted-foreground">
+            <p className="mt-5 text-sm text-muted-foreground">
               Refund conditions are described in our{" "}
               <Link
                 href="/terms"
-                className="font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={`rounded-sm font-medium text-primary underline-offset-4 hover:underline ${focusRing}`}
               >
                 Terms
               </Link>
@@ -442,10 +501,10 @@ export default function PricingPage() {
         {/* Trust: a 3D checkout-card scene beside the reasons to pay with confidence */}
         <section
           aria-labelledby="trust-title"
-          className="border-t py-14 sm:py-20"
+          className="border-t py-16 sm:py-24"
         >
           <Container>
-            <div className="grid items-center gap-12 lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-20">
+            <div className="grid items-center gap-14 lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-24">
               <TiltCard className="mx-auto h-40 w-64 sm:h-44 sm:w-72" max={14}>
                 <span
                   aria-hidden="true"
@@ -468,25 +527,28 @@ export default function PricingPage() {
               </TiltCard>
 
               <div className="min-w-0">
-                <h2
+                <SectionHeading
                   id="trust-title"
-                  className="max-w-xl text-balance text-3xl sm:text-4xl"
-                >
-                  Pay with confidence
-                </h2>
-                <ul className="mt-8 grid grid-cols-1 gap-x-10 sm:grid-cols-2">
+                  eyebrow="Security & clarity"
+                  title="Pay with confidence"
+                />
+                <ul className="mt-10 grid grid-cols-1 gap-x-12 sm:grid-cols-2">
                   {trust.map(({ icon: Icon, title, text }) => (
-                    <li key={title} className="min-w-0 border-t py-5">
-                      <h3 className="flex items-center gap-2 font-sans text-base font-semibold text-foreground">
-                        <Icon
-                          aria-hidden="true"
-                          className="size-5 text-primary"
-                        />
-                        {title}
-                      </h3>
-                      <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
-                        {text}
-                      </p>
+                    <li
+                      key={title}
+                      className="flex min-w-0 gap-4 border-t py-6"
+                    >
+                      <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                        <Icon aria-hidden="true" className="size-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <h3 className="font-sans text-base font-semibold text-foreground">
+                          {title}
+                        </h3>
+                        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                          {text}
+                        </p>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -499,28 +561,59 @@ export default function PricingPage() {
         <section
           id="faq"
           aria-labelledby="faq-title"
-          className="scroll-mt-24 border-t bg-muted/30 py-14 sm:py-20"
+          className="scroll-mt-24 border-t bg-muted/30 py-16 sm:py-24"
         >
           <Container>
-            <div className="grid gap-8 lg:grid-cols-12 lg:gap-16">
-              <h2
-                id="faq-title"
-                className="text-balance text-3xl sm:text-4xl lg:col-span-4"
-              >
-                Pricing questions
-              </h2>
+            <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
+              <div className="lg:col-span-4">
+                <div className="lg:sticky lg:top-28">
+                  <SectionHeading
+                    id="faq-title"
+                    eyebrow="FAQ"
+                    title="Pricing questions"
+                    description="Quick answers about payments, access and refunds."
+                  />
+                  <p className="mt-6 text-sm text-muted-foreground">
+                    Need the fine print? Read our{" "}
+                    <Link
+                      href="/terms"
+                      className={`rounded-sm font-medium text-primary underline-offset-4 hover:underline ${focusRing}`}
+                    >
+                      Terms
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
 
-              <div className="divide-y divide-border border-y border-border lg:col-span-8">
-                {faqs.map(({ q, a }) => (
-                  <details key={q} className="group py-1">
-                    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-3 text-left text-base font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                      {q}
-                      <FiChevronDown
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-primary transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
-                      />
+              <div className="space-y-3 lg:col-span-8">
+                {faqs.map(({ q, a }, i) => (
+                  <details
+                    key={q}
+                    className="group rounded-xl border bg-card px-5 shadow-sm transition-colors hover:border-primary/30 open:border-primary/30 motion-reduce:transition-none sm:px-6"
+                  >
+                    <summary
+                      className={`flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-4 text-left text-base font-medium text-foreground focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden`}
+                    >
+                      <span className="flex min-w-0 items-baseline gap-3">
+                        <span
+                          aria-hidden="true"
+                          className="text-xs font-semibold tabular-nums text-primary"
+                        >
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <span>{q}</span>
+                      </span>
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                        <FiChevronDown
+                          aria-hidden="true"
+                          className="size-4 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
+                        />
+                      </span>
                     </summary>
-                    <p className="max-w-2xl pb-4 text-muted-foreground">{a}</p>
+                    <p className="max-w-2xl pb-5 pl-0 leading-relaxed text-muted-foreground sm:pl-8">
+                      {a}
+                    </p>
                   </details>
                 ))}
               </div>

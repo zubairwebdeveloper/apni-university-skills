@@ -2,15 +2,26 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { MotionConfig, motion, useScroll, useSpring } from "framer-motion";
+import {
+  MotionConfig,
+  motion,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+} from "framer-motion";
 import {
   ArrowRight,
   ArrowUp,
   BookOpen,
+  Briefcase,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Clock,
+  Copyright,
   FileCheck2,
   GraduationCap,
   Handshake,
@@ -19,15 +30,20 @@ import {
   LockKeyhole,
   MessageCircle,
   Printer,
+  RotateCcw,
   Scale,
   Search,
   ShieldCheck,
   Sparkles,
+  UserRound,
   WalletCards,
   X,
 } from "lucide-react";
 
 import { TechScene } from "@/components/public/TechScene";
+
+const focusRing =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const container = {
   hidden: {},
@@ -105,6 +121,22 @@ const shortcuts = [
   { id: "reviews", label: "Reviews" },
 ];
 
+// Optional icons for known section ids; unknown ids fall back to the number only.
+const sectionIcons = {
+  "using-apni-university": FileCheck2,
+  accounts: UserRound,
+  "courses-access": BookOpen,
+  payments: WalletCards,
+  refunds: RotateCcw,
+  reviews: MessageCircle,
+  "acceptable-use": ShieldCheck,
+  jobs: Briefcase,
+  "intellectual-property": Copyright,
+  "user-content": MessageCircle,
+  limitation: Scale,
+  contact: MessageCircle,
+};
+
 const faqs = [
   {
     q: "Can I share my account with someone else?",
@@ -167,18 +199,32 @@ function useActiveSection(ids) {
   return active;
 }
 
+function Eyebrow({ children, className = "" }) {
+  return (
+    <p
+      className={`inline-flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-primary ${className}`}
+    >
+      <span aria-hidden="true" className="h-px w-6 bg-primary" />
+      {children}
+    </p>
+  );
+}
+
 function ScrollProgressBar() {
+  const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, {
+  const spring = useSpring(scrollYProgress, {
     stiffness: 120,
     damping: 25,
     restDelta: 0.001,
   });
+  const scaleX = reduce ? scrollYProgress : spring;
 
   return (
     <motion.div
+      aria-hidden="true"
       style={{ scaleX }}
-      className="fixed inset-x-0 top-0 z-50 h-1 origin-left bg-gradient-to-r from-primary via-primary/70 to-accent print:hidden"
+      className="fixed inset-x-0 top-0 z-50 h-1 origin-left bg-primary print:hidden"
     />
   );
 }
@@ -188,6 +234,7 @@ function BackToTop() {
 
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 600);
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -203,10 +250,12 @@ function BackToTop() {
           : { opacity: 0, scale: 0.6, pointerEvents: "none" }
       }
       transition={{ duration: 0.25 }}
-      className="fixed bottom-6 right-6 z-40 flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 print:hidden"
+      aria-hidden={!visible}
+      tabIndex={visible ? 0 : -1}
+      className={`fixed bottom-6 right-6 z-40 flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 print:hidden ${focusRing}`}
       aria-label="Back to top"
     >
-      <ArrowUp className="size-5" />
+      <ArrowUp className="size-5" aria-hidden="true" />
     </motion.button>
   );
 }
@@ -236,12 +285,12 @@ function CopyLink({ id, heading }) {
       type="button"
       onClick={copy}
       aria-label={`Copy link to ${heading}`}
-      className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring print:hidden"
+      className={`grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground motion-reduce:transition-none print:hidden ${focusRing}`}
     >
       {copied ? (
-        <Check className="size-4 text-emerald-600" />
+        <Check className="size-4 text-emerald-600" aria-hidden="true" />
       ) : (
-        <Link2 className="size-4" />
+        <Link2 className="size-4" aria-hidden="true" />
       )}
       <span className="sr-only" aria-live="polite">
         {copied ? "Link copied" : ""}
@@ -250,8 +299,16 @@ function CopyLink({ id, heading }) {
   );
 }
 
-export default function TermsContent({ sections = [] }) {
+// effectiveDate: pass the real date from your content; the old date is the default.
+export default function TermsContent({
+  sections = [],
+  effectiveDate = "October 7, 2026",
+}) {
   const [query, setQuery] = useState("");
+  // Sections are open by default; this set holds the ones the reader collapsed.
+  const [closed, setClosed] = useState(() => new Set());
+  const [tocOpen, setTocOpen] = useState(false);
+  const tocRef = useRef(null);
 
   // ~200 words/min reading estimate from section body text
   const wordCount = sections.reduce((total, section) => {
@@ -288,21 +345,99 @@ export default function TermsContent({ sections = [] }) {
     ? numbered.filter((s) => matchIds.has(s.id))
     : numbered;
   const active = useActiveSection(numbered.map((s) => s.id));
+  const activeIndex = Math.max(
+    0,
+    numbered.findIndex((s) => s.id === active),
+  );
+  const activeSection = numbered[activeIndex];
 
+  const allOpen = closed.size === 0;
+
+  const openSection = (id) =>
+    setClosed((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+
+  const toggleSection = (id) =>
+    setClosed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const expandAll = () => setClosed(new Set());
+  const collapseAll = () => setClosed(new Set(numbered.map((s) => s.id)));
+
+  // Searching opens the sections that match, so the result is never hidden.
   useEffect(() => {
-    document
-      .querySelector(`[data-toc-mobile="${active}"]`)
-      ?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, [active]);
+    if (!matchIds || matchIds.size === 0) return;
+    setClosed((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      matchIds.forEach((id) => {
+        if (next.delete(id)) changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [matchIds]);
+
+  // Opening a link such as /terms#refunds expands that section first.
+  useEffect(() => {
+    const ids = new Set(numbered.map((s) => s.id));
+    const openFromHash = () => {
+      const id = window.location.hash.slice(1);
+      if (!id || !ids.has(id)) return;
+      openSection(id);
+      requestAnimationFrame(() =>
+        document
+          .getElementById(id)
+          ?.scrollIntoView({ behavior: "auto", block: "start" }),
+      );
+    };
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, [numbered]);
+
+  // The mobile list closes on Escape and when you tap outside it.
+  useEffect(() => {
+    if (!tocOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") setTocOpen(false);
+    };
+    const onPointerDown = (e) => {
+      if (tocRef.current && !tocRef.current.contains(e.target)) {
+        setTocOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [tocOpen]);
 
   const jumpToFirstMatch = (e) => {
     e.preventDefault();
     const first = tocSections[0];
     if (q && first) {
-      document
-        .getElementById(first.id)
-        ?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+      openSection(first.id);
+      requestAnimationFrame(() =>
+        document
+          .getElementById(first.id)
+          ?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }),
+      );
     }
+  };
+
+  const handlePrint = () => {
+    expandAll();
+    setTimeout(() => window.print(), 150);
   };
 
   const availableShortcuts = shortcuts.filter((s) =>
@@ -311,47 +446,43 @@ export default function TermsContent({ sections = [] }) {
 
   return (
     <MotionConfig reducedMotion="user">
-      <main className="relative overflow-hidden bg-background">
+      {/* overflow-x-clip (not hidden) so the sticky sidebar and mobile nav keep working */}
+      <main className="relative overflow-x-clip bg-background">
         <ScrollProgressBar />
         <BackToTop />
 
-        {/* Decorative background */}
+        {/* Decorative background: three soft, static glows (nothing moves) */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden print:hidden"
         >
-          <motion.div
-            animate={{ y: [0, 20, 0] }}
-            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -left-40 top-24 h-80 w-80 rounded-full bg-primary/10 blur-3xl"
-          />
-          <motion.div
-            animate={{ y: [0, -16, 0] }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -right-40 top-[28rem] h-96 w-96 rounded-full bg-accent/10 blur-3xl"
-          />
+          <div className="absolute -left-40 top-24 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute -right-40 top-[28rem] h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
           <div className="absolute left-1/2 top-[55rem] h-72 w-72 -translate-x-1/2 rounded-full bg-primary/5 blur-3xl" />
         </div>
 
         {/* Hero */}
         <section className="relative border-b bg-muted/20">
-          <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:px-8 lg:py-20">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-16 lg:px-8 lg:py-24">
             <motion.div
               initial="hidden"
               animate="show"
               variants={container}
-              className="mx-auto max-w-3xl text-center lg:mx-0 lg:text-left"
+              className="mx-auto min-w-0 max-w-3xl text-center lg:mx-0 lg:text-left"
             >
               <motion.div variants={item}>
                 <span className="inline-flex items-center gap-2 rounded-full border bg-background/80 px-4 py-2 text-sm font-semibold shadow-sm backdrop-blur">
-                  <FileCheck2 className="size-4 text-primary" />
+                  <FileCheck2
+                    className="size-4 text-primary"
+                    aria-hidden="true"
+                  />
                   Terms of Service
                 </span>
               </motion.div>
 
               <motion.h1
                 variants={item}
-                className="mt-6 text-balance text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.05] tracking-tight"
+                className="mt-6 text-balance text-[clamp(2.25rem,6vw,4.25rem)] font-semibold leading-[1.05] tracking-tight"
               >
                 Learn with confidence.
                 <span className="mt-2 block text-primary">
@@ -361,7 +492,7 @@ export default function TermsContent({ sections = [] }) {
 
               <motion.p
                 variants={item}
-                className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-8 text-muted-foreground sm:text-lg lg:mx-0"
+                className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg sm:leading-9 lg:mx-0"
               >
                 These Terms of Service explain how Apni University works, what
                 you can expect from us, and what we expect from you as part of
@@ -370,25 +501,31 @@ export default function TermsContent({ sections = [] }) {
 
               <motion.div
                 variants={item}
-                className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start"
+                className="mt-8 flex flex-wrap items-center justify-center gap-2.5 lg:justify-start"
               >
-                <div className="inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm">
-                  <CheckCircle2 className="size-4 text-emerald-600" />
-                  Clear & transparent
+                <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3.5 py-2 text-sm font-medium shadow-sm sm:px-4">
+                  <CheckCircle2
+                    className="size-4 text-emerald-600"
+                    aria-hidden="true"
+                  />
+                  Clear &amp; transparent
                 </div>
 
-                <div className="inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm">
-                  <LockKeyhole className="size-4 text-primary" />
+                <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3.5 py-2 text-sm font-medium shadow-sm sm:px-4">
+                  <LockKeyhole
+                    className="size-4 text-primary"
+                    aria-hidden="true"
+                  />
                   Account focused
                 </div>
 
-                <div className="inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm">
-                  <Scale className="size-4 text-primary" />
+                <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3.5 py-2 text-sm font-medium shadow-sm sm:px-4">
+                  <Scale className="size-4 text-primary" aria-hidden="true" />
                   Fair platform rules
                 </div>
 
-                <div className="inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm">
-                  <Clock className="size-4 text-primary" />
+                <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3.5 py-2 text-sm font-medium shadow-sm sm:px-4">
+                  <Clock className="size-4 text-primary" aria-hidden="true" />
                   {readingMinutes} min read
                 </div>
               </motion.div>
@@ -397,16 +534,17 @@ export default function TermsContent({ sections = [] }) {
                 <motion.nav
                   variants={item}
                   aria-label="Jump to common sections"
-                  className="mt-6 flex flex-wrap items-center justify-center gap-2 lg:justify-start print:hidden"
+                  className="mt-7 flex flex-wrap items-center justify-center gap-2 lg:justify-start print:hidden"
                 >
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm font-medium text-muted-foreground">
                     Jump to:
                   </span>
                   {availableShortcuts.map((s) => (
                     <a
                       key={s.id}
                       href={`#${s.id}`}
-                      className="rounded-full border bg-background px-3 py-1 text-sm font-medium outline-none transition-colors hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => openSection(s.id)}
+                      className={`inline-flex min-h-10 items-center rounded-full border bg-background px-4 text-sm font-medium transition-colors hover:border-primary/40 hover:text-primary motion-reduce:transition-none ${focusRing}`}
                     >
                       {s.label}
                     </a>
@@ -416,23 +554,26 @@ export default function TermsContent({ sections = [] }) {
 
               <motion.div
                 variants={item}
-                className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-muted-foreground lg:justify-start"
+                className="mt-7 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-muted-foreground lg:justify-start"
               >
                 <span>
                   Effective date:{" "}
                   <span className="font-semibold text-foreground">
-                    October 7, 2026
+                    {effectiveDate}
                   </span>
                 </span>
 
-                <span className="hidden size-1 rounded-full bg-muted-foreground/40 sm:inline-block print:hidden" />
+                <span
+                  aria-hidden="true"
+                  className="hidden size-1 rounded-full bg-muted-foreground/40 sm:inline-block print:hidden"
+                />
 
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  className="inline-flex items-center gap-1.5 rounded font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring print:hidden"
+                  onClick={handlePrint}
+                  className={`inline-flex min-h-10 items-center gap-1.5 rounded font-medium text-primary underline-offset-4 hover:underline print:hidden ${focusRing}`}
                 >
-                  <Printer className="size-3.5" />
+                  <Printer className="size-3.5" aria-hidden="true" />
                   Print this page
                 </button>
               </motion.div>
@@ -450,14 +591,14 @@ export default function TermsContent({ sections = [] }) {
         </section>
 
         {/* Trust highlights */}
-        <section className="relative border-b">
-          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <section aria-label="Our principles" className="relative border-b">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
             <motion.div
               initial="hidden"
               whileInView="show"
               viewport={{ once: true, amount: 0.15 }}
               variants={container}
-              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5"
             >
               {highlights.map((highlight) => {
                 const Icon = highlight.icon;
@@ -467,15 +608,17 @@ export default function TermsContent({ sections = [] }) {
                     key={highlight.title}
                     variants={item}
                     whileHover={cardHover}
-                    className="group rounded-2xl border bg-background p-5 shadow-sm transition-shadow hover:shadow-lg"
+                    className="group min-w-0 rounded-2xl border bg-background p-5 shadow-sm transition-[box-shadow,border-color] hover:border-primary/40 hover:shadow-lg motion-reduce:transition-none sm:p-6"
                   >
-                    <div className="mb-4 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-110">
-                      <Icon className="size-5" />
+                    <div className="mb-5 flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground motion-reduce:transition-none">
+                      <Icon className="size-5" aria-hidden="true" />
                     </div>
 
-                    <h2 className="font-semibold">{highlight.title}</h2>
+                    <h2 className="text-base font-semibold">
+                      {highlight.title}
+                    </h2>
 
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
                       {highlight.description}
                     </p>
                   </motion.div>
@@ -487,47 +630,104 @@ export default function TermsContent({ sections = [] }) {
 
         {/* Main content */}
         <section className="relative">
-          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
-            {/* Mobile section nav */}
-            <nav
-              aria-label="Terms sections"
-              className="sticky top-16 z-30 -mx-4 mb-8 overflow-x-auto border-b bg-background/90 px-4 backdrop-blur [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:hidden print:hidden"
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-24">
+            {/* Mobile and tablet: one tidy dropdown instead of a scrolling strip */}
+            <div
+              ref={tocRef}
+              className="sticky top-16 z-30 -mx-4 mb-8 border-b bg-background/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden print:hidden"
             >
-              <ul className="flex min-w-max gap-1 py-2">
-                {tocSections.map((section) => {
-                  const on = active === section.id;
-                  return (
-                    <li key={section.id}>
-                      <a
-                        href={`#${section.id}`}
-                        data-toc-mobile={section.id}
-                        aria-current={on ? "true" : undefined}
-                        className={`block rounded-full px-3.5 py-1.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
-                          on
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {section.number} {section.heading}
-                      </a>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
+              <button
+                type="button"
+                onClick={() => setTocOpen((v) => !v)}
+                aria-expanded={tocOpen}
+                aria-controls="terms-toc-panel"
+                className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-lg py-2 text-left text-sm font-semibold ${focusRing}`}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <BookOpen
+                    className="size-4 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="shrink-0 tabular-nums text-primary">
+                    {activeSection?.number}
+                  </span>
+                  <span className="truncate">
+                    {activeSection?.heading ?? "On this page"}
+                  </span>
+                </span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${
+                    tocOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
 
-            <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
+              {tocOpen && (
+                <nav
+                  id="terms-toc-panel"
+                  aria-label="Terms sections"
+                  className="absolute inset-x-0 top-full max-h-[60vh] overflow-y-auto border-b bg-background px-4 py-2 shadow-lg sm:px-6"
+                >
+                  {tocSections.length === 0 && (
+                    <p className="px-2 py-3 text-sm text-muted-foreground">
+                      No sections match your search.
+                    </p>
+                  )}
+                  <ul className="space-y-0.5">
+                    {tocSections.map((section) => {
+                      const on = active === section.id;
+                      return (
+                        <li key={section.id}>
+                          <a
+                            href={`#${section.id}`}
+                            aria-current={on ? "true" : undefined}
+                            onClick={() => {
+                              openSection(section.id);
+                              setTocOpen(false);
+                            }}
+                            className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors motion-reduce:transition-none ${focusRing} ${
+                              on
+                                ? "bg-primary/10 font-semibold text-foreground"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            }`}
+                          >
+                            <span className="min-w-6 text-xs font-bold tabular-nums text-primary">
+                              {section.number}
+                            </span>
+                            <span className="leading-5">{section.heading}</span>
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </nav>
+              )}
+            </div>
+
+            <div className="grid gap-10 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-14">
               {/* Sidebar (desktop) */}
-              <aside className="hidden lg:sticky lg:top-24 lg:block print:hidden">
+              <aside className="hidden space-y-5 lg:sticky lg:top-24 lg:block print:hidden">
                 <div className="rounded-2xl border bg-background/90 p-5 shadow-sm backdrop-blur">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="size-4 text-primary" />
-                    <h2 className="font-semibold">On this page</h2>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <BookOpen
+                        className="size-4 text-primary"
+                        aria-hidden="true"
+                      />
+                      <h2 className="text-sm font-semibold">On this page</h2>
+                    </div>
+                    {numbered.length > 0 && (
+                      <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                        {String(activeIndex + 1).padStart(2, "0")} /{" "}
+                        {String(numbered.length).padStart(2, "0")}
+                      </span>
+                    )}
                   </div>
 
                   <nav
                     aria-label="Terms sections"
-                    className="mt-4 max-h-[55vh] space-y-1 overflow-y-auto pr-1"
+                    className="mt-4 max-h-[50vh] space-y-1 overflow-y-auto pr-1"
                   >
                     {tocSections.length === 0 && (
                       <p className="px-2.5 py-2 text-sm text-muted-foreground">
@@ -541,20 +741,22 @@ export default function TermsContent({ sections = [] }) {
                           key={section.id}
                           href={`#${section.id}`}
                           aria-current={on ? "true" : undefined}
-                          className={`group flex items-start gap-2 rounded-lg px-2.5 py-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+                          onClick={() => openSection(section.id)}
+                          className={`group flex items-start gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors motion-reduce:transition-none ${focusRing} ${
                             on
-                              ? "bg-primary/10 font-medium text-foreground"
+                              ? "bg-primary/10 font-semibold text-foreground"
                               : "text-muted-foreground hover:bg-muted hover:text-foreground"
                           }`}
                         >
-                          <span className="mt-0.5 min-w-5 text-xs font-bold text-primary">
+                          <span className="mt-0.5 min-w-5 text-xs font-bold tabular-nums text-primary">
                             {section.number}
                           </span>
 
                           <span className="leading-5">{section.heading}</span>
 
                           <ChevronRight
-                            className={`ml-auto mt-0.5 size-3.5 shrink-0 transition-opacity ${
+                            aria-hidden="true"
+                            className={`ml-auto mt-0.5 size-3.5 shrink-0 transition-opacity motion-reduce:transition-none ${
                               on
                                 ? "opacity-100"
                                 : "opacity-0 group-hover:opacity-100"
@@ -567,10 +769,29 @@ export default function TermsContent({ sections = [] }) {
 
                   <div className="mt-5 border-t pt-4">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Clock className="size-3.5" />
+                      <Clock className="size-3.5" aria-hidden="true" />
                       About {readingMinutes} min read
                     </div>
                   </div>
+                </div>
+
+                <div className="rounded-2xl border bg-background/90 p-5 shadow-sm backdrop-blur">
+                  <span className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <MessageCircle className="size-4" aria-hidden="true" />
+                  </span>
+                  <p className="mt-3 text-sm font-semibold">
+                    Something unclear?
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    Ask us before you buy or enroll.
+                  </p>
+                  <Link
+                    href="/contact"
+                    className={`mt-3 inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline ${focusRing}`}
+                  >
+                    Contact us
+                    <ArrowRight className="size-3.5" aria-hidden="true" />
+                  </Link>
                 </div>
               </aside>
 
@@ -594,60 +815,93 @@ export default function TermsContent({ sections = [] }) {
                     </label>
                     <Search
                       aria-hidden="true"
-                      className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                      className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                     />
                     <input
                       id="terms-search"
                       type="search"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Search the terms, for example refund, password or reviews"
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape" && query) {
+                          e.preventDefault();
+                          setQuery("");
+                        }
+                      }}
+                      placeholder="Search: refund, password, reviews"
                       autoComplete="off"
-                      className="h-12 w-full rounded-2xl border bg-background pl-10 pr-11 text-sm shadow-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-search-cancel-button]:hidden"
+                      className="h-12 w-full rounded-2xl border bg-background pl-11 pr-11 text-sm shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [&::-webkit-search-cancel-button]:hidden"
                     />
                     {query && (
                       <button
                         type="button"
                         onClick={() => setQuery("")}
                         aria-label="Clear search"
-                        className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                        className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <X className="size-4" />
+                        <X className="size-4" aria-hidden="true" />
                       </button>
                     )}
                   </form>
-                  <p
-                    aria-live="polite"
-                    className="mt-2 min-h-5 text-sm text-muted-foreground"
-                  >
-                    {q
-                      ? matchIds.size > 0
-                        ? `${matchIds.size} of ${sections.length} sections match. Press Enter to jump to the first one.`
-                        : "No sections match your search."
-                      : ""}
-                  </p>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p
+                      aria-live="polite"
+                      className="min-h-5 min-w-0 text-sm text-muted-foreground"
+                    >
+                      {q
+                        ? matchIds.size > 0
+                          ? `${matchIds.size} of ${sections.length} sections match. Press Enter to jump to the first one.`
+                          : "No sections match your search."
+                        : `${sections.length} sections`}
+                    </p>
+
+                    {numbered.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={allOpen ? collapseAll : expandAll}
+                        className={`inline-flex min-h-10 items-center gap-2 rounded-full border bg-background px-4 text-sm font-medium transition-colors hover:border-primary/40 hover:text-primary motion-reduce:transition-none ${focusRing}`}
+                      >
+                        {allOpen ? (
+                          <>
+                            <ChevronsDownUp
+                              className="size-4"
+                              aria-hidden="true"
+                            />
+                            Collapse all
+                          </>
+                        ) : (
+                          <>
+                            <ChevronsUpDown
+                              className="size-4"
+                              aria-hidden="true"
+                            />
+                            Expand all
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </motion.div>
 
                 {/* Intro */}
                 <motion.div
                   variants={item}
-                  className="mb-8 rounded-3xl border bg-primary/[0.04] p-6 sm:p-8"
+                  className="mb-8 rounded-3xl border border-primary/20 bg-primary/[0.05] p-5 sm:p-8"
                 >
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
-                      <GraduationCap className="size-6" />
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
+                      <GraduationCap className="size-6" aria-hidden="true" />
                     </div>
 
-                    <div>
-                      <p className="text-sm font-bold uppercase tracking-wider text-primary">
-                        Welcome to Apni University
-                      </p>
+                    <div className="min-w-0">
+                      <Eyebrow>Welcome to Apni University</Eyebrow>
 
-                      <h2 className="mt-2 text-balance text-2xl font-semibold tracking-tight">
+                      <h2 className="mt-3 text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
                         A simple agreement for a better learning experience.
                       </h2>
 
-                      <p className="mt-3 leading-7 text-muted-foreground">
+                      <p className="mt-3 leading-7 text-muted-foreground sm:text-lg sm:leading-8">
                         Apni University exists to help learners build practical
                         technology skills, work on real projects, explore modern
                         tools, and prepare for the future of work. These terms
@@ -661,88 +915,147 @@ export default function TermsContent({ sections = [] }) {
                 {/* Quick facts */}
                 <motion.div
                   variants={item}
-                  className="mb-10 rounded-2xl border bg-background p-6 shadow-sm"
+                  className="mb-10 rounded-2xl border bg-background p-5 shadow-sm sm:p-7"
                 >
-                  <h2 className="flex items-center gap-2 font-semibold">
-                    <Sparkles className="size-4 text-primary" />
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <Sparkles
+                      className="size-4 text-primary"
+                      aria-hidden="true"
+                    />
                     Before you continue
                   </h2>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <ul className="mt-5 grid gap-3 sm:grid-cols-2">
                     {quickFacts.map((fact) => (
-                      <div
+                      <li
                         key={fact}
-                        className="flex items-center gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm"
+                        className="flex items-center gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm font-medium sm:text-base"
                       >
-                        <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                        <CheckCircle2
+                          className="size-4 shrink-0 text-emerald-600"
+                          aria-hidden="true"
+                        />
                         <span>{fact}</span>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </motion.div>
 
-                {/* Terms sections */}
-                <div className="space-y-5">
+                {/* Terms sections: each one opens and closes */}
+                <div className="space-y-4 sm:space-y-5">
                   {numbered.map((section) => {
                     const matched = matchIds?.has(section.id);
                     const dimmed = matchIds && !matched;
+                    const Icon = sectionIcons[section.id];
+                    const isRefund = section.id === "refunds";
+                    const open = !closed.has(section.id);
+                    const panelId = `panel-${section.id}`;
+                    const buttonId = `toggle-${section.id}`;
 
                     return (
                       <motion.article
                         key={section.id}
                         id={section.id}
                         variants={item}
-                        whileHover={{ y: -2 }}
-                        className={`scroll-mt-32 rounded-3xl border bg-background p-6 shadow-sm transition-[box-shadow,opacity] duration-300 hover:shadow-md sm:p-8 print:break-inside-avoid print:shadow-none ${
-                          matched ? "ring-2 ring-primary/30" : ""
-                        } ${dimmed ? "opacity-50" : ""}`}
+                        className={`scroll-mt-32 rounded-3xl border shadow-sm transition-[box-shadow,opacity,border-color] duration-300 hover:border-primary/30 hover:shadow-md motion-reduce:transition-none print:break-inside-avoid print:shadow-none ${
+                          isRefund
+                            ? "border-primary/30 bg-primary/[0.04]"
+                            : "bg-background"
+                        } ${matched ? "ring-2 ring-primary/30" : ""} ${
+                          dimmed ? "opacity-70" : ""
+                        }`}
                       >
-                        <div className="flex gap-4">
-                          <div className="hidden shrink-0 sm:block">
-                            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-sm font-black text-primary">
-                              {section.number}
-                            </div>
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start gap-3">
-                              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:hidden">
-                                <span className="text-xs font-black">
+                        {/* Header: the toggle button and the copy-link button are siblings */}
+                        <div className="flex items-start gap-2 p-4 sm:gap-3 sm:p-6">
+                          <button
+                            type="button"
+                            id={buttonId}
+                            onClick={() => toggleSection(section.id)}
+                            aria-expanded={open}
+                            aria-controls={panelId}
+                            className={`flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl p-1 text-left sm:gap-4 ${focusRing}`}
+                          >
+                            <span
+                              className={`flex size-11 shrink-0 items-center justify-center rounded-xl sm:size-12 ${
+                                isRefund
+                                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                                  : "bg-primary/10 text-primary"
+                              }`}
+                            >
+                              {Icon ? (
+                                <Icon className="size-5" aria-hidden="true" />
+                              ) : (
+                                <span className="text-sm font-black tabular-nums">
                                   {section.number}
                                 </span>
+                              )}
+                            </span>
+
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-xs font-semibold uppercase tracking-[0.14em] tabular-nums text-primary">
+                                Section {section.number}
+                              </span>
+                              <span className="mt-0.5 block text-balance break-words text-lg font-semibold leading-snug tracking-tight sm:text-2xl">
+                                {section.heading}
+                              </span>
+                            </span>
+
+                            <span
+                              aria-hidden="true"
+                              className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary print:hidden"
+                            >
+                              <ChevronDown
+                                className={`size-4 transition-transform duration-300 motion-reduce:transition-none ${
+                                  open ? "rotate-180" : ""
+                                }`}
+                              />
+                            </span>
+                          </button>
+
+                          <CopyLink id={section.id} heading={section.heading} />
+                        </div>
+
+                        {/* Collapsible body: grid-rows animates height without measuring */}
+                        <div
+                          id={panelId}
+                          role="region"
+                          aria-labelledby={buttonId}
+                          className={`grid transition-[grid-template-rows,visibility] duration-300 ease-out motion-reduce:transition-none print:visible print:grid-rows-[1fr] ${
+                            open
+                              ? "visible grid-rows-[1fr]"
+                              : "invisible grid-rows-[0fr]"
+                          }`}
+                        >
+                          <div className="overflow-hidden print:overflow-visible">
+                            <div className="px-5 pb-6 sm:px-8 sm:pb-8 sm:pl-[5.25rem]">
+                              <div className="space-y-4">
+                                {section.body?.map(
+                                  (paragraph, paragraphIndex) => (
+                                    <p
+                                      key={`${section.id}-${paragraphIndex}`}
+                                      className="max-w-prose break-words text-base leading-7 text-muted-foreground sm:leading-8"
+                                    >
+                                      {paragraph}
+                                    </p>
+                                  ),
+                                )}
                               </div>
 
-                              <h2 className="flex-1 text-balance text-xl font-semibold tracking-tight sm:text-2xl">
-                                {section.heading}
-                              </h2>
-
-                              <CopyLink
-                                id={section.id}
-                                heading={section.heading}
-                              />
-                            </div>
-
-                            <div className="mt-5 space-y-4">
-                              {section.body?.map(
-                                (paragraph, paragraphIndex) => (
-                                  <p
-                                    key={`${section.id}-${paragraphIndex}`}
-                                    className="max-w-prose leading-7 text-muted-foreground"
-                                  >
-                                    {paragraph}
+                              {section.note && (
+                                <div className="mt-6 flex gap-3 rounded-xl border border-primary/20 bg-background p-4 text-sm leading-6 text-muted-foreground">
+                                  <ShieldCheck
+                                    className="mt-0.5 size-4 shrink-0 text-primary"
+                                    aria-hidden="true"
+                                  />
+                                  <p className="min-w-0">
+                                    <span className="font-semibold text-foreground">
+                                      Note:
+                                    </span>{" "}
+                                    {section.note}
                                   </p>
-                                ),
+                                </div>
                               )}
                             </div>
-
-                            {section.note && (
-                              <div className="mt-6 rounded-xl border border-primary/20 bg-primary/[0.04] p-4 text-sm leading-6 text-muted-foreground">
-                                <span className="font-semibold text-foreground">
-                                  Note:
-                                </span>{" "}
-                                {section.note}
-                              </div>
-                            )}
                           </div>
                         </div>
                       </motion.article>
@@ -751,43 +1064,60 @@ export default function TermsContent({ sections = [] }) {
                 </div>
 
                 {/* FAQ */}
-                <motion.div
+                <motion.section
                   variants={item}
-                  className="mt-10 rounded-3xl border bg-background p-6 shadow-sm sm:p-8"
+                  aria-labelledby="terms-faq"
+                  className="mt-14"
                 >
                   <div className="mb-6 flex items-center gap-3">
                     <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <HelpCircle className="size-5" />
+                      <HelpCircle className="size-5" aria-hidden="true" />
                     </div>
-                    <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
+                    <h2
+                      id="terms-faq"
+                      className="text-xl font-semibold tracking-tight sm:text-2xl"
+                    >
                       Frequently asked questions
                     </h2>
                   </div>
 
-                  <div className="divide-y">
-                    {faqs.map((faq) => (
+                  <div className="space-y-3">
+                    {faqs.map((faq, i) => (
                       <details
                         key={faq.q}
-                        className="group py-4 first:pt-0 last:pb-0"
+                        className="group rounded-xl border bg-background px-4 shadow-sm transition-colors hover:border-primary/30 open:border-primary/30 motion-reduce:transition-none sm:px-6"
                       >
-                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-md text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-base [&::-webkit-details-marker]:hidden">
-                          {faq.q}
-                          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-90" />
+                        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-md py-4 text-left text-base font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                          <span className="flex min-w-0 items-baseline gap-3">
+                            <span
+                              aria-hidden="true"
+                              className="text-xs font-semibold tabular-nums text-primary"
+                            >
+                              {String(i + 1).padStart(2, "0")}
+                            </span>
+                            <span className="min-w-0 break-words">{faq.q}</span>
+                          </span>
+                          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                            <ChevronRight
+                              className="size-4 transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+                              aria-hidden="true"
+                            />
+                          </span>
                         </summary>
-                        <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                        <p className="max-w-2xl pb-5 leading-7 text-muted-foreground sm:pl-8">
                           {faq.a}
                         </p>
                       </details>
                     ))}
                   </div>
-                </motion.div>
+                </motion.section>
 
                 {/* Contact CTA */}
                 <motion.div
                   variants={item}
-                  className="mt-10 overflow-hidden rounded-3xl border bg-foreground text-background print:hidden"
+                  className="mt-14 overflow-hidden rounded-3xl border bg-foreground text-background print:hidden"
                 >
-                  <div className="relative p-7 sm:p-10">
+                  <div className="relative p-6 sm:p-10">
                     <div
                       aria-hidden="true"
                       className="absolute -right-20 -top-20 size-64 rounded-full bg-primary/20 blur-3xl"
@@ -796,15 +1126,18 @@ export default function TermsContent({ sections = [] }) {
                     <div className="relative flex flex-col gap-7 md:flex-row md:items-center md:justify-between">
                       <div className="max-w-2xl">
                         <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-                          <MessageCircle className="size-4" />
+                          <MessageCircle
+                            className="size-4"
+                            aria-hidden="true"
+                          />
                           Need clarification?
                         </div>
 
-                        <h2 className="mt-3 text-balance text-2xl font-semibold sm:text-3xl">
+                        <h2 className="mt-3 text-balance text-2xl font-semibold leading-tight sm:text-3xl">
                           We&apos;re here to help you understand the rules.
                         </h2>
 
-                        <p className="mt-3 leading-7 text-background/70">
+                        <p className="mt-3 leading-7 text-background/70 sm:text-lg sm:leading-8">
                           If something in these Terms is unclear, reach out to
                           the Apni University team before making an important
                           decision.
@@ -813,10 +1146,13 @@ export default function TermsContent({ sections = [] }) {
 
                       <Link
                         href="/contact"
-                        className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-background px-5 py-3 font-bold text-foreground outline-none transition-all hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className={`group inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-background px-5 py-3 font-bold text-foreground transition-all hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${focusRing}`}
                       >
                         Contact us
-                        <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                        <ArrowRight
+                          className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none"
+                          aria-hidden="true"
+                        />
                       </Link>
                     </div>
                   </div>
@@ -825,27 +1161,30 @@ export default function TermsContent({ sections = [] }) {
                 {/* Bottom brand CTA */}
                 <motion.div
                   variants={item}
-                  className="mt-8 text-center print:hidden"
+                  className="mt-12 text-center print:hidden"
                 >
                   <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <GraduationCap className="size-6" />
+                    <GraduationCap className="size-6" aria-hidden="true" />
                   </div>
 
-                  <h2 className="mt-4 text-2xl font-semibold">
+                  <h2 className="mt-4 text-2xl font-semibold tracking-tight">
                     Ready to keep learning?
                   </h2>
 
-                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                  <p className="mx-auto mt-2 max-w-xl leading-7 text-muted-foreground">
                     Explore practical courses, build real projects, and continue
                     your journey with Apni University.
                   </p>
 
                   <Link
                     href="/courses"
-                    className="group mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-sm outline-none transition-all hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className={`group mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${focusRing}`}
                   >
                     Explore courses
-                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                    <ArrowRight
+                      className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none"
+                      aria-hidden="true"
+                    />
                   </Link>
                 </motion.div>
               </motion.div>

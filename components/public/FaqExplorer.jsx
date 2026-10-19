@@ -1,7 +1,14 @@
 // components/public/FaqExplorer.jsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -13,6 +20,7 @@ import {
   FiHelpCircle,
   FiLink,
   FiMessageSquare,
+  FiRotateCcw,
   FiSearch,
   FiStar,
   FiThumbsDown,
@@ -21,6 +29,7 @@ import {
   FiX,
 } from "react-icons/fi";
 
+import { cn } from "@/lib/utils";
 import {
   Accordion,
   AccordionContent,
@@ -29,6 +38,9 @@ import {
 } from "@/components/ui/accordion";
 import { buttonVariants } from "@/components/ui/button";
 import { getFaqCategory } from "@/components/public/faqUtils";
+
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const CATEGORY_ICONS = {
   Courses: FiBookOpen,
@@ -89,12 +101,15 @@ function Highlight({ text, query }) {
 
 export function FaqExplorer({ faqs = [] }) {
   const reduce = useReducedMotion();
+  const uid = useId();
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [open, setOpen] = useState([]);
   const [votes, setVotes] = useState({}); // { [id]: "up" | "down" }
-  const [copiedId, setCopiedId] = useState(null);
+  const [copied, setCopied] = useState(null); // { id, ok }
+
+  const scrollBehavior = reduce ? "auto" : "smooth";
 
   // Stable id per question, based on its original position.
   const items = useMemo(
@@ -159,9 +174,14 @@ export function FaqExplorer({ faqs = [] }) {
   // "/" focuses search, "Esc" clears it.
   useEffect(() => {
     function onKey(e) {
-      const tag = document.activeElement?.tagName;
-      const typing = tag === "INPUT" || tag === "TEXTAREA";
-      if (e.key === "/" && !typing && !e.metaKey && !e.ctrlKey) {
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      const typing =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        el?.isContentEditable;
+      if (e.key === "/" && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         inputRef.current?.focus();
       }
@@ -175,30 +195,40 @@ export function FaqExplorer({ faqs = [] }) {
   }, []);
 
   // Deep link: /faq#faq-3 opens and scrolls to that question.
+  // Also reacts to the hash changing while the page is open.
   useEffect(() => {
-    const id = window.location.hash.replace("#", "");
-    if (id && items.some((f) => f.id === id)) {
-      setTimeout(
-        () => {
-          setOpen([id]);
-          document
-            .getElementById(id)
-            ?.scrollIntoView({ behavior: "smooth", block: "center" });
-        },
-        300,
-      );
+    let timer;
+    function openFromHash() {
+      const id = window.location.hash.replace("#", "");
+      if (!id || !items.some((f) => f.id === id)) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setOpen((prev) => (prev.includes(id) ? prev : [...prev, id]));
+        document
+          .getElementById(id)
+          ?.scrollIntoView({ behavior: scrollBehavior, block: "center" });
+      }, 300);
     }
-  }, [items]);
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("hashchange", openFromHash);
+    };
+  }, [items, scrollBehavior]);
 
   async function copyLink(id) {
     const url = `${window.location.origin}${window.location.pathname}#${id}`;
+    let ok = true;
     try {
       await navigator.clipboard.writeText(url);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1800);
     } catch {
-      window.history.pushState(null, "", `#${id}`);
+      // Clipboard blocked: put the link in the address bar instead.
+      ok = false;
+      window.history.replaceState(null, "", `#${id}`);
     }
+    setCopied({ id, ok });
+    setTimeout(() => setCopied((c) => (c?.id === id ? null : c)), 2200);
   }
 
   function openRelated(id) {
@@ -208,7 +238,7 @@ export function FaqExplorer({ faqs = [] }) {
       () =>
         document
           .getElementById(id)
-          ?.scrollIntoView({ behavior: "smooth", block: "center" }),
+          ?.scrollIntoView({ behavior: scrollBehavior, block: "center" }),
       250,
     );
   }
@@ -216,6 +246,31 @@ export function FaqExplorer({ faqs = [] }) {
   const spring = reduce
     ? { duration: 0 }
     : { type: "spring", stiffness: 420, damping: 34 };
+
+  // Nothing to show at all (no data), as opposed to "no search matches".
+  if (!items.length) {
+    return (
+      <div className="rounded-2xl border border-dashed bg-card/50 px-6 py-12 text-center">
+        <span className="mx-auto grid size-12 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+          <FiHelpCircle aria-hidden="true" className="size-5" />
+        </span>
+        <h3 className="mt-4 font-sans text-lg font-semibold tracking-tight">
+          No questions yet
+        </h3>
+        <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
+          Questions will show up here once they are added. In the meantime, you
+          can send us a message.
+        </p>
+        <Link
+          href="/contact"
+          className={cn(buttonVariants({ variant: "default" }), "mt-5")}
+        >
+          <FiMessageSquare aria-hidden="true" />
+          Contact us
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -233,7 +288,8 @@ export function FaqExplorer({ faqs = [] }) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search: refund, certificate, payment..."
             aria-label="Search frequently asked questions"
-            className="h-12 w-full rounded-xl border bg-background pl-10 pr-12 text-base outline-none transition-all placeholder:text-muted-foreground focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/15 sm:text-sm [&::-webkit-search-cancel-button]:appearance-none"
+            aria-keyshortcuts="/"
+            className="h-12 w-full rounded-xl border bg-background pl-10 pr-12 text-base outline-none transition-all placeholder:text-muted-foreground hover:border-primary/30 focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/15 sm:text-sm [&::-webkit-search-cancel-button]:appearance-none"
           />
           {query ? (
             <button
@@ -243,7 +299,10 @@ export function FaqExplorer({ faqs = [] }) {
                 inputRef.current?.focus();
               }}
               aria-label="Clear search"
-              className="absolute right-2.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className={cn(
+                "absolute right-2.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                FOCUS_RING,
+              )}
             >
               <FiX aria-hidden="true" className="size-4" />
             </button>
@@ -266,7 +325,10 @@ export function FaqExplorer({ faqs = [] }) {
                 key={s}
                 type="button"
                 onClick={() => setQuery(s)}
-                className="rounded-full border bg-background px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                className={cn(
+                  "rounded-full border bg-background px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary",
+                  FOCUS_RING,
+                )}
               >
                 {s}
               </button>
@@ -277,7 +339,7 @@ export function FaqExplorer({ faqs = [] }) {
         {/* Topic chips: full-bleed horizontal scroll on mobile */}
         {categories.length > 2 && (
           <div
-            className="-mx-3.5 mt-4 flex snap-x gap-2 overflow-x-auto px-3.5 pb-1 sm:-mx-5 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="-mx-3.5 mt-4 flex snap-x gap-2 overflow-x-auto px-3.5 py-1 sm:-mx-5 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             role="group"
             aria-label="Filter by topic"
           >
@@ -290,15 +352,18 @@ export function FaqExplorer({ faqs = [] }) {
                   type="button"
                   onClick={() => setCategory(c.name)}
                   aria-pressed={active}
-                  className={`relative inline-flex shrink-0 snap-start items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors duration-200 ${
+                  className={cn(
+                    "relative inline-flex shrink-0 snap-start items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors duration-200",
+                    FOCUS_RING,
                     active
                       ? "border-primary text-primary-foreground"
-                      : "bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  }`}
+                      : "bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
                 >
                   {active && (
                     <motion.span
-                      layoutId="faq-chip-bg"
+                      layoutId={`${uid}-chip-bg`}
+                      aria-hidden="true"
                       transition={spring}
                       className="absolute inset-0 rounded-full bg-primary shadow-sm"
                     />
@@ -307,9 +372,10 @@ export function FaqExplorer({ faqs = [] }) {
                     {Icon && <Icon aria-hidden="true" className="size-3.5" />}
                     {c.name}
                     <span
-                      className={`rounded-full px-1.5 text-xs ${
-                        active ? "bg-primary-foreground/20" : "bg-muted"
-                      }`}
+                      className={cn(
+                        "rounded-full px-1.5 text-xs tabular-nums",
+                        active ? "bg-primary-foreground/20" : "bg-muted",
+                      )}
                     >
                       {c.count}
                     </span>
@@ -327,7 +393,7 @@ export function FaqExplorer({ faqs = [] }) {
               key={category}
               initial={reduce ? false : { opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
               className="overflow-hidden pt-3 text-sm text-muted-foreground"
             >
@@ -338,28 +404,32 @@ export function FaqExplorer({ faqs = [] }) {
       </div>
 
       {/* ---------- Result meta ---------- */}
-      <div
-        className="mt-5 flex flex-col gap-2 sm:mt-6 sm:flex-row sm:items-center sm:justify-between"
-        aria-live="polite"
-      >
-        <p className="text-sm text-muted-foreground">
+      <div className="mt-5 flex flex-col gap-2 sm:mt-6 sm:flex-row sm:items-center sm:justify-between">
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-sm text-muted-foreground"
+        >
           Showing{" "}
           <motion.span
             key={results.length}
             initial={reduce ? false : { opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-block font-semibold text-foreground"
+            className="inline-block font-semibold tabular-nums text-foreground"
           >
             {results.length}
           </motion.span>{" "}
-          of {items.length} questions
+          of <span className="tabular-nums">{items.length}</span> questions
         </p>
         <div className="flex items-center gap-4">
           {results.length > 1 && (
             <button
               type="button"
               onClick={toggleAll}
-              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+              className={cn(
+                "rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline",
+                FOCUS_RING,
+              )}
             >
               {allOpen ? "Collapse all" : "Expand all"}
             </button>
@@ -368,9 +438,12 @@ export function FaqExplorer({ faqs = [] }) {
             <button
               type="button"
               onClick={clearFilters}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline",
+                FOCUS_RING,
+              )}
             >
-              <FiX aria-hidden="true" className="size-3.5" />
+              <FiRotateCcw aria-hidden="true" className="size-3.5" />
               Clear filters
             </button>
           )}
@@ -395,31 +468,39 @@ export function FaqExplorer({ faqs = [] }) {
               const related = items
                 .filter((r) => r.category === f.category && r.id !== f.id)
                 .slice(0, 2);
+              const copiedHere = copied?.id === f.id ? copied : null;
 
               return (
                 <motion.div
                   key={f.id}
                   id={f.id}
-                  layout={!reduce}
+                  // "position" avoids stretching the content while an item
+                  // expands and its neighbours slide.
+                  layout={reduce ? false : "position"}
                   initial={reduce ? false : { opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
                   transition={{
                     duration: 0.25,
-                    delay: Math.min(i * 0.03, 0.2),
+                    delay: reduce ? 0 : Math.min(i * 0.03, 0.2),
                   }}
                   className="scroll-mt-24"
                 >
                   <AccordionItem
                     value={f.id}
-                    className="rounded-xl border bg-card px-3.5 transition-all duration-200 hover:border-primary/30 data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:px-5"
+                    className="rounded-xl border bg-card px-3.5 shadow-sm transition-[border-color,box-shadow] duration-200 hover:border-primary/30 data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:px-5"
                   >
-                    <AccordionTrigger className="gap-3 py-4 text-left text-[15px] leading-snug hover:no-underline sm:text-base">
+                    <AccordionTrigger
+                      className={cn(
+                        "group/trigger gap-3 py-4 text-left text-[15px] leading-snug hover:no-underline sm:text-base",
+                        FOCUS_RING,
+                      )}
+                    >
                       <span className="flex items-start gap-3">
-                        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary transition-colors group-hover/trigger:bg-primary group-hover/trigger:text-primary-foreground group-data-[state=open]/trigger:bg-primary group-data-[state=open]/trigger:text-primary-foreground">
                           <Icon aria-hidden="true" className="size-4" />
                         </span>
-                        <span>
+                        <span className="font-medium">
                           <Highlight text={f.q} query={query} />
                         </span>
                       </span>
@@ -437,22 +518,29 @@ export function FaqExplorer({ faqs = [] }) {
 
                       {/* Meta + actions */}
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                        <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground/70">
+                        <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground/70">
                           {f.category}
                         </span>
 
                         <button
                           type="button"
                           onClick={() => copyLink(f.id)}
-                          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                            FOCUS_RING,
+                          )}
                         >
-                          {copiedId === f.id ? (
+                          {copiedHere ? (
                             <>
                               <FiCheck
                                 aria-hidden="true"
                                 className="size-3.5 text-primary"
                               />
-                              Link copied
+                              <span role="status">
+                                {copiedHere.ok
+                                  ? "Link copied"
+                                  : "Link is in the address bar"}
+                              </span>
                             </>
                           ) : (
                             <>
@@ -481,7 +569,10 @@ export function FaqExplorer({ faqs = [] }) {
                                 onClick={() =>
                                   setVotes((v) => ({ ...v, [f.id]: "up" }))
                                 }
-                                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary",
+                                  FOCUS_RING,
+                                )}
                               >
                                 <FiThumbsUp
                                   aria-hidden="true"
@@ -495,7 +586,10 @@ export function FaqExplorer({ faqs = [] }) {
                                 onClick={() =>
                                   setVotes((v) => ({ ...v, [f.id]: "down" }))
                                 }
-                                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted",
+                                  FOCUS_RING,
+                                )}
                               >
                                 <FiThumbsDown
                                   aria-hidden="true"
@@ -507,6 +601,7 @@ export function FaqExplorer({ faqs = [] }) {
                           ) : (
                             <motion.p
                               key="thanks"
+                              role="status"
                               initial={reduce ? false : { opacity: 0, y: 6 }}
                               animate={{ opacity: 1, y: 0 }}
                               className="inline-flex flex-wrap items-center gap-1.5 text-foreground/80"
@@ -522,12 +617,31 @@ export function FaqExplorer({ faqs = [] }) {
                                   Sorry about that.{" "}
                                   <Link
                                     href="/contact"
-                                    className="font-medium text-primary underline-offset-4 hover:underline"
+                                    className={cn(
+                                      "rounded-sm font-medium text-primary underline-offset-4 hover:underline",
+                                      FOCUS_RING,
+                                    )}
                                   >
                                     Ask us directly
                                   </Link>
                                 </>
                               )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setVotes((v) => {
+                                    const next = { ...v };
+                                    delete next[f.id];
+                                    return next;
+                                  })
+                                }
+                                className={cn(
+                                  "ml-1 rounded-sm text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline",
+                                  FOCUS_RING,
+                                )}
+                              >
+                                Change answer
+                              </button>
                             </motion.p>
                           )}
                         </AnimatePresence>
@@ -535,8 +649,8 @@ export function FaqExplorer({ faqs = [] }) {
 
                       {/* Related questions */}
                       {related.length > 0 && (
-                        <div className="mt-4 rounded-lg bg-muted/50 p-3">
-                          <p className="mb-1.5 text-xs font-medium text-foreground/70">
+                        <div className="mt-4 rounded-lg border bg-muted/50 p-3">
+                          <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-foreground/70">
                             Related questions
                           </p>
                           <ul className="space-y-1">
@@ -545,11 +659,14 @@ export function FaqExplorer({ faqs = [] }) {
                                 <button
                                   type="button"
                                   onClick={() => openRelated(r.id)}
-                                  className="group/rel flex w-full items-start gap-2 text-left text-sm text-muted-foreground transition-colors hover:text-primary"
+                                  className={cn(
+                                    "group/rel flex w-full items-start gap-2 rounded-md text-left text-sm text-muted-foreground transition-colors hover:text-primary",
+                                    FOCUS_RING,
+                                  )}
                                 >
                                   <FiArrowRight
                                     aria-hidden="true"
-                                    className="mt-1 size-3.5 shrink-0 transition-transform group-hover/rel:translate-x-0.5"
+                                    className="mt-1 size-3.5 shrink-0 transition-transform motion-safe:group-hover/rel:translate-x-0.5"
                                   />
                                   <span>{r.q}</span>
                                 </button>
@@ -571,13 +688,13 @@ export function FaqExplorer({ faqs = [] }) {
           animate={{ opacity: 1, scale: 1 }}
           className="mt-5 rounded-2xl border border-dashed bg-card/50 p-6 text-center sm:p-10"
         >
-          <span className="mx-auto grid size-12 place-items-center rounded-xl bg-primary/10 text-primary">
+          <span className="mx-auto grid size-12 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
             <FiSearch aria-hidden="true" className="size-5" />
           </span>
-          <h3 className="mt-4 font-sans text-lg font-semibold">
+          <h3 className="mt-4 font-sans text-lg font-semibold tracking-tight">
             No questions match your search
           </h3>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+          <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
             Try different words or a shorter search, or send us your question
             and we will help.
           </p>
@@ -592,7 +709,10 @@ export function FaqExplorer({ faqs = [] }) {
                     setCategory("All");
                     setQuery(s);
                   }}
-                  className="rounded-full border bg-background px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                  className={cn(
+                    "rounded-full border bg-background px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary",
+                    FOCUS_RING,
+                  )}
                 >
                   {s}
                 </button>
@@ -604,8 +724,12 @@ export function FaqExplorer({ faqs = [] }) {
             <button
               type="button"
               onClick={clearFilters}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              className={cn(
+                "inline-flex items-center justify-center gap-2 rounded-lg border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted",
+                FOCUS_RING,
+              )}
             >
+              <FiRotateCcw aria-hidden="true" className="size-4" />
               Reset filters
             </button>
             <Link
@@ -625,17 +749,17 @@ export function FaqExplorer({ faqs = [] }) {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-60px" }}
         transition={{ duration: 0.4 }}
-        className="mt-10 flex flex-col items-start gap-4 rounded-2xl border bg-primary/5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+        className="mt-10 flex flex-col items-start gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
       >
         <div className="flex items-start gap-4">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
             <FiMessageSquare aria-hidden="true" className="size-5" />
           </span>
           <div>
-            <h3 className="font-sans text-base font-semibold sm:text-lg">
+            <h3 className="font-sans text-base font-semibold tracking-tight sm:text-lg">
               Still have a question?
             </h3>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
               Cannot find your answer here? Send us a message and we will get
               back to you.
             </p>
@@ -643,10 +767,16 @@ export function FaqExplorer({ faqs = [] }) {
         </div>
         <Link
           href="/contact"
-          className={`${buttonVariants({ variant: "default" })} w-full sm:w-auto`}
+          className={cn(
+            buttonVariants({ variant: "default" }),
+            "group w-full sm:w-auto",
+          )}
         >
           Contact us
-          <FiArrowRight aria-hidden="true" />
+          <FiArrowRight
+            aria-hidden="true"
+            className="transition-transform duration-300 motion-safe:group-hover:translate-x-0.5"
+          />
         </Link>
       </motion.div>
     </div>

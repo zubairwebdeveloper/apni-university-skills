@@ -1,4 +1,6 @@
 // components/shared/VideoPlayer.jsx: https only; embeds are allow-listed, everything else plays as <video>
+import { FiVideoOff } from "react-icons/fi";
+
 const YT = /^[\w-]{11}$/;
 
 function resolve(url) {
@@ -36,12 +38,13 @@ export function VideoPlayer({ url, title }) {
   const src = resolve(url);
   if (!src)
     return (
-      <div className="grid aspect-video place-items-center rounded-xl bg-muted text-sm text-muted-foreground">
-        Video unavailable
+      <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-muted text-muted-foreground">
+        <FiVideoOff aria-hidden="true" className="size-5" />
+        <span className="text-sm">Video unavailable</span>
       </div>
     );
   return (
-    <div className="aspect-video overflow-hidden rounded-xl bg-black">
+    <div className="aspect-video overflow-hidden rounded-xl bg-black shadow-sm ring-1 ring-border/50">
       {src.iframe ? (
         <iframe
           src={src.iframe}
@@ -63,4 +66,3 @@ export function VideoPlayer({ url, title }) {
     </div>
   );
 }
-

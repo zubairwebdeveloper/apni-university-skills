@@ -18,7 +18,6 @@ import {
 import { Container } from "@/components/ui/container";
 import { footerNav } from "@/config/site";
 import { AnimatedLogo } from "@/components/layout/AnimatedLogo";
-import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { FooterCtaButtons, FooterCtaText } from "./FooterClient";
 
 const DEFAULT_SITE_NAME = "Apni University";
@@ -391,7 +390,7 @@ export async function FooterView({
         </div>
       </Container>
 
-      <ScrollToTop />
+      
     </footer>
   );
 }

@@ -283,3 +283,18 @@ body::-webkit-scrollbar {
     }
   }
 }
+
+/* AI chat widget: ScrollToTop ke saath stack hota hai */
+.ai-chat-slot {
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transition: bottom 0.3s ease;
+}
+html[data-scrolltop="visible"] .ai-chat-slot {
+  /* 24px (scroll btn bottom) + 44px (btn size) + 12px (gap) */
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-chat-slot {
+    transition: none;
+  }
+}

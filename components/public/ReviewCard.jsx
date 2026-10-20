@@ -1,4 +1,3 @@
-// components/public/ReviewCard.jsx: denormalized studentName/courseTitle are stored on the review at creation
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
@@ -12,17 +11,17 @@ export function ReviewCard({ review: r }) {
 
   return (
     <motion.div
-      className="h-full"
+      className="h-full w-full"
       initial={reduceMotion ? false : { opacity: 0, y: 16 }}
       whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
     >
-      <Card className="group relative flex h-full flex-col gap-5 overflow-hidden border-border/60 p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-within:-translate-y-0.5 focus-within:border-primary/40 focus-within:shadow-lg">
+      <Card className="group relative flex h-full w-full flex-col gap-4 overflow-hidden border-border/60 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-within:-translate-y-0.5 focus-within:border-primary/40 focus-within:shadow-lg sm:gap-5 sm:p-6">
         {/* Decorative quote mark, purely visual */}
         <Quote
           aria-hidden="true"
-          className="pointer-events-none absolute -right-2 -top-2 size-20 text-primary/5 transition-colors duration-300 group-hover:text-primary/10"
+          className="pointer-events-none absolute -right-2 -top-2 size-14 text-primary/5 transition-colors duration-300 group-hover:text-primary/10 sm:size-20"
           strokeWidth={1}
         />
 
@@ -31,17 +30,17 @@ export function ReviewCard({ review: r }) {
         </div>
 
         {r.title && (
-          <h3 className="relative font-serif text-lg font-semibold leading-snug text-foreground">
+          <h3 className="relative font-serif text-base font-semibold leading-snug text-foreground sm:text-lg">
             {r.title}
           </h3>
         )}
 
-        <blockquote className="relative line-clamp-5 text-sm leading-relaxed text-muted-foreground">
+        <blockquote className="relative line-clamp-4 text-sm leading-relaxed text-muted-foreground sm:line-clamp-5">
           {r.comment}
         </blockquote>
 
-        <div className="relative mt-auto flex items-center gap-3 border-t border-border/60 pt-4">
-          <Avatar className="size-9 ring-1 ring-border">
+        <div className="relative mt-auto flex items-center gap-3 border-t border-border/60 pt-3 sm:pt-4">
+          <Avatar className="size-8 shrink-0 ring-1 ring-border sm:size-9">
             <AvatarImage src={r.studentPhotoURL} alt="" />
             <AvatarFallback className="text-xs font-medium">
               {r.studentName?.charAt(0)}

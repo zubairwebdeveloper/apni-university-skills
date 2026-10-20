@@ -70,7 +70,7 @@ function ReviewCard({ row }) {
   return (
     <Card
       onMouseMove={spot}
-      className="group relative overflow-hidden rounded-2xl border-border p-5 shadow-sm transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-6"
+      className="group relative overflow-hidden rounded-2xl border-border p-5 shadow-sm transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-6 w-100 text-wrap"
     >
       <span
         aria-hidden="true"
@@ -85,7 +85,7 @@ function ReviewCard({ row }) {
         className="absolute inset-y-0 left-0 w-1 bg-primary/25 transition-colors group-hover:bg-primary motion-reduce:transition-none"
       />
 
-      <div className="relative space-y-4 pl-2">
+      <div className="relative space-y-4 pl-2 overflow-hidden">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-start gap-2">

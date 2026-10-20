@@ -9,12 +9,14 @@ import { Footer } from "@/components/layout/Footer";
 import { Providers } from "@/components/layout/Providers";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { SiteBackground } from "@/components/layout/SiteBackground";
-
+import { AIChatWidget } from "@/components/ai-assistant";
+import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { settingsService } from "@/services/settingsService";
 
 import "./globals.css";
 import { SnakeScrollAuto } from "@/components/layout/SnakeScrollbar";
-
+import { ScrollProgress } from "@/components/layout/ScrollProgress";
+import { OfflineBanner } from "@/components/layout/OfflineBanner";
 // Fonts are loaded via a <link> tag below (browser-fetched at runtime,
 // cached by the CDN) instead of next/font/google, so the build never needs
 // to reach fonts.googleapis.com itself. Font families are mapped to
@@ -85,7 +87,14 @@ export async function generateMetadata() {
       description,
       images: settings?.ogImage ? [settings.ogImage] : undefined,
     },
-
+    keywords: settings?.seoKeywords || [
+      "technology courses",
+      "AI",
+      "practical skills",
+      "online learning",
+    ],
+    alternates: { canonical: "/" },
+    formatDetection: { telephone: false, email: false, address: false },
     robots: {
       index: true,
       follow: true,
@@ -103,19 +112,32 @@ export default async function RootLayout({ children }) {
     "Practical technology education.";
 
   // Structured data so search engines understand the site
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "EducationalOrganization",
-    name: siteName,
-    url: siteUrl,
-    description,
-    logo: absoluteUrl(settings?.logo),
-    email: settings?.contactEmail || undefined,
-    telephone: settings?.phone || undefined,
-    sameAs: Object.values(settings?.social ?? {}).filter(
-      (v) => typeof v === "string" && v.trim(),
-    ),
-  };
+   const jsonLd = {
+     "@context": "https://schema.org",
+     "@graph": [
+       {
+         "@type": "EducationalOrganization",
+         "@id": `${siteUrl}/#organization`,
+         name: siteName,
+         url: siteUrl,
+         description,
+         logo: absoluteUrl(settings?.logo),
+         email: settings?.contactEmail || undefined,
+         telephone: settings?.phone || undefined,
+         sameAs: Object.values(settings?.social ?? {}).filter(
+           (v) => typeof v === "string" && v.trim(),
+         ),
+       },
+       {
+         "@type": "WebSite",
+         "@id": `${siteUrl}/#website`,
+         url: siteUrl,
+         name: siteName,
+         publisher: { "@id": `${siteUrl}/#organization` },
+         inLanguage: "en",
+       },
+     ],
+   };
 
   return (
     <html
@@ -135,12 +157,9 @@ export default async function RootLayout({ children }) {
       <body className="relative flex min-h-dvh flex-col overflow-x-clip bg-background font-sans text-[15px] leading-relaxed text-foreground antialiased selection:bg-primary/20 selection:text-foreground sm:text-base lg:text-[17px] dark:selection:bg-primary/30">
         <Providers>
           <AuthProvider>
-            {/* Animated background behind the whole site */}
+            <ScrollProgress />
             <SiteBackground />
-
             <Navbar />
-
-            {/* Target of the "Skip to content" link in the Navbar */}
             <main
               id="main-content"
               tabIndex={-1}
@@ -150,9 +169,12 @@ export default async function RootLayout({ children }) {
             </main>
             <Footer />
 
-            {/* Ctrl/⌘ + K quick search */}
-            <CommandPalette />
+            {/* Dono ek stack mein: chat upar, scroll-to-top neeche */}
+            <AIChatWidget className="ai-chat-slot fixed  right-4 z-[9998]" />
+            <ScrollToTop bottom={24} />
 
+            <CommandPalette />
+            <OfflineBanner />
             <Toaster richColors closeButton position="top-right" />
           </AuthProvider>
         </Providers>

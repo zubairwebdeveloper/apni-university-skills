@@ -35,7 +35,7 @@ export function AIChatWidget() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="fixed bottom-24 right-8 sm:right-12 z-50 flex flex-col-reverse items-end gap-3 ">
+      <div className="fixed bottom-24 right-6 sm:right-10 z-50 flex flex-col-reverse items-end gap-3 ">
         <Button
           ref={launcherRef}
           type="button"

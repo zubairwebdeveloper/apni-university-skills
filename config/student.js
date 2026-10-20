@@ -10,6 +10,7 @@ import {
   FiTrendingUp,
   FiUser,
   FiBell,
+  FiCpu,
 } from "react-icons/fi";
 
 export const studentNav = [
@@ -23,5 +24,6 @@ export const studentNav = [
   { label: "Payments", href: "/student/payments", icon: FiCreditCard },
   { label: "Profile", href: "/student/profile", icon: FiUser },
   { label: "Settings", href: "/student/settings", icon: FiSettings },
+  { label: "AI Assistant", href: "/student/ai-assistant", icon: FiCpu },
 ];
 

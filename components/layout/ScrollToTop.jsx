@@ -108,7 +108,7 @@ export function ScrollToTop({ bottom = 24, threshold = 300 }) {
         style={{
           bottom: `calc(${bottom}px + env(safe-area-inset-bottom, 0px))`,
         }}
-        className={`group fixed right-8 z-[9997] flex size-13 sm:right-12 cursor-pointer items-center justify-center rounded-full border-[3px] border-white/30 bg-[#7B00F5] text-white shadow-lg shadow-[#7B00F5]/40 outline-none transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-1 hover:bg-[#6A00D6] hover:shadow-xl hover:shadow-[#7B00F5]/60 focus-visible:ring-2 focus-visible:ring-[#A855F7] focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-90 motion-reduce:transition-none sm:right-12 dark:bg-[#8B2CF5] dark:shadow-[#8B2CF5]/40 dark:hover:bg-[#A855F7] ${
+        className={`group fixed right-6 z-[9997] flex size-13  cursor-pointer items-center justify-center rounded-full border-[3px] border-white/30 bg-[#7B00F5] text-white shadow-lg shadow-[#7B00F5]/40 outline-none transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-1 hover:bg-[#6A00D6] hover:shadow-xl hover:shadow-[#7B00F5]/60 focus-visible:ring-2 focus-visible:ring-[#A855F7] focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-90 motion-reduce:transition-none sm:right-10 dark:bg-[#8B2CF5] dark:shadow-[#8B2CF5]/40 dark:hover:bg-[#A855F7] ${
           visible
             ? "translate-y-0 scale-100 opacity-100"
             : "pointer-events-none translate-y-4 scale-50 opacity-0"

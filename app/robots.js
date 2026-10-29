@@ -1,8 +1,11 @@
 // app/robots.js
+
+const base = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://apni-university-skills-lurc.vercel.app"
+).replace(/\/+$/, "");
+
 export default function robots() {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    "https://apni-university-skills-lurc.vercel.app/";
   return {
     rules: [
       {
@@ -23,4 +26,3 @@ export default function robots() {
     host: base,
   };
 }
-

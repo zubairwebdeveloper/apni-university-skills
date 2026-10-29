@@ -24,7 +24,10 @@ import { OfflineBanner } from "@/components/layout/OfflineBanner";
 const GOOGLE_FONTS_HREF =
   "https://fonts.googleapis.com/css2?family=DM+Sans:wght@100..1000&family=Source+Serif+4:opsz,wght@8..60,200..900&display=swap";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://apni-university-skills-lurc.vercel.app/";
+const siteUrl = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://apni-university-skills-lurc.vercel.app"
+).replace(/\/+$/, "");
 
 // One settings request per render, shared by metadata and the layout.
 const getSettings = cache(() => settingsService.getPublic());

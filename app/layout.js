@@ -17,6 +17,7 @@ import "./globals.css";
 import { SnakeScrollAuto } from "@/components/layout/SnakeScrollbar";
 import { ScrollProgress } from "@/components/layout/ScrollProgress";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
+import { Analytics } from "@vercel/analytics/next";
 // Fonts are loaded via a <link> tag below (browser-fetched at runtime,
 // cached by the CDN) instead of next/font/google, so the build never needs
 // to reach fonts.googleapis.com itself. Font families are mapped to
@@ -182,7 +183,7 @@ export default async function RootLayout({ children }) {
           </AuthProvider>
         </Providers>
         <SnakeScrollAuto />
-
+        <Analytics />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

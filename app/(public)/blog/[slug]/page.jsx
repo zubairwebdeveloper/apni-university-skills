@@ -47,7 +47,9 @@ const PANEL = "rounded-2xl border border-border bg-card p-5";
 
 const getPost = cache((slug) => blogService.getPostBySlug(slug));
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://apni-university-skills-lurc.vercel.app/";
 
 const iso = (ms) => (ms ? new Date(ms).toISOString() : undefined);
 

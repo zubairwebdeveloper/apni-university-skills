@@ -35,7 +35,8 @@ const sources = [
 
 export default async function sitemap() {
   const base = (
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://apni-university-skills-lurc.vercel.app/"
   ).replace(/\/$/, "");
 
   const dynamic = await Promise.all(

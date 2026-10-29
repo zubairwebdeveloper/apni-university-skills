@@ -54,7 +54,9 @@ export const revalidate = 300;
 
 // cache() dedupes the lookup between generateMetadata and the page
 const getCourse = cache((slug) => courseService.getCourseBySlug(slug));
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://apni-university-skills-lurc.vercel.app/";
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;

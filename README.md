@@ -242,7 +242,7 @@ STRIPE_WEBHOOK_SECRET=
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
 
 # App
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=https://apni-university-skills-lurc.vercel.app/
 ```
 
 > ⚠️ Variable names aapke code ke hisaab se different ho sakte hain. `.env.local` ko kabhi Git mein commit na karein.

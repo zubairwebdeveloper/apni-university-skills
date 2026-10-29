@@ -32,7 +32,9 @@ import { formatCompact } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 
 export const revalidate = 300;
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://apni-university-skills-lurc.vercel.app/";
 const getInstructor = cache((slug) =>
   instructorService.getInstructorBySlug(slug),
 );

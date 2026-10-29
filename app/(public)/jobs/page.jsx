@@ -39,7 +39,9 @@ import { parseJobFilters } from "@/lib/validations/listings";
 import { EMPLOYMENT_TYPES, EXPERIENCE_LEVELS } from "@/config/jobs";
 import { cn } from "@/lib/utils";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://apni-university-skills-lurc.vercel.app/";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const metadata = {

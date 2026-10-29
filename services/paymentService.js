@@ -8,7 +8,9 @@ import { courseService } from "@/services/courseService";
 import { enrollmentService } from "@/services/enrollmentService";
 import { couponService } from "@/services/couponService";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://apni-university-skills-lurc.vercel.app/";
 
 // Stripe wants the smallest currency unit (2-decimal currencies like USD/PKR).
 // If you sell in zero-decimal currencies (JPY etc.) handle that here.

@@ -1,6 +1,8 @@
 // app/robots.js
 export default function robots() {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const base =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://apni-university-skills-lurc.vercel.app/";
   return {
     rules: [
       {
